@@ -20,8 +20,9 @@ task files), read its code and `docs/decisions.md` and follow it.
   `src/runner/`.
 - **The engine is pure.** `src/engine/` takes state, orders, a time and a
   seeded RNG, and returns new state, results and Record events. No I/O, no
-  imports from outside `src/engine/`, no `Date.now()`, `new Date()` without
-  an argument, or `Math.random()`. Time and randomness are always passed in.
+  imports from outside `src/engine/` except `zod`, no `Date.now()`,
+  `new Date()` without an argument, or `Math.random()`. Time and randomness
+  are always passed in.
 - **One write path.** Every change to the world, free actions included, is
   an order applied by `submitOrders` in `src/game/`. The CLI, MCP tools, web
   forms and legacy systems all call it. Routes and tools parse input, call
@@ -71,8 +72,15 @@ task files), read its code and `docs/decisions.md` and follow it.
 
 ## Commands
 
-None yet. Phase 0 adds `npm run typecheck` and `npm test`; add each new
-command here and to the README as it lands.
+```bash
+npm install
+npm run typecheck
+npm test             # every tests/*.test.ts, one process each
+```
+
+Add each new command here and to the README as it lands. The rules schema
+is `src/engine/rules.ts`; a new key in `config/rules.yaml` needs a field
+there too, or the file won't load.
 
 ## Production
 

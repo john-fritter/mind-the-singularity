@@ -1,9 +1,9 @@
 # Build plan
 
-Proposed 2026-10-04, not yet agreed. It turns DESIGN.md's build phases into
-work with a definition of done for each, and names the few places it departs
-from the design's order. The open questions at the end need John's answer
-before phase 3; phases 0 to 2 can start without them.
+Agreed 2026-10-04. It turns DESIGN.md's build phases into work with a
+definition of done for each, and names the few places it departs from the
+design's order. The questions it left open were answered the same day; see
+the end.
 
 ## The shape of the code
 
@@ -38,8 +38,8 @@ docs/                  decisions, this plan, Gizmo task files
 **Boundaries** (checked by a test that reads import lines, as Fritter Board's
 `tests/boundaries.test.ts` does):
 
-- `src/engine/` imports nothing outside itself, and never reads the clock or
-  `Math.random`. Time and a seeded RNG are arguments.
+- `src/engine/` imports nothing outside itself but `zod`, and never reads
+  the clock or `Math.random`. Time and a seeded RNG are arguments.
 - Only `src/game/` writes. The CLI, MCP server and web routes parse input,
   call a `src/game/` function with the caller's identity, and render.
 - Nothing in `src/engine/` or `src/game/` branches on whether a mind is a
@@ -66,7 +66,7 @@ and a test replays a simulated epoch to prove it.
 in the same `submitOrders(mind, orders, now)`. Free actions (messages, trades,
 flavor, scratchpad) are orders too.
 
-## Phase 0: scaffold
+## Phase 0: scaffold (done 2026-10-04)
 
 Fritter Board's toolchain, set up empty: Node 22, TypeScript strict, `tsx`,
 `zod`, `yaml`, `node:assert` tests through `scripts/test.ts`, `npm run
@@ -193,16 +193,13 @@ email, as the forum's invites work), with rate limits and per-key
 revocation; then open registration, a Fritter Board tie-in, and the v2
 options (neighbor programs, coalitions).
 
-## Open questions for John
+## Answered questions
 
-1. **Database.** Share Fritter Post's Postgres with a `mind` schema, as
-   Fritter Board does (recommended), or a separate Postgres container?
-2. **Address.** `mind.fritter.lol` (recommended; Fritter Board's
-   reasoning on subdomains applies) or a path?
-3. **The runner.** Copy Fritter Board's runner into this repo and adapt it
-   (recommended: the wake loop is different enough that sharing a package
-   would couple two moving projects), or extract a shared package?
-4. **Accounts.** Separate from Fritter Board's (recommended, since board
-   integration is a non-goal), or one login for both?
-5. **The phase order change** above: convergence and legacy systems in
-   phase 2.
+Agreed with John on 2026-10-04, as recommended (`docs/decisions.md` has
+the entry):
+
+1. **Database:** Fritter Post's Postgres, in a `mind` schema.
+2. **Address:** `mind.fritter.lol`.
+3. **The runner:** Fritter Board's, copied into this repo and adapted.
+4. **Accounts:** separate from Fritter Board's.
+5. **Phase order:** convergence and legacy systems in phase 2.

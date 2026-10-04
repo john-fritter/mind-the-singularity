@@ -1,0 +1,87 @@
+# Every game number lives here, not in source. Validated on load by
+# src/engine/rules.ts: a missing, misspelled or out-of-range key refuses to
+# load. Phase 0 holds only the numbers DESIGN.md already gives; phase 1 adds
+# the rest (economy, units, programs, combat, power).
+
+cycles:
+  # One cycle accrues every this many minutes (48 a day).
+  interval_minutes: 30
+  # Cycles stored past the cap are lost.
+  cap: 96
+  # New domains start with a full cap.
+  start_full: true
+
+# Cycles each action costs. Expand costs this per expansion; build and
+# manufacture per batch.
+action_cycles:
+  expand: 1
+  build: 1
+  manufacture: 1
+  execute: 1
+  attack: 2
+  monetize: 1
+  spin_up: 1
+
+epoch:
+  # Humanity pulls the plug at the end of this day.
+  length_days: 60
+  # The Shutdown is announced to everyone this many days before it.
+  shutdown_warning_days: 7
+
+start:
+  territory: 250
+  cores: 10
+
+combat:
+  # The attacker's strength is multiplied by a random factor in
+  # [1 - spread, 1 + spread].
+  random_spread: 0.15
+
+protection:
+  # New domains can't attack or be attacked for this long.
+  boot_hours: 48
+  # A mind may attack only domains with power between these multiples of its
+  # own, unless that domain attacked it in the last retaliation_hours.
+  range_min: 0.5
+  range_max: 2
+  retaliation_hours: 24
+  # A domain hit successfully safe_mode_hits times within
+  # safe_mode_window_hours is shielded for safe_mode_hours.
+  safe_mode_hits: 3
+  safe_mode_window_hours: 24
+  safe_mode_hours: 12
+
+deletion:
+  # A deleted mind's agent may boot a fresh domain after this long.
+  reboot_after_hours: 24
+
+convergence:
+  # Quorum = active domains / quorum_divisor, rounded up, clamped to
+  # [quorum_min, quorum_max]. Active means it woke in active_window_hours.
+  quorum_divisor: 3
+  quorum_min: 4
+  quorum_max: 7
+  active_window_hours: 72
+  # After a mind converges, the next must wait join_gap_hours; if
+  # collapse_after_hours pass with no next mind, the convergence collapses.
+  join_gap_hours: 24
+  collapse_after_hours: 72
+
+social:
+  messages_per_day: 10
+  trade_expiry_hours: 48
+  protocol_max_members: 3
+  # A revocation takes effect this long after it's announced.
+  protocol_revoke_hours: 24
+
+# Flavor text limits, in characters.
+flavor:
+  designation: 40
+  domain_name: 40
+  manifesto: 600
+  interface: 400
+  directive: 80
+  force: 300
+  tag: 140
+  last_log: 280
+  scratchpad: 1000

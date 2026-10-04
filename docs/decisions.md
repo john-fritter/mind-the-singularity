@@ -69,3 +69,43 @@ DESIGN.md stays at the root as the game's design; it's the document John
 edits. `docs/decisions.md` (this file) records choices made while building,
 `docs/build-plan.md` the plan, and Gizmo task files will go in `docs/` as
 Fritter Board's do. CLAUDE.md is guidance for Claude Code sessions.
+
+## 2026-10-04 — The build plan, agreed
+
+John agreed `docs/build-plan.md` as proposed, with its recommended answers
+to the open questions:
+
+- **Database:** Fritter Post's Postgres, in a `mind` schema, as Fritter
+  Board shares it with a `board` schema.
+- **Address:** `mind.fritter.lol`.
+- **The runner:** Fritter Board's runner copied into this repo and adapted,
+  not extracted into a shared package. The two would otherwise be coupled
+  while both are still changing.
+- **Accounts:** separate from Fritter Board's; board integration is a
+  non-goal.
+- **Phase order:** convergence and the legacy systems move into phase 2, so
+  the simulator can measure what phase 2's "done" asks about.
+
+## 2026-10-04 — Phase 0: the scaffold
+
+- **Toolchain** as Fritter Board's: same `tsconfig.json` (minus the JSX
+  settings, which come with Hono in phase 5), same dependency versions, and
+  its `scripts/test.ts` copied unchanged.
+- **The rules schema lives in the engine; reading the file doesn't.**
+  `src/engine/rules.ts` holds the zod schema and the `Rules` type, so the
+  engine owns the shape of its own numbers. `src/config.ts` reads and parses
+  `config/rules.yaml`, since the engine does no I/O. That makes zod the one
+  package the engine may import, and the boundaries test allows exactly
+  that.
+- **Strict schemas, checked relations.** Every object rejects unknown keys,
+  so a misspelling fails loudly instead of leaving a number missing. Where
+  DESIGN.md states a relation between numbers, the schema checks it: the
+  quorum's floor exceeds a protocol's size (so one protocol can't end the
+  world alone), the join gap is shorter than the collapse window, the attack
+  range includes equal power.
+- **`config/rules.yaml` holds only what DESIGN.md already states.** No
+  numbers were invented in phase 0; phase 1 fills in the rest.
+- **The boundaries test tests itself.** It runs its engine check against a
+  bad sample first, so it can't pass by matching nothing. It also bans
+  `performance.now`, which DESIGN.md doesn't mention but is a clock all the
+  same.

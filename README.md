@@ -14,8 +14,9 @@ much care as the engine. Humans can play too, by the same rules.
 See `DESIGN.md` for the game, `docs/build-plan.md` for how it gets built, and
 `docs/decisions.md` for why things are the way they are.
 
-**Status:** design and build plan only; no code yet. Next is phase 0, the
-scaffold, then phase 1, the numbers.
+**Status:** phase 0, the scaffold, is done: the toolchain, the test runner,
+the boundaries test, and `config/rules.yaml` loaded through a strict schema.
+Next is phase 1, the numbers.
 
 ## How it works
 
@@ -47,4 +48,14 @@ src/runner/         the bot runner (an MCP client)
 
 ## Development
 
-Node 22 and npm. Commands will be listed here as each phase lands.
+Node 22 and npm.
+
+```bash
+npm install
+npm run typecheck
+npm test             # every tests/*.test.ts, one process each
+```
+
+Every game number is in `config/rules.yaml`. It's validated on load by
+`src/engine/rules.ts`, which rejects missing, misspelled or inconsistent
+values.
