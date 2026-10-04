@@ -48,6 +48,40 @@ function main() {
   rejects((d) => (d.epoch.shutdown_warning_days = 60), "shutdown_warning_days");
   rejects((d) => (d.social.protocol_max_members = 4), "protocol_max_members");
 
+  // Every id in src/engine/architectures.ts needs an entry, and no other.
+  rejects((d) => delete d.architectures.steward.programs.hardening, "hardening");
+  rejects((d) => delete d.architectures.oracle.deployments.ghosts, "ghosts");
+  rejects((d) => (d.architectures.oracle.deployments.wraiths = d.architectures.oracle.deployments.ghosts), "wraiths");
+  rejects((d) => delete d.buildings.lab, "lab");
+  rejects((d) => (d.start.buildings.castle = 1), "castle");
+  rejects((d) => delete d.hardware.walkers, "walkers");
+  rejects((d) => (d.architectures.steward.programs.hardening.duration.unit = "days"), "unit");
+  rejects((d) => (d.research.tier_by_kind.self = 4), "tier_by_kind");
+  rejects((d) => (d.research.cost_by_tier = [4000, 12000]), "cost_by_tier");
+  rejects((d) => (d.architectures.symbiote.programs.blight.capital_share = 1.5), "capital_share");
+
+  // The starting domain must be a legal domain.
+  rejects((d) => (d.start.buildings.core = 0), "at least one core");
+  rejects((d) => (d.start.territory = 50), "start has 80 buildings on 50 sectors");
+  rejects((d) => (d.start.users = 100000), "start users exceed");
+  rejects((d) => (d.start.compute = 100000), "start compute exceeds");
+  rejects((d) => (d.start.hardware.walkers = 1000), "start hardware exceeds");
+
+  // Numbers that must keep their order.
+  rejects((d) => (d.research.cost_by_tier = [4000, 3000, 30000]), "cost_by_tier must rise with tier");
+  rejects((d) => (d.programs.deploy.compute_by_tier = [500, 500, 3000]), "compute_by_tier must rise with tier");
+  rejects((d) => (d.capability.crash_min = 0.2), "crash_min must not exceed");
+  rejects((d) => (d.combat.winner_loss_max = 0.15), "winner_loss_max must be below loser_loss_base");
+  rejects((d) => (d.combat.lopsided_ratio = 1), "lopsided_ratio");
+  rejects((d) => (d.programs.singularity.cycles = 97), "the Singularity costs more cycles than the cap");
+
+  // Legacy systems.
+  rejects((d) => (d.legacy.systems[0].orders.expand = 0.5), "shares must add up to 1");
+  rejects((d) => (d.legacy.systems[1].designation = d.legacy.systems[0].designation), "legacy designations must be unique");
+  rejects((d) => (d.legacy.systems[0].designation = "X".repeat(41)), "longer than flavor.designation");
+  rejects((d) => (d.legacy.systems[0].architecture = "druid"), "architecture");
+  rejects((d) => (d.legacy.raid_every_hours_min = 100), "raid_every_hours_min");
+
   // The error names the source.
   assert.throws(() => parseRules("cycles: {}", "test.yaml"), /test\.yaml is invalid/);
 }

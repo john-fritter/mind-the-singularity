@@ -109,3 +109,81 @@ to the open questions:
   bad sample first, so it can't pass by matching nothing. It also bans
   `performance.now`, which DESIGN.md doesn't mention but is a clock all the
   same.
+
+## 2026-10-04 — Phase 1: the numbers
+
+John agreed the phase 1 proposal and its recommendations. Every number
+DESIGN.md left open is now in `config/rules.yaml`, and each formula is a
+pure function in `src/engine/` (`economy.ts`, `units.ts`, `programs.ts`,
+`combat.ts`, `power.ts`, `convergence.ts`) whose comment names the keys it
+reads. Phase 2 builds the engine on these functions rather than writing
+its own.
+
+**Decided with John:**
+
+- **The opposing-architecture bonus is the attacker's.** An attacker's
+  strength is multiplied by `1 + combat.opposing_attack_bonus` (+10%) when
+  the defender is opposite it on the wheel. A symmetric damage bonus would
+  have made fights between opposites bloodier, which discourages them;
+  DESIGN.md wants opposites to be natural enemies.
+- **Each self program says what its duration counts.** Abundance Protocol
+  and Overclock count cycles the caster spends; Hardening and False
+  Signature count hours. With real time, an economy or attack buff could be
+  run once and stacked under a whole 96-cycle batch spent in one moment.
+  Defensive ones count hours because they matter while the mind sleeps.
+- **Building cost rises with territory:** base ×
+  `(1 + territory / build.cost_territory_scale)`, as in Archmage. Without
+  it, capital stopped mattering once a domain was big enough.
+
+**Smaller calls, made here:**
+
+- **Ids in code, names and numbers in config.** `src/engine/architectures.ts`
+  fixes the ids of architectures, buildings, units and programs, the wheel,
+  and which deployments and programs each architecture has. The schema
+  requires a config entry for every id and rejects any other. Display names
+  are `name` fields in the config, so the placeholder names can change
+  without code. Each of the 15 non-deploy architecture programs has its own
+  strict schema, since phase 2 writes code for each effect anyway.
+- **A deployment's program has the deployment's id**, and deploy programs'
+  compute and unit counts are set by tier (`programs.deploy`); the units'
+  stats are per deployment.
+- **Tiers:** deployments by their column in DESIGN.md; Probe and self
+  programs tier 1, battle tier 2, hostile tier 3 (`research.tier_by_kind`).
+  The Singularity has its own research cost and never crashes
+  (`programs.singularity.can_crash: false`).
+- **Everyone starts with no programs**, so capability starts at 0. The first
+  program comes around day 4, after the boot period.
+- **Capability scaling caps shares at 1.** Effect sizes are multiplied by
+  `1 + 0.1 × capability`; a share or chance never passes 1.
+- **Probe isn't hostile:** firewalls don't block it and it isn't an act of
+  war.
+- **The hostile-program cap counts every sender together** against one
+  target per day.
+- **A tie goes to the defender.**
+- **Conquered land arrives open.** The defender's buildings on it are
+  destroyed in proportion, cores excepted; only a lopsided win (strength
+  ratio ≥ 1.5) destroys a core. With 10 starting cores, the boot period and
+  safe mode, the earliest possible deletion is days away.
+- **Hardware upkeep is the main capital sink**, as gold upkeep is in
+  Archmage: housing is generous (`manufacture.housing_per_factory`) and
+  upkeep high enough that a domain's army is bounded by its income.
+- **Rounding:** formulas that return counts (sectors, buildings, units)
+  return integers; amounts of capital, compute, users and research come
+  back exact and the engine rounds down where it writes state; costs round
+  up.
+- **Legacy systems are ordinary domains with a fixed order mix**: the
+  starting domain scaled up or down, spending `cycles_per_day` cycles a day
+  in their `orders`, `buildings` and `hardware` mixes, never researching,
+  not counted toward the quorum. That keeps them on the one write path.
+- **`start.cores` became `start.buildings.core`**, since a core is a
+  building.
+
+**Calibration.** The numbers were fitted to the day-12 example brief in
+DESIGN.md and checked with `npm run curves`, which prints the curves and
+a crude solo projection. The first draft let a balanced player learn all
+eight programs by day 17 and pile up millions of unspendable capital. So
+research costs went up 2.5×, capital per user went down, and hardware
+upkeep and housing went up. The projection now reaches about 900 sectors
+and capability 4 by day 12, and the full research path around day 39 for a
+player with a fifth of its buildings in labs. That fits "a Singularity in
+some epochs, not most", but it is a guess for the simulator to test.

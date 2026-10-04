@@ -75,7 +75,7 @@ validated by a zod schema.
 
 **Done when** `npm run typecheck` and `npm test` pass on an empty project.
 
-## Phase 1: numbers
+## Phase 1: numbers (done 2026-10-04)
 
 Every cost, stat, rate and formula constant from the design goes into
 `config/rules.yaml`, with each formula written once in `src/engine/` and
@@ -98,6 +98,9 @@ generated from this file later, so the rules text can't drift from the code.
 
 **Done when** the config validates and every DESIGN.md placeholder has a
 number. The numbers are first guesses; phase 2 tunes them.
+
+`npm run curves` prints the main curves and a crude solo projection, for
+eyeballing a change to the numbers until the simulator exists.
 
 ## Phase 2: engine, command line, scripted players
 

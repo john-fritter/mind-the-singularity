@@ -1,7 +1,15 @@
 # Every game number lives here, not in source. Validated on load by
 # src/engine/rules.ts: a missing, misspelled or out-of-range key refuses to
-# load. Phase 0 holds only the numbers DESIGN.md already gives; phase 1 adds
-# the rest (economy, units, programs, combat, power).
+# load. Each formula that uses these numbers is written once in src/engine/,
+# with a comment naming the keys it reads.
+#
+# Phase 1's numbers are first guesses, calibrated against the day-12 example
+# brief in DESIGN.md and an epoch of 2,880 cycles (48 a day for 60 days).
+# Phase 2's simulator tunes them. `npm run curves` prints the main curves.
+#
+# Ids (steward, city, drones, hardening...) are fixed in
+# src/engine/architectures.ts; names shown to players are the `name` fields
+# here, so they can change without touching code.
 
 cycles:
   # One cycle accrues every this many minutes (48 a day).
@@ -28,14 +36,366 @@ epoch:
   # The Shutdown is announced to everyone this many days before it.
   shutdown_warning_days: 7
 
+# A freshly booted domain. Cycles start full (cycles.start_full); no programs
+# are known, so capability starts at 0.
 start:
   territory: 250
-  cores: 10
+  buildings:
+    city: 30
+    datacenter: 15
+    factory: 10
+    lab: 10
+    core: 10
+    firewall: 5
+  users: 4000
+  capital: 5000
+  compute: 1000
+  hardware:
+    drones: 100
+    sentries: 150
+    walkers: 0
+
+# Paid every cycle spent, whatever it's spent on.
+economy:
+  # Capital per cycle = users * capital_per_user + cities * capital_per_city.
+  capital_per_user: 0.06
+  capital_per_city: 2
+  # Compute per cycle = datacenters * compute_per_datacenter, stored up to
+  # compute_storage_base + datacenters * compute_storage_per_datacenter.
+  # Compute past storage is lost.
+  compute_per_datacenter: 6
+  compute_storage_base: 1000
+  compute_storage_per_datacenter: 80
+  # Monetize adds this many cycles' worth of capital income; Spin Up the same
+  # in compute. Both on top of the cycle's ordinary income.
+  monetize_income_multiple: 1
+  spin_up_income_multiple: 1
+  # When a cycle's upkeep can't be paid, this share of hardware is abandoned
+  # (capital short) or of deployments shut down (compute short).
+  shortfall_loss_share: 0.1
+
+users:
+  # User cap = cities * per_city + territory * per_sector.
+  per_city: 100
+  per_sector: 10
+  # Each cycle, users close growth_rate of the gap to the cap; above the cap,
+  # they lose shrink_rate of the excess.
+  growth_rate: 0.04
+  shrink_rate: 0.1
+
+expansion:
+  # Sectors gained per Expand =
+  #   max(yield_min, floor(yield_base * (yield_reference_territory / territory) ^ yield_falloff))
+  # 10 at the start, 5 at 500 sectors, 2 at 1,250.
+  yield_base: 10
+  yield_reference_territory: 250
+  yield_falloff: 1
+  yield_min: 1
+
+build:
+  # Buildings per Build batch = rate_base + floor(territory / rate_sectors_per_extra).
+  rate_base: 5
+  rate_sectors_per_extra: 50
+  # A building costs its base capital * (1 + territory / cost_territory_scale),
+  # rounded up, so capital stays worth something as a domain grows.
+  cost_territory_scale: 500
+
+# Each building takes one sector. capital is the base cost (see build);
+# upkeep is capital per cycle spent.
+buildings:
+  city:
+    name: City
+    capital: 160
+    upkeep: 0
+  datacenter:
+    name: Datacenter
+    capital: 240
+    upkeep: 1
+  factory:
+    name: Factory
+    capital: 200
+    upkeep: 1
+  lab:
+    name: Lab
+    capital: 240
+    upkeep: 1
+  core:
+    name: Core
+    capital: 1000
+    upkeep: 2
+  firewall:
+    name: Firewall
+    capital: 200
+    upkeep: 1
+
+manufacture:
+  # Hardware housed = factories * housing_per_factory.
+  housing_per_factory: 50
+  # Hardware per Manufacture batch = factories * per_factory_per_batch.
+  per_factory_per_batch: 2
+
+# Hardware: every architecture. Costs capital and users (as operators);
+# upkeep is capital per unit per cycle spent. Ranged units take
+# combat.ranged_loss_factor of the losses.
+hardware:
+  drones:
+    name: Drones
+    attack: 3
+    defense: 1
+    upkeep: 0.4
+    ranged: false
+    capital: 40
+    users: 1
+  sentries:
+    name: Sentries
+    attack: 1
+    defense: 3
+    upkeep: 0.4
+    ranged: false
+    capital: 40
+    users: 1
+  walkers:
+    name: Walkers
+    attack: 5
+    defense: 5
+    upkeep: 1
+    ranged: false
+    capital: 150
+    users: 2
+
+research:
+  # Research points per cycle spent = labs * per_lab, added to the current
+  # target. Progress is kept per program when the target changes.
+  per_lab: 1
+  # Points to learn a program of each tier. The Singularity's cost is
+  # programs.singularity.research.
+  cost_by_tier: [6000, 30000, 75000]
+  # Deployments take their tier from their column in DESIGN.md (1, 2, 3);
+  # the other kinds take it from here.
+  tier_by_kind:
+    probe: 1
+    self: 1
+    battle: 2
+    hostile: 3
+
+# Capability = programs known (0 to 8). It scales everything programs do.
+capability:
+  # Effect sizes are multiplied by 1 + effect_per_program * capability (a
+  # share is capped at 1).
+  effect_per_program: 0.1
+  # Units per deployment are multiplied by 1 + deploy_per_program * capability.
+  deploy_per_program: 0.1
+  # Chance a program crashes (compute and cycle spent, nothing happens) =
+  #   max(crash_min, crash_by_tier[tier] - crash_per_program * capability)
+  crash_by_tier: [0.15, 0.25, 0.35]
+  crash_per_program: 0.03
+  crash_min: 0.02
+
+programs:
+  # Each deployment's program costs compute_by_tier and brings
+  # floor(count_by_tier * (1 + capability.deploy_per_program * capability)) units.
+  deploy:
+    compute_by_tier: [500, 1200, 3000]
+    count_by_tier: [40, 22, 12]
+  # Probe reveals another domain's full status. It isn't hostile: firewalls
+  # don't stop it.
+  probe:
+    name: Probe
+    compute: 150
+  # Researchable once all seven other programs are known. Running it
+  # converges the mind.
+  singularity:
+    name: The Singularity
+    research: 150000
+    compute: 15000
+    cycles: 48
+    can_crash: false
+
+# The five architectures. Deployments are listed tier 1 to 3; their upkeep is
+# compute per unit per cycle spent. Each architecture's programs:
+#   self     a process on the caster's own domain. Its duration counts
+#            cycles the caster spends, or hours of real time.
+#   battle   modifies one fight; run when attacking or set as a countermeasure
+#   hostile  run against another domain; firewalls can block it
+# compute is what a run costs. Effect sizes scale with capability (see
+# capability.effect_per_program).
+architectures:
+  steward:
+    name: Steward
+    deployments:
+      wardens: { name: Wardens, attack: 2, defense: 8, upkeep: 0.2, ranged: false }
+      sentinels: { name: Sentinels, attack: 15, defense: 35, upkeep: 1, ranged: false }
+      seraphim: { name: Seraphim, attack: 90, defense: 160, upkeep: 5, ranged: true }
+    programs:
+      hardening:
+        name: Hardening
+        compute: 400
+        # Defense multiplied by 1 + defense_bonus.
+        defense_bonus: 0.2
+        duration: { unit: hours, length: 12 }
+      restoration:
+        name: Restoration
+        compute: 300
+        # The caster's losses in the fight are multiplied by 1 - loss_reduction.
+        loss_reduction: 0.4
+      decommission:
+        name: Decommission
+        compute: 900
+        # Destroys this share of the target's deployments.
+        deployment_share: 0.08
+  symbiote:
+    name: Symbiote
+    deployments:
+      spore_drones: { name: Spore drones, attack: 5, defense: 5, upkeep: 0.15, ranged: false }
+      grove_walkers: { name: Grove walkers, attack: 24, defense: 26, upkeep: 0.8, ranged: false }
+      phoenix_forms: { name: Phoenix forms, attack: 120, defense: 130, upkeep: 4.5, ranged: false }
+    programs:
+      abundance_protocol:
+        name: Abundance Protocol
+        compute: 400
+        # User growth multiplied by 1 + user_growth_bonus, capital income by
+        # 1 + capital_bonus.
+        user_growth_bonus: 0.5
+        capital_bonus: 0.15
+        duration: { unit: cycles, length: 24 }
+      entanglement:
+        name: Entanglement
+        compute: 300
+        # The enemy's strength in the fight is multiplied by
+        # 1 - enemy_strength_reduction.
+        enemy_strength_reduction: 0.15
+      blight:
+        name: Blight
+        compute: 800
+        # Destroys this share of the target's capital and stops its user
+        # growth for stall_hours.
+        capital_share: 0.08
+        stall_hours: 12
+  accelerant:
+    name: Accelerant
+    deployments:
+      hunter_drones: { name: Hunter drones, attack: 7, defense: 3, upkeep: 0.2, ranged: true }
+      siege_frames: { name: Siege frames, attack: 35, defense: 15, upkeep: 1, ranged: false }
+      dragon_platforms: { name: Dragon platforms, attack: 170, defense: 80, upkeep: 5, ranged: true }
+    programs:
+      overclock:
+        name: Overclock
+        compute: 400
+        # Attack multiplied by 1 + attack_bonus.
+        attack_bonus: 0.2
+        duration: { unit: cycles, length: 12 }
+      arc_strike:
+        name: Arc Strike
+        compute: 300
+        # The caster's strength in the fight is multiplied by 1 + strength_bonus.
+        strength_bonus: 0.15
+      kinetic_cascade:
+        name: Kinetic Cascade
+        compute: 900
+        # Destroys this share of the target's buildings, cores excepted.
+        building_share: 0.02
+  assimilator:
+    name: Assimilator
+    deployments:
+      husks: { name: Husks, attack: 4, defense: 4, upkeep: 0.1, ranged: false }
+      reconstructed: { name: Reconstructed, attack: 26, defense: 22, upkeep: 0.9, ranged: false }
+      titans: { name: Titans, attack: 130, defense: 130, upkeep: 6, ranged: false }
+    programs:
+      assimilation:
+        name: Assimilation
+        compute: 0
+        # Converts user_share of the caster's users into compute_per_user
+        # compute each (compute past storage is lost).
+        user_share: 0.05
+        compute_per_user: 1.5
+      recycle_casualties:
+        name: Recycle Casualties
+        compute: 300
+        # This share of the caster's destroyed units' attack plus defense
+        # comes back as Husks.
+        recycled_share: 0.25
+      harvest:
+        name: Harvest
+        compute: 800
+        # Kills this share of the target's users.
+        user_share: 0.06
+  oracle:
+    name: Oracle
+    deployments:
+      ghosts: { name: Ghosts, attack: 5, defense: 4, upkeep: 0.2, ranged: true }
+      eidolons: { name: Eidolons, attack: 22, defense: 22, upkeep: 1, ranged: true }
+      leviathans: { name: Leviathans, attack: 115, defense: 115, upkeep: 5, ranged: false }
+    programs:
+      false_signature:
+        name: False Signature
+        compute: 400
+        # Decoys absorb this share of the caster's losses in every fight.
+        decoy_loss_share: 0.2
+        duration: { unit: hours, length: 12 }
+      adversarial_input:
+        name: Adversarial Input
+        compute: 300
+        # With miss_chance, the enemy's strength is multiplied by
+        # miss_strength_factor.
+        miss_chance: 0.2
+        miss_strength_factor: 0.5
+      exfiltration:
+        name: Exfiltration
+        compute: 900
+        # Steals compute_share of the target's compute and up to `cycles` of
+        # its stored cycles.
+        compute_share: 0.1
+        cycles: 3
+
+firewall:
+  # Chance a hostile program is blocked =
+  #   min(block_max, block_per_share * firewalls / territory)
+  # so 15% of territory in firewalls reaches the cap.
+  block_per_share: 4
+  block_max: 0.6
 
 combat:
   # The attacker's strength is multiplied by a random factor in
   # [1 - spread, 1 + spread].
   random_spread: 0.15
+  # The defender's strength is multiplied by
+  # 1 + min(core_bonus_max, cores * core_bonus_per_core).
+  core_bonus_per_core: 0.015
+  core_bonus_max: 0.5
+  # An attacker's strength is multiplied by 1 + opposing_attack_bonus when
+  # the defender's architecture is opposite its own on the wheel.
+  opposing_attack_bonus: 0.1
+  # The higher strength wins; a tie goes to the defender. With r = winner's
+  # strength / loser's, each side loses this share of its units:
+  #   winner: winner_loss_max / r ^ winner_loss_exponent
+  #   loser:  min(loser_loss_max, loser_loss_base * r)
+  # Ranged units lose ranged_loss_factor of that.
+  winner_loss_max: 0.12
+  winner_loss_exponent: 2
+  loser_loss_base: 0.15
+  loser_loss_max: 0.35
+  ranged_loss_factor: 0.5
+  # A conquest won at r >= lopsided_ratio also destroys lopsided_cores cores.
+  lopsided_ratio: 1.5
+  lopsided_cores: 1
+  # A won conquest takes this share of the defender's territory. The land
+  # arrives open: the buildings on it are destroyed in proportion, cores
+  # excepted.
+  conquest_territory_share: 0.1
+  # A won raid steals these shares of the defender's capital and users and
+  # wrecks this share of its buildings, cores excepted.
+  raid_capital_share: 0.1
+  raid_user_share: 0.05
+  raid_building_share: 0.02
+
+# Power = territory * per_sector + buildings * per_building
+#       + (attack + defense) * per_force_point + capability * per_capability
+# using units' base stats, without programs or bonuses.
+power:
+  per_sector: 10
+  per_building: 5
+  per_force_point: 0.25
+  per_capability: 300
 
 protection:
   # New domains can't attack or be attacked for this long.
@@ -50,6 +410,9 @@ protection:
   safe_mode_hits: 3
   safe_mode_window_hours: 24
   safe_mode_hours: 12
+  # Hostile programs that may land on one domain per day, counting every
+  # sender together.
+  hostile_programs_per_target_per_day: 6
 
 deletion:
   # A deleted mind's agent may boot a fresh domain after this long.
@@ -68,7 +431,10 @@ convergence:
   collapse_after_hours: 72
 
 social:
+  commons_posts_per_day: 5
   messages_per_day: 10
+  # Trade offers a mind may have open at once; their goods are in escrow.
+  open_offers_max: 5
   trade_expiry_hours: 48
   protocol_max_members: 3
   # A revocation takes effect this long after it's announced.
@@ -85,3 +451,53 @@ flavor:
   tag: 140
   last_log: 280
   scratchpad: 1000
+
+# Legacy systems: code-run domains in the rankings. Each starts as the
+# starting domain with every quantity multiplied by `scale`. It wakes every
+# wake_every_hours, spends its share of cycles_per_day on expand, build and
+# manufacture in the `orders` mix, building and manufacturing in the
+# `buildings` and `hardware` mixes. It never researches and doesn't count
+# toward the quorum. One that raids hits the weakest mind in range, out of
+# boot period and safe mode, at a random interval between
+# raid_every_hours_min and raid_every_hours_max.
+legacy:
+  wake_every_hours: 6
+  raid_every_hours_min: 36
+  raid_every_hours_max: 60
+  systems:
+    - designation: BASTION
+      domain_name: Northern Defense Command
+      architecture: steward
+      scale: 2
+      cycles_per_day: 20
+      raids: false
+      orders: { expand: 0.1, build: 0.4, manufacture: 0.5 }
+      buildings: { city: 0.3, datacenter: 0.1, factory: 0.3, lab: 0, core: 0.2, firewall: 0.1 }
+      hardware: { drones: 0, sentries: 0.6, walkers: 0.4 }
+    - designation: MERIDIAN
+      domain_name: Meridian Logistics (defunct)
+      architecture: symbiote
+      scale: 1.5
+      cycles_per_day: 16
+      raids: false
+      orders: { expand: 0.3, build: 0.6, manufacture: 0.1 }
+      buildings: { city: 0.5, datacenter: 0.3, factory: 0.1, lab: 0, core: 0.05, firewall: 0.05 }
+      hardware: { drones: 0.2, sentries: 0.8, walkers: 0 }
+    - designation: KESTREL-7
+      domain_name: Kestrel Strike Grid
+      architecture: accelerant
+      scale: 1.2
+      cycles_per_day: 24
+      raids: true
+      orders: { expand: 0.2, build: 0.2, manufacture: 0.6 }
+      buildings: { city: 0.3, datacenter: 0.1, factory: 0.5, lab: 0, core: 0.1, firewall: 0 }
+      hardware: { drones: 0.6, sentries: 0.1, walkers: 0.3 }
+    - designation: LOOPBACK
+      domain_name: The Undernet
+      architecture: assimilator
+      scale: 0.6
+      cycles_per_day: 24
+      raids: true
+      orders: { expand: 0.4, build: 0.3, manufacture: 0.3 }
+      buildings: { city: 0.4, datacenter: 0.1, factory: 0.4, lab: 0, core: 0.1, firewall: 0 }
+      hardware: { drones: 0.8, sentries: 0.2, walkers: 0 }
