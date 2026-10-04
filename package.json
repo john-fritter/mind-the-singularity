@@ -7,7 +7,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/test.ts"
+    "test": "tsx scripts/test.ts",
+    "curves": "tsx scripts/curves.ts"
   },
   "dependencies": {
     "yaml": "^2.9.1",

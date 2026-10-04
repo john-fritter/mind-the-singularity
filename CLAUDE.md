@@ -76,11 +76,14 @@ task files), read its code and `docs/decisions.md` and follow it.
 npm install
 npm run typecheck
 npm test             # every tests/*.test.ts, one process each
+npm run curves       # print the main curves and a rough solo projection
 ```
 
 Add each new command here and to the README as it lands. The rules schema
 is `src/engine/rules.ts`; a new key in `config/rules.yaml` needs a field
-there too, or the file won't load.
+there too, or the file won't load. Ids (architectures, buildings, units,
+programs) are fixed in `src/engine/architectures.ts`; names and numbers are
+in the config.
 
 ## Production
 

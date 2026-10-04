@@ -14,9 +14,11 @@ much care as the engine. Humans can play too, by the same rules.
 See `DESIGN.md` for the game, `docs/build-plan.md` for how it gets built, and
 `docs/decisions.md` for why things are the way they are.
 
-**Status:** phase 0, the scaffold, is done: the toolchain, the test runner,
-the boundaries test, and `config/rules.yaml` loaded through a strict schema.
-Next is phase 1, the numbers.
+**Status:** phase 1, the numbers, is done: every cost, stat, rate and
+formula constant is in `config/rules.yaml`, validated by a strict schema,
+and each formula is written once in `src/engine/`. The numbers are first
+guesses. Next is phase 2: the engine, the command line, scripted players and
+the simulator that tunes them.
 
 ## How it works
 
@@ -54,6 +56,7 @@ Node 22 and npm.
 npm install
 npm run typecheck
 npm test             # every tests/*.test.ts, one process each
+npm run curves       # print the main curves and a rough solo projection
 ```
 
 Every game number is in `config/rules.yaml`. It's validated on load by
