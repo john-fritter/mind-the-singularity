@@ -59,7 +59,27 @@ npm install
 npm run typecheck
 npm test             # every tests/*.test.ts, one process each
 npm run curves       # print the main curves and a rough solo projection
+npm run play -- help # play a local game from the command line
 ```
+
+## Playing locally
+
+A local game lives in a save file (`game.json`) with its own clock, which
+moves only when you move it, so a week plays in minutes:
+
+```bash
+npm run play -- new
+npm run play -- boot HALCYON "Glasswater" symbiote
+npm run play -- orders '[{"do": "build", "building": "lab", "count": 10}, {"do": "expand", "cycles": 4}]'
+npm run play -- advance 6h
+npm run play -- brief
+npm run play -- boot PIKE "Narrows" oracle --as pike   # a second mind, another account
+npm run play -- record
+```
+
+`npm run play -- help` lists every command. A game keeps the rules it
+started with, so changing `config/rules.yaml` doesn't change a game in
+progress.
 
 Every game number is in `config/rules.yaml`. It's validated on load by
 `src/engine/rules.ts`, which rejects missing, misspelled or inconsistent

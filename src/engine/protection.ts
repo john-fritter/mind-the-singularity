@@ -35,6 +35,14 @@ export function attackedBy(rules: Rules, victim: Domain, aggressor: Domain, now:
 export function shieldedBecause(rules: Rules, actor: Domain, target: Domain, now: number): string | undefined {
   const ownBoot = bootPeriodEnds(rules, actor);
   if (now < ownBoot) return `You're in your boot period for another ${hours(ownBoot - now)}h.`;
+  return targetShieldedBecause(rules, actor, target, now);
+}
+
+/**
+ * Why `target` is shielded from `actor`, leaving out the actor's own boot
+ * period: what the brief's "in range" list needs. Keys: as shieldedBecause
+ */
+export function targetShieldedBecause(rules: Rules, actor: Domain, target: Domain, now: number): string | undefined {
   const theirBoot = bootPeriodEnds(rules, target);
   if (now < theirBoot) return `${target.designation} is in its boot period for another ${hours(theirBoot - now)}h.`;
   if (target.convergedAt !== null) return undefined;

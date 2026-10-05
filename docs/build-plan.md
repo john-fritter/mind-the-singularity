@@ -160,7 +160,7 @@ read functions in `src/game/`, the in-memory store with a JSON save file,
 the orders log, and the CLI (boot, brief data, orders, view domains and the
 Record, `--at` and `--advance`). *Done when* the replay test rebuilds a
 game from its start and orders log, and John can play a local game from
-the CLI.
+the CLI. (Done 2026-10-05.)
 
 **2d: scripted players and the legacy systems.** Random, builder, raider,
 turtle and converger, and the legacy systems, each seeing only the brief's

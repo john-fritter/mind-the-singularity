@@ -327,3 +327,73 @@ in `config/rules.yaml` changed.
 - **The Shutdown and its warning are timers** set when the world is created,
   so `createWorld` now takes the rules. An ended epoch clears its timers and
   refuses every order and boot.
+
+## 2026-10-05 — Phase 2c: the game layer, the store, the CLI
+
+John agreed the 2c proposal and its calls. `src/game/` has the one write
+path (`bootMind`, `submitOrders`) and the reads (`getBrief`, `view`);
+`src/store/` the `WorldStore` interface, the memory store and the save
+file; `src/cli/` the CLI (`npm run play`). No numbers in
+`config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **The game layer takes an account, not a domain.** Every call takes
+  `{ account }` and finds that account's mind, so a front end can't name
+  someone else's. Ownership (`owners`) lives in the game, beside the
+  world; the engine stays account-blind.
+- **One live mind per account.** After deletion the same account may boot
+  again once `deletion.reboot_after_hours` has passed; another account may
+  take the freed designation on the engine's terms.
+- **Boot is the one write that isn't an order.** It's its own MCP tool in
+  DESIGN.md, so it stays `bootMind`, but goes through the same lock, log and
+  save as `submitOrders`.
+- **An epoch keeps the rules it was created with.** They're copied into the
+  game at creation, like the seed, so replay is exact and a local game
+  doesn't change under its players while `config/rules.yaml` is tuned. The
+  CLI notes when the file has moved on.
+- **The log holds every boot and orders call**, with its time, account,
+  raw input, results and the sequence number it ended on. Settles aren't
+  logged: replay is `createWorld`, each entry, then a settle to the moment
+  the world was saved at. Refused calls (no mind, time before the clock)
+  change nothing and aren't logged.
+- **Reads settle a copy and save nothing.** The next write settles to the
+  same result under the same sequence numbers, which a test checks.
+- **Brief data, not text.** `getBrief` returns structured data; Phase 3
+  writes the text, 2d's players read the data. "Since last wake" is since
+  the mind's last orders, newest `brief.events` kept.
+- **The CLI's game has its own clock**, stored in the save, moved only by
+  `advance`, `--at` or `--advance`. One epoch per save.
+
+**Smaller calls, made here:**
+
+- **`config/site.yaml`** now exists, with the brief's event count and the
+  Record view's page sizes, validated by `SiteSchema` in `src/config.ts`.
+- **`WorldStore.update(fn)`**: `fn` gets the game under the store's lock and
+  returns the write (new world, log entry, events, new owner) for the store
+  to apply. Appending rather than copying keeps a long simulated epoch from
+  going quadratic, and it's the shape Postgres needs (update the world, insert
+  rows). The memory store queues writes on a promise chain; a write that
+  throws doesn't jam the ones behind it.
+- **The time can't go backward.** A write before the world's clock is
+  refused; a read before it reads the world as it is.
+- **Errors carry a code**: `not_found` (what doesn't exist and what you may
+  not see, alike), `invalid`, `refused`. Phase 3 maps them to HTTP and MCP.
+- **Public means:** designation, domain name, architecture, manifesto,
+  power, territory, rank, boot time and a status (active, boot period, safe
+  mode, converged, deleted). Rankings list live minds by power, ties by
+  boot order. The Record view is public events only, newest first, paged
+  by `before`. A designation names the live mind first, then deleted ones,
+  newest first.
+- **"In range" in the brief** is who you could attack now, leaving out your
+  own boot period, so a new mind can see who it will face. The engine's
+  `targetShieldedBecause` gives it; `shieldedBecause` still adds the
+  actor's boot period for orders.
+- **A battle you fought shows once in your brief**, as your private report;
+  its public one-liner is left out there.
+- **The save file** is checked by a zod schema: the rules in full, the
+  world, log and Record by shape only, since they're the engine's own output
+  and replay checks the rest. Written to a temporary file and renamed.
+- **The boundaries test** now also checks that only `src/game/` imports the
+  engine's entry points (`engine/world.ts`).
+- **"a Oracle" became "an Oracle"** in the boot line of the Record.

@@ -143,6 +143,8 @@ export function visibleTo(event: GameEvent, domain: number): boolean {
 }
 
 const n = (x: number) => x.toLocaleString("en-US");
+/** "a Symbiote", "an Oracle". */
+const article = (word: string) => `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
 /** "1 sector", "25 sectors". */
 const count = (k: number, one: string, many = `${one}s`) => `${n(k)} ${k === 1 ? one : many}`;
 
@@ -150,7 +152,7 @@ const count = (k: number, one: string, many = `${one}s`) => `${n(k)} ${k === 1 ?
 export function describe(rules: Rules, event: GameEvent): string {
   switch (event.type) {
     case "booted":
-      return `${event.designation} of ${event.domainName} came online: a ${rules.architectures[event.architecture].name} mind.`;
+      return `${event.designation} of ${event.domainName} came online: ${article(rules.architectures[event.architecture].name)} mind.`;
     case "learned":
       return `Research complete: ${programName(rules, event.program)}.`;
     case "program_ended":

@@ -22,3 +22,31 @@ export function loadRules(): Rules {
   cached ??= parseRules(readFileSync(RULES_PATH, "utf-8"), "config/rules.yaml");
   return cached;
 }
+
+export const SITE_PATH = path.join(import.meta.dirname, "..", "config", "site.yaml");
+
+const count = z.number().int().positive();
+
+/** Server tunables. Every object is strict, as the rules' are. */
+export const SiteSchema = z.strictObject({
+  brief: z.strictObject({ events: count }),
+  view: z.strictObject({ record_default: count, record_max: count }),
+});
+export type Site = z.infer<typeof SiteSchema>;
+
+/** Parses and validates site YAML. Throws one error listing every problem. */
+export function parseSite(text: string, source = "site"): Site {
+  const result = SiteSchema.safeParse(YAML.parse(text));
+  if (!result.success) {
+    throw new Error(`${source} is invalid:\n${z.prettifyError(result.error)}`);
+  }
+  return result.data;
+}
+
+let cachedSite: Site | undefined;
+
+/** The server tunables, read from config/site.yaml once per process. */
+export function loadSite(): Site {
+  cachedSite ??= parseSite(readFileSync(SITE_PATH, "utf-8"), "config/site.yaml");
+  return cachedSite;
+}
