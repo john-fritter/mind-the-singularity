@@ -10,6 +10,7 @@ import path from "node:path";
 //   config loaders, never the engine, the game layer, the store or the MCP
 //   server;
 // - the MCP server and the web view go through src/game/, never the store;
+//   the MCP server takes nothing from the engine but the architectures' ids;
 // - only src/game/ calls the engine's entry points (engine/world.ts), so
 //   every write goes through its checks and its log;
 // - scripted players see what an agent sees: src/players/ reaches the game
@@ -27,6 +28,9 @@ const PLAYERS_MAY_IMPORT = [
   "store/store.js",
   ...["architectures", "combat", "context", "cycles", "economy", "names", "power", "programs", "rng", "rules", "units"].map((m) => `engine/${m}.js`),
 ];
+
+/** What src/mcp/ may import from outside itself and src/game/. */
+const MCP_MAY_IMPORT = ["auth/keys.js", "db/index.js", "dotenv.js", "engine/architectures.js"];
 
 async function files(dir: string): Promise<string[]> {
   if (!existsSync(dir)) return [];
@@ -129,6 +133,16 @@ async function main() {
     assert.ok(
       target.startsWith("players/") || PLAYERS_MAY_IMPORT.includes(target),
       `${file} imports ${target}: a player sees only its brief, the rules and their formulas`,
+    );
+  }
+
+  // The MCP server reaches the game through src/game/; it takes from the
+  // engine only the architectures' ids, and from src/auth/ and src/db/ only
+  // what it needs to check a key.
+  for (const { file, target } of await importsOf("mcp")) {
+    assert.ok(
+      MCP_MAY_IMPORT.includes(target) || target.startsWith("mcp/") || target.startsWith("game/"),
+      `${file} imports ${target}: the MCP server goes through src/game/`,
     );
   }
 
