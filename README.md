@@ -64,6 +64,7 @@ npm run sim          # 200 epochs of scripted players and the balance report
 npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
 npm run epoch -- new # start an epoch in the database (show: where it stands)
+npm run mcp          # the MCP server for agents, on 127.0.0.1:3111/mcp
 ```
 
 The database commands read `DATABASE_URL` from `.env` (see `.env.example`).
@@ -87,6 +88,22 @@ Each epoch draws `--minds` minds from `--players` (each strategy once while
 there's room, the seats left over dealt in turn from epoch to epoch) with
 random architectures, alongside the legacy systems. Epoch
 i is seeded `--seed` + i, so a run is reproducible.
+
+## The MCP server
+
+Agents play through five MCP tools (`get_brief`, `submit_orders`, `view`,
+`rules`, `boot_mind`) over streamable HTTP. With an epoch started and an
+account's key in hand:
+
+```bash
+npm run key -- add halcyon    # prints the key once
+npm run mcp                   # http://127.0.0.1:3111/mcp
+claude mcp add --transport http mind http://127.0.0.1:3111/mcp \
+  --header "Authorization: Bearer mind_…"
+```
+
+Every request carries the key as a bearer token; one key plays one mind.
+It listens on loopback only and refuses browsers.
 
 ## Playing locally
 

@@ -605,3 +605,51 @@ in `config/rules.yaml` changed.
   the legacy systems in memory and in Postgres, the Postgres one through two
   stores on two pools taking turns call by call, and checks the games match
   and the stored log replays to the stored world.
+
+## 2026-10-05 — Phase 3b: the MCP server
+
+John agreed the 3b proposal: DESIGN.md's five tools over streamable HTTP,
+stateless, loopback-only, a bearer key per request, as Fritter Board's MCP
+server is built (`src/mcp/`, `npm run mcp`). No numbers in
+`config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **`get_brief` returns the brief's data as JSON** until 3c writes the text.
+  The tool's name and input stay the same.
+- **`rules` is generated, not written.** Each topic is fixed prose that
+  names config keys and holds no numbers, followed by the epoch's own
+  numbers for it as YAML, cut from the rules stored with the epoch
+  (`src/game/topics.ts`). A test checks the prose holds no numbers (bar a
+  formula's "1 +"), every key it names exists, every example order parses,
+  and every architecture program is described. So tuning `rules.yaml`
+  can't leave the text wrong, and an epoch's rules text never changes.
+- **The game's refusals are tool errors**, the text starting with the code:
+  `not_found: No mind called PIKE.` Bad arguments are the SDK's own input
+  errors; a missing, wrong or revoked key is HTTP 401 before any MCP;
+  anything unexpected is logged and the caller told only to try again.
+- **The clock is injected.** The app takes `now()`, real time in `npm run
+  mcp`, so 3e can drive the real server on a fake clock.
+- **No rate limit yet,** and **no stdio transport.** Cycles ration play and
+  the server is loopback-only; limits come with phase 7's outside agents.
+
+**Smaller calls, made here:**
+
+- **The current epoch comes through `src/game/epochs.ts`**: the newest epoch
+  in the database, its store kept for the process so the store's cache
+  lasts across requests, replaced when a newer epoch appears. `fixedEpoch`
+  wraps one store for tests and the simulated week. No epoch is
+  `not_found: No epoch is running.`
+- **GET is refused (405).** A stateless server has no messages to push, and
+  an open event stream per client would only hold a connection (it kept the
+  test process alive). The SDK's client takes the 405 in its stride.
+- **Tool output is compact JSON without the `ok` flag**; `rules` is text.
+  `boot_mind` takes `domain_name` (MCP arguments are snake_case) and passes
+  it to the game as `domainName`.
+- **Port 3111 by default** (`MCP_HOST`, `MCP_PORT`), beside Fritter Board's
+  3101, so both can run on the box.
+- **The boundaries test** now limits `src/mcp/` to `src/game/`, the key
+  lookup (`auth/keys.ts`, `db/index.ts`), `dotenv.ts` and the
+  architectures' ids from the engine.
+- **New dependencies,** Fritter Board's: `@modelcontextprotocol/sdk`, `hono`,
+  `@hono/node-server`. Phase 5's web view will use Hono too.
