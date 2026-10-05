@@ -36,14 +36,16 @@ strategies:
     hardware: { drones: 0, sentries: 1, walkers: 0 }
 
   # Builds a force and raids the weakest mind in range when it can win;
-  # hunts converged minds.
+  # joins a convergence.
   raider:
-    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile]
+    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile, singularity]
     self: true
     deploy: true
     countermeasure: 1.5
     attack: { mode: raid, margin: 1.3, blind_defense_per_power: 0.25, hostile: true }
-    singularity: hunt
+    # Joins rather than hunts: with every raider hunting, no convergence
+    # outlived the next raider wake (docs/decisions.md, 2e tuning).
+    singularity: join
     reserve_cycles: 0
     reserve_compute: 300
     expand: 0.25

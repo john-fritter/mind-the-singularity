@@ -38,7 +38,7 @@ function boot() {
   assert.equal(totalBuildings(d), 80);
   assert.equal(d.cycles, 96);
   assert.equal(capability(d), 0);
-  assert.equal(domainPower(rules, d), 3150);
+  assert.equal(domainPower(rules, d), 3030);
 
   const fresh = createWorld(rules, { epoch: 1, seed: 1, startedAt: T0 });
   const ok = (input: object) => bootMind(rules, fresh, { designation: "A", domainName: "B", architecture: "oracle", ...input }, T0);

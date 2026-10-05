@@ -394,7 +394,9 @@ combat:
 power:
   per_sector: 10
   per_building: 5
-  per_force_point: 0.25
+  # 0.25 until 2e: forces outweighed everything else, so army-heavy
+  # strategies topped the rankings (docs/decisions.md, 2e tuning).
+  per_force_point: 0.13
   per_capability: 300
 
 protection:

@@ -212,7 +212,7 @@ function powerAndRange() {
   assert.deepEqual(force, { attack: 450, defense: 550, capitalUpkeep: 100, computeUpkeep: 0 });
   const built = Object.values(s.buildings).reduce((a, b) => a + b, 0);
   const start = { territory: s.territory, buildings: built, attack: force.attack, defense: force.defense, capability: 0 };
-  assert.equal(power(rules, start), 3150);
+  assert.equal(power(rules, start), 3030);
   for (const key of ["territory", "buildings", "attack", "defense", "capability"] as const) {
     assert.ok(power(rules, { ...start, [key]: start[key] + 10 }) > power(rules, start), `power rises with ${key}`);
   }

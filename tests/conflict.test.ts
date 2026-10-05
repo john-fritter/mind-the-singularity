@@ -173,10 +173,10 @@ function refusals() {
   );
   refused(setup({ change: (a) => ((a.cycles = 1), (a.cycleTicks = 96)) }), attack, "Out of cycles: this costs 2, 1 left.");
 
-  // Range: half to double. Starting power is 3,150; 4,000 more sectors puts
-  // VESTA at 43,150.
+  // Range: half to double. Starting power is 3,030; 4,000 more sectors puts
+  // VESTA at 43,030.
   const far = setup({ change: (_a, b) => (b.territory += 4000) });
-  refused(far, attack, "VESTA is out of range: power 43,150, and you can reach 0.5× to 2× your 3,150.");
+  refused(far, attack, "VESTA is out of range: power 43,030, and you can reach 0.5× to 2× your 3,030.");
   // ...unless VESTA attacked HALCYON in the last 24 hours.
   const wronged = setup({ change: (a, b) => ((b.territory += 4000), (a.aggressors = [{ domain: 2, at: T - 23 * HOUR_MS }])) });
   assert.ok(run(wronged, [attack]).results[0]!.ok);
@@ -418,11 +418,11 @@ function probe() {
   );
   const status = out.results[0]!.status!;
   assert.equal(status.designation, "VESTA");
-  assert.equal(status.power, 3150);
+  assert.equal(status.power, 3030);
   assert.equal(status.cycles, 96);
   assert.equal(status.compute, 1000);
   assert.ok(!("scratchpad" in status));
-  assert.equal(out.results[0]!.message, "Probed VESTA: power 3,150, 96 cycles, capability 0.");
+  assert.equal(out.results[0]!.message, "Probed VESTA: power 3,030, 96 cycles, capability 0.");
   assert.equal(out.a.compute, 1000 - 150 + 90);
   const probed = out.events.find((e) => e.type === "probed")!;
   assert.equal(probed.public, false);
