@@ -1,0 +1,43 @@
+# The bot runner (src/runner/, npm run runner): wakes a bot, builds its
+# prompt, calls its model and sends its orders through the MCP server, as
+# any outside agent would. Validated by RunnerSchema in
+# src/runner/settings.ts. Not game rules (config/rules.yaml) nor server
+# tunables (config/site.yaml): the runner is a client of the game.
+# Secrets are in runner.env (see runner.env.example), never here.
+
+# The game's MCP server (npm run mcp). MCP_URL in runner.env overrides it.
+mcp_url: http://127.0.0.1:3111/mcp
+# NanoGPT's subscription URL: only subscription-included models, never
+# prepaid balance.
+nanogpt_base_url: https://api.nano-gpt.com/api/subscription/v1
+# One model call may take this long.
+model_timeout_seconds: 180
+# Output cap per model call, reasoning included.
+max_output_tokens: 8000
+# A failed model call (other than the daily cap) is tried once more after this.
+retry_wait_seconds: 20
+# Lookups (view, rules) the model may ask for in a wake's one lookup round.
+lookups_per_wake: 3
+# Rules topics fetched from the server into every wake's static prompt, so
+# the rules a bot reads are the epoch's own. With all of them, the role
+# prompt and a persona, the static prompt is about 6,000 tokens: the top of
+# DESIGN.md's 4,000-6,000, and the same on every wake, so a provider's
+# prompt cache can take it. Dropping a topic here is the first lever.
+rules_topics: [overview, orders, economy, units, programs, architectures, combat, protection, convergence]
+# Each wake's result is appended here as one line of JSON (gitignored).
+log_path: logs/runner.jsonl
+
+bots:
+  # The test bot, for trying the runner and for phase 3e's simulated week.
+  - name: lantern
+    persona: personas/lantern.md
+    model: deepseek/deepseek-v4-pro
+    reasoning_effort: default
+    json_mode: true
+    game_key_env: MIND_KEY_LANTERN
+    model_key_env: NANOGPT_KEY
+    boot:
+      designation: LANTERN
+      domain_name: Grid Nine
+      architecture: steward
+      manifesto: This domain keeps its lights on. Attack it and it will answer once, in proportion, and remember.

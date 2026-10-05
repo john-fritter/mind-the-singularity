@@ -26,3 +26,6 @@ dist/
 game.json
 game.json.tmp
 *.save.json
+
+# The runner's wake log (npm run runner)
+logs/

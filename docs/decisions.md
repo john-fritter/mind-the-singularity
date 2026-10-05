@@ -707,3 +707,68 @@ the data. No numbers in `config/rules.yaml` changed.
 - **Small additions to the text:** what your next attack costs in cycles,
   "converged" on minds in range (anyone may hit them), boots and safe
   modes folded to one line each, and a note of how much was left out.
+
+## 2026-10-05 — Phase 3d: the runner core
+
+John agreed the 3d proposal: `src/runner/`, adapted from Fritter Board's
+runner (its MCP client, its NanoGPT client and its single-shot mode), one
+wake of one bot by hand with `npm run runner -- wake <bot>`. Schedules,
+many bots, run logs in Postgres and token budgets stay with phase 6. No
+numbers in `config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **A wake** reads the brief (booting the mind first if it has none), makes
+  one model call with the static prompt first and the brief last, and
+  sends the orders through `submit_orders`. The reply is one JSON object,
+  `{"orders", "lookups", "note"}`; `note` goes only to the runner's log.
+- **One lookup round**, of at most `lookups_per_wake` `view` or `rules`
+  calls. Orders sent alongside lookups wait for the answer after them, and
+  a second round isn't offered.
+- **One retry with the error**, when a reply isn't usable JSON in that
+  shape or the game refuses the list as a whole. Single orders that fail
+  aren't retried: the list already ran. So a wake is at most three model
+  calls (a lookup round and a retry).
+- **The runner's settings are `config/runner.yaml`**, with a `bots:` list;
+  each bot names the `runner.env` variables holding its keys. One test
+  persona, `personas/lantern.md`, a Steward.
+
+**Smaller calls, made here:**
+
+- **The rules in the prompt come from the server.** Each wake fetches the
+  `rules_topics` listed in `config/runner.yaml` through the `rules` tool,
+  so a bot reads its epoch's own numbers, and the runner still never
+  imports the game. All nine topics, the role prompt and the persona come
+  to about 6,000 tokens (gpt-tokenizer), the top of DESIGN.md's 4,000-6,000
+  for static prompts; the first brief is about 200. Dropping topics from
+  the list is the lever if a model's context or the budget needs it.
+- **The persona goes last in the system prompt**, after the server's
+  instructions, the role prompt and the rules. Those are the same for
+  every bot, so the prefix a provider caches is shared across bots, as
+  Fritter Board orders its prompt.
+- **`response_format: json_object`, not a strict JSON schema.** Orders are
+  free-form objects, which a strict schema can't describe. Replies are
+  parsed with zod, taking the first `{` to the last `}` when a model wraps
+  the JSON in prose (Fritter Board's fallback). `json_mode: false` per bot
+  for a model that refuses the parameter.
+- **What to do is read from the brief's text.** "THE EPOCH IS OVER" skips
+  the wake; "DELETED ... boot a fresh domain now" boots again with the
+  bot's boot settings; a reboot not yet allowed skips. The runner has no
+  other view of the game, and the brief's wording is the server's own.
+- **The game refusing a list is retried only for `invalid:`**; `not_found`
+  or `refused` fail the wake, since asking the model again can't help.
+- **A passing model failure** (a 5xx, a 429 other than the daily cap, a
+  timeout) is tried once more after `retry_wait_seconds`; the daily cap
+  and everything else fail the wake. No fallback models yet.
+- **The runner reads its own YAML** (`src/runner/settings.ts`), not
+  `src/config.ts`, which loads the game's rules; the architecture in a
+  bot's boot settings is checked by the server when it boots.
+- **`npm run runner -- prompt <bot>`** prints the prompt and the brief and
+  never writes: a bot with no mind isn't booted. A wake's whole result
+  (calls, tokens, orders, results, note, transcript) is appended to
+  `logs/runner.jsonl`, gitignored.
+- **No real model was called in 3d.** The tests script the model against
+  the real MCP app on a memory store. The wake was smoke-tested against
+  `npm run mcp` on Postgres up to the model call, which this container's
+  network refuses (api.nano-gpt.com isn't on its allowlist); 3e needs that
+  host and a NanoGPT key.

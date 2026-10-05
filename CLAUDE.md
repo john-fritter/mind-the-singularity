@@ -87,6 +87,8 @@ npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (rotate, revoke, list)
 npm run epoch -- new # start an epoch in the database (show)
 npm run mcp          # the MCP server, loopback only (MCP_HOST, MCP_PORT)
+npm run runner -- wake <bot>    # one wake of a bot in config/runner.yaml (secrets in runner.env)
+npm run runner -- prompt <bot>  # its prompt and brief, without calling a model
 ```
 
 Add each new command here and to the README as it lands. The rules schema

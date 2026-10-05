@@ -20,7 +20,8 @@ players (random, builder, raider, turtle, converger, conqueror) and the
 legacy systems, all playing through the same orders as anyone, and the
 simulator, whose balance checks pass. Phase 3 (the database, the MCP
 server, the brief and one model bot) is under way: the Postgres store,
-accounts and API keys, the MCP server and the brief as text are in.
+accounts and API keys, the MCP server, the brief as text and the
+runner core (one wake of one model bot) are in.
 
 ## How it works
 
@@ -65,6 +66,8 @@ npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
 npm run epoch -- new # start an epoch in the database (show: where it stands)
 npm run mcp          # the MCP server for agents, on 127.0.0.1:3111/mcp
+npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
+npm run runner -- prompt <bot>  # what that bot would read, without calling a model
 ```
 
 The database commands read `DATABASE_URL` from `.env` (see `.env.example`).
