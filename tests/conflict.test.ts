@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { loadRules } from "../src/config.js";
 import type { Architecture } from "../src/engine/architectures.js";
-import { HOUR_MS } from "../src/engine/cycles.js";
+import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { describe, visibleTo, type BattleReport, type GameEvent } from "../src/engine/record.js";
 import { rngFor } from "../src/engine/rng.js";
 import type { Domain, World } from "../src/engine/state.js";
+import { domainStatus } from "../src/engine/status.js";
 import { applyOrders, bootMind, createWorld } from "../src/engine/world.js";
 
 // Minds against each other (phase 2b): attacks in both modes, battle
@@ -67,6 +68,19 @@ function seedWhere(
     if (ok(out)) return out;
   }
   throw new Error("no seed found");
+}
+
+/** Each attack in the last 24 hours makes the next cost 2 cycles more. */
+function attackCost() {
+  const raid = { do: "attack", target: "VESTA", mode: "raid" };
+  const out = run(setup({ change: strong }), [raid, raid, raid]);
+  assert.deepEqual(out.results.map((r) => r.cycles), [2, 4, 6]);
+  assert.equal(domainStatus(rules, out.a, T).attackCycles, 8);
+  assert.equal(domainStatus(rules, out.a, T + DAY_MS - 1).attackCycles, 8);
+  assert.equal(domainStatus(rules, out.a, T + DAY_MS).attackCycles, 2, "a day later it's back to 2");
+  // Refused for want of cycles at the escalated price.
+  const short = run(setup({ change: (a) => (strong(a), (a.attacksMade = [T - HOUR_MS]), (a.cycles = 3), (a.cycleTicks = 96)) }), [raid]);
+  assert.equal(short.results[0]!.message, "Out of cycles: this costs 4, 3 left.");
 }
 
 function conquest() {
@@ -455,6 +469,7 @@ function deletion() {
 }
 
 conquest();
+attackCost();
 raid();
 repelled();
 refusals();

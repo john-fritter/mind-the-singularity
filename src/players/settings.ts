@@ -60,7 +60,7 @@ const StrategySchema = z
   .refine((s) => s.expand + s.manufacture <= 1, { message: "expand and manufacture can't take more than every cycle" });
 export type Strategy = z.infer<typeof StrategySchema>;
 
-export const STRATEGIES = ["builder", "raider", "turtle", "converger"] as const;
+export const STRATEGIES = ["builder", "raider", "turtle", "converger", "conqueror"] as const;
 export type StrategyName = (typeof STRATEGIES)[number] | "random";
 
 export const PlayersSchema = z.strictObject({

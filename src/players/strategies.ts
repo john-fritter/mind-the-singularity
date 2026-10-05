@@ -47,7 +47,7 @@ export class Planned implements Player {
       if (target && plan.attack > 0) {
         const probed = previous?.find((r) => r.ok && r.status?.designation === target.designation)?.status;
         // Look first, if it can; the second step decides.
-        if (step === 1 && !probed && plan.knows("probe") && plan.cycles >= 1 + rules.action_cycles.attack && plan.probe(target.designation)) {
+        if (step === 1 && !probed && plan.knows("probe") && plan.cycles >= 1 + brief.you.attackCycles && plan.probe(target.designation)) {
           return plan.orders();
         }
         const defense = probed ? forceTotals(rules, probed.units).defense : target.power * s.attack.blind_defense_per_power;

@@ -1,5 +1,6 @@
 import type { Architecture, Building, Program, Unit } from "./architectures.js";
-import { availableCycles } from "./cycles.js";
+import { attackCycles } from "./combat.js";
+import { availableCycles, DAY_MS } from "./cycles.js";
 import { capability, domainPower } from "./domain.js";
 import type { Rules } from "./rules.js";
 import type { Domain, RunningProgram } from "./state.js";
@@ -26,6 +27,8 @@ export interface DomainStatus {
   countermeasure: { program: Program; above: number } | null;
   safeModeUntil: number | null;
   convergedAt: number | null;
+  /** Cycles this mind's next attack costs. */
+  attackCycles: number;
 }
 
 /** A domain's full status at a moment. */
@@ -49,5 +52,6 @@ export function domainStatus(rules: Rules, d: Domain, now: number): DomainStatus
     countermeasure: d.countermeasure,
     safeModeUntil: d.safeModeUntil !== null && d.safeModeUntil > now ? d.safeModeUntil : null,
     convergedAt: d.convergedAt,
+    attackCycles: attackCycles(rules, d.attacksMade.filter((t) => t > now - DAY_MS).length),
   });
 }

@@ -74,11 +74,18 @@ export interface EpochResult {
   foreseeable: { count: number; examples: string[] };
 }
 
-/** The scripted minds for an epoch: each listed strategy once while there's room, the rest drawn, then shuffled. */
-export function drawMinds(rng: Rng, strategies: StrategyName[], minds: number): { strategy: StrategyName; architecture: Architecture }[] {
+/**
+ * The scripted minds for an epoch: each listed strategy once while there's
+ * room, and the seats left over dealt in turn from epoch to epoch (by the
+ * seed), so over a run every strategy holds about as many seats; then
+ * shuffled, with random architectures.
+ */
+export function drawMinds(rng: Rng, seed: number, strategies: StrategyName[], minds: number): { strategy: StrategyName; architecture: Architecture }[] {
   const pick = <T>(xs: readonly T[]) => xs[Math.floor(rng.next() * xs.length)]!;
+  const n = strategies.length;
   const drawn = strategies.slice(0, minds);
-  while (drawn.length < minds) drawn.push(pick(strategies));
+  const extra = minds - drawn.length;
+  for (let j = 0; j < extra; j++) drawn.push(strategies[(((seed * extra + j) % n) + n) % n]!);
   for (let i = drawn.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1));
     [drawn[i], drawn[j]] = [drawn[j]!, drawn[i]!];
@@ -110,7 +117,7 @@ export async function runEpoch(input: EpochInput): Promise<EpochResult> {
   const startedAt = Date.UTC(2026, 0, 1);
   const game: Game = newGame(rules, { epoch: 1, seed, startedAt });
   const store = new MemoryStore(game);
-  const drawn = drawMinds(rngFor(seed, -1), input.strategies, input.minds);
+  const drawn = drawMinds(rngFor(seed, -1), seed, input.strategies, input.minds);
   const minds = drawn.map((m, i) => {
     const designation = `${m.strategy.toUpperCase()}-${i + 1}`;
     const seat = scriptedSeat(settings, {

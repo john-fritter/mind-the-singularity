@@ -87,5 +87,23 @@ strategies:
     buildings: { city: 0.3, datacenter: 0.25, factory: 0, lab: 0.35, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0, sentries: 1, walkers: 0 }
 
+  # The raider's build, but takes land: conquers the weakest mind in range
+  # when it can win. Added in 2e so the simulator tests conquest, which any
+  # agent will try.
+  conqueror:
+    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile, singularity]
+    self: true
+    deploy: true
+    countermeasure: 1.5
+    attack: { mode: conquest, margin: 1.3, blind_defense_per_power: 0.25, hostile: true }
+    singularity: never
+    reserve_cycles: 0
+    reserve_compute: 300
+    expand: 0.25
+    manufacture: 0.35
+    leftover: spin_up
+    buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
+    hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
+
 random:
   actions_per_wake: 6

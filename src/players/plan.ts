@@ -70,6 +70,8 @@ export class Plan {
   readonly known: Program[];
   readonly running = new Set<Program>();
   researchTarget: Program | null;
+  /** Whether this plan has an attack in it. */
+  private attacked = false;
   /** Cycles this plan has spent so far. */
   spent = 0;
 
@@ -128,9 +130,16 @@ export class Plan {
     return this.known.includes(program);
   }
 
-  /** One cycle's economy, as a lower bound: income only where upkeep or shrinking outweighs it. */
-  private passCycles(k: number): void {
+  /**
+   * One cycle's economy, as a lower bound: income only where upkeep or
+   * shrinking outweighs it. `uncertain` is for an order that may be refused
+   * for a reason the brief can't show (a target's hostile cap): refused, it
+   * spends no cycle and earns nothing, so the estimate keeps the lower of
+   * the two outcomes.
+   */
+  private passCycles(k: number, uncertain = false): void {
     const r = this.rules;
+    const before = { capital: this.capital, compute: this.compute, users: this.users };
     for (let i = 0; i < k; i++) {
       this.cycles--;
       this.spent++;
@@ -145,6 +154,11 @@ export class Plan {
       this.capital = capital >= capitalUpkeep ? capital - capitalUpkeep : 0;
       const computeUpkeep = Math.ceil(force.computeUpkeep);
       this.compute = compute >= computeUpkeep ? compute - computeUpkeep : 0;
+    }
+    if (uncertain) {
+      this.capital = Math.min(this.capital, before.capital);
+      this.compute = Math.min(this.compute, before.compute);
+      this.users = Math.min(this.users, before.users);
     }
   }
 
@@ -190,8 +204,9 @@ export class Plan {
   }
 
   attackWith(target: string, mode: "conquest" | "raid", program?: Program): boolean {
-    const cost = this.rules.action_cycles.attack;
-    if (!this.canSpend(cost) || !this.targets().some((t) => t.designation === target) || this.attack <= 0) return false;
+    // One attack a wake: each makes the next cost more, and the brief gives only the next one's cost.
+    const cost = this.brief.you.attackCycles;
+    if (this.attacked || !this.canSpend(cost) || !this.targets().some((t) => t.designation === target) || this.attack <= 0) return false;
     if (this.brief.now < this.brief.you.bootPeriodEndsAt) return false;
     const order: Record<string, unknown> = { do: "attack", target, mode };
     if (program !== undefined && this.knows(program) && PROGRAM_INFO.get(program)!.kind === "battle" && this.compute >= programCompute(this.rules, program)) {
@@ -199,6 +214,7 @@ export class Plan {
       this.compute -= programCompute(this.rules, program);
     }
     if (mode === "conquest") this.costTerritory += conquestSectors(this.rules, this.targets().find((t) => t.designation === target)!.territory);
+    this.attacked = true;
     this.spending.push(order);
     // A fight costs units; assume none, which only overstates upkeep.
     this.passCycles(cost);
@@ -214,7 +230,7 @@ export class Plan {
     if (this.compute < compute) return false;
     this.compute -= compute;
     this.spending.push({ do: "execute", program, target });
-    this.passCycles(cost);
+    this.passCycles(cost, true);
     return true;
   }
 

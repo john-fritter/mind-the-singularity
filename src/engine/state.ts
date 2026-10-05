@@ -55,6 +55,8 @@ export interface Domain {
 
   /** The battle program run automatically when attacked by a force above `above` × this domain's defense. */
   countermeasure: { program: Program; above: number } | null;
+  /** When this domain's own attacks were made, within the last day; each makes the next cost more. */
+  attacksMade: number[];
   /** When the domain's last won-against attacks landed, within protection.safe_mode_window_hours. */
   hits: number[];
   /** Shielded from attacks and hostile programs until then. */

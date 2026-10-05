@@ -14,12 +14,18 @@ const settings = loadPlayers();
 const ALL: StrategyName[] = [...STRATEGIES, "random"];
 
 function draws() {
-  const minds = drawMinds(rngFor(1, -1), ALL, 8);
+  const minds = drawMinds(rngFor(1, -1), 1, ALL, 8);
   assert.equal(minds.length, 8);
   for (const s of ALL) assert.ok(minds.some((m) => m.strategy === s), `${s} wasn't drawn though there was room`);
-  assert.deepEqual(drawMinds(rngFor(1, -1), ALL, 8), minds, "the draw is seeded");
+  assert.deepEqual(drawMinds(rngFor(1, -1), 1, ALL, 8), minds, "the draw is seeded");
   // Fewer minds than strategies: the first ones listed, shuffled.
-  assert.deepEqual(new Set(drawMinds(rngFor(2, -1), ALL, 3).map((m) => m.strategy)), new Set(ALL.slice(0, 3)));
+  assert.deepEqual(new Set(drawMinds(rngFor(2, -1), 2, ALL, 3).map((m) => m.strategy)), new Set(ALL.slice(0, 3)));
+  // The leftover seats go round: over a run, every strategy holds as many.
+  const seats = new Map<string, number>();
+  for (let seed = 1; seed <= 3 * ALL.length; seed++) {
+    for (const m of drawMinds(rngFor(seed, -1), seed, ALL, 8)) seats.set(m.strategy, (seats.get(m.strategy) ?? 0) + 1);
+  }
+  assert.equal(new Set(seats.values()).size, 1, `uneven seats: ${[...seats].join(" ")}`);
 }
 
 async function oneEpoch() {

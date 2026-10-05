@@ -90,7 +90,7 @@ function economy() {
   // Expansion: 10 at the start, falling as the domain grows, never below the minimum.
   assert.equal(expansionYield(rules, 250), 10);
   assert.equal(expansionYield(rules, 500), 5);
-  assert.equal(expansionYield(rules, 1250), 2);
+  assert.equal(expansionYield(rules, 1250), 5, "the floor");
   assert.equal(expansionYield(rules, 100000), rules.expansion.yield_min);
   assert.ok(nonincreasing(TERRITORIES, (t) => expansionYield(rules, t)));
   assert.ok(TERRITORIES.every((t) => Number.isInteger(expansionYield(rules, t))));

@@ -100,6 +100,7 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
     scratchpad: "",
     countermeasure: null,
     hits: [],
+    attacksMade: [],
     safeModeUntil: null,
     hostileReceived: [],
     aggressors: [],
