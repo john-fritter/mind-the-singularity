@@ -1,6 +1,7 @@
 import type { GameEvent } from "../engine/record.js";
 import type { World } from "../engine/state.js";
-import { applyOrders, bootMind, createWorld, settle, type BootInput } from "../engine/world.js";
+import { applyOrders, bootMind, settle, type BootInput } from "../engine/world.js";
+import { startWorld } from "./game.js";
 import type { Game } from "./state.js";
 
 // The audit: a game's start and its log rebuild its world and Record
@@ -11,8 +12,9 @@ import type { Game } from "./state.js";
 /** Rebuilds a game's world and Record from its start and log. Throws if an entry no longer applies. */
 export function replay(game: Game): { world: World; record: GameEvent[] } {
   const { rules } = game;
-  let world = createWorld(rules, game.start);
-  const record: GameEvent[] = [];
+  const start = startWorld(rules, game.start);
+  let world = start.world;
+  const record: GameEvent[] = [...start.events];
   for (const [i, entry] of game.log.entries()) {
     if (entry.kind === "boot") {
       const booted = bootMind(rules, world, entry.input as BootInput, entry.at);

@@ -51,7 +51,7 @@ async function main() {
   assert.ok(!text.includes(SECRET), "a scratchpad leaked into another mind's brief");
   assert.ok(!theirs.since.events.some((e) => e.type === "probed"), "the target was told of a probe");
   assert.ok(theirs.since.events.some((e) => e.type === "battle_report"), "the defender gets its battle report");
-  assert.ok(theirs.since.events.every((e) => e.public || e.domains.includes(2)));
+  assert.ok(theirs.since.events.every((e) => e.public || e.domains.includes(currentMind(game, "vesta")!.id)));
   for (const d of theirs.inRange) assert.deepEqual(Object.keys(d).sort(), SUMMARY_KEYS);
 
   // HALCYON's own brief shows what's its own.

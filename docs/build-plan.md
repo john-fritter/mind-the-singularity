@@ -166,7 +166,7 @@ the CLI. (Done 2026-10-05.)
 turtle and converger, and the legacy systems, each seeing only the brief's
 data and submitting orders through `submitOrders`. *Done when* each one
 plays a whole epoch without a failing order it could have known would
-fail.
+fail. (Done 2026-10-05.)
 
 **2e: the simulator and tuning.** `npm run sim` and its report, and
 `config/rules.yaml` tuned until phase 2's checks pass. *Done when* phase 2

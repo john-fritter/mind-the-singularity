@@ -7,6 +7,8 @@
  * with its own clock, which moves only when told to: `advance 6h`, or
  * --at / --advance on any command. So a week can be played in minutes.
  * Every command goes through src/game/, as the MCP server and web view will.
+ * Whenever the clock moves, the legacy systems and any scripted players
+ * added with `add` take the wakes that fell due, before the command runs.
  */
 
 import { randomInt } from "node:crypto";
@@ -15,12 +17,15 @@ import { parseArgs } from "node:util";
 import { isDeepStrictEqual } from "node:util";
 import { loadRules } from "../config.js";
 import { ARCHITECTURES } from "../engine/architectures.js";
+import { loadPlayers } from "../config.js";
 import { bootMind, newGame, submitOrders } from "../game/game.js";
 import { getBrief, view } from "../game/read.js";
 import { replay } from "../game/replay.js";
 import type { GameError } from "../game/state.js";
+import { drive, legacySeats, scriptedSeat, type Seat } from "../players/drive.js";
+import { STRATEGIES, type StrategyName } from "../players/settings.js";
 import { MemoryStore } from "../store/memory.js";
-import { readSave, writeSave, type SaveFile } from "../store/save.js";
+import { readSave, writeSave, type SaveFile, type SavedPlayer } from "../store/save.js";
 import { renderBrief, renderOrders, renderPage, renderRankings, renderRecord, span, when } from "./render.js";
 
 const HELP = `Play Mind: the Singularity locally.
@@ -37,6 +42,9 @@ Commands
   view NAME                    a domain's public page
   record                       the public Record (--mind NAME, --type TYPE, --limit N, --before SEQ)
   rankings                     every live mind by power
+  add STRATEGY [DESIGNATION]   add a scripted opponent (--arch ARCHITECTURE); strategies:
+                               ${[...STRATEGIES, "random"].join(", ")}
+  players                      the scripted players in this game
   advance DURATION             move the game's clock, e.g. 6h, 1d12h, 30m
   replay                       check the save rebuilds from its start and orders log
 
@@ -55,6 +63,7 @@ const OPTIONS = {
   seed: { type: "string" },
   force: { type: "boolean", default: false },
   manifesto: { type: "string" },
+  arch: { type: "string" },
   file: { type: "string", short: "f" },
   mind: { type: "string" },
   type: { type: "string" },
@@ -113,7 +122,7 @@ async function main() {
     const startedAt = o.at !== undefined ? parseTime(o.at) : Math.floor(Date.now() / 60_000) * 60_000;
     const seed = int(o.seed, "--seed") ?? randomInt(2 ** 31);
     const game = newGame(loadRules(), { epoch: 1, seed, startedAt });
-    writeSave(o.save, { version: 1, clock: startedAt, game });
+    writeSave(o.save, { version: 1, clock: startedAt, game, players: [] });
     out(game.start, `New game in ${o.save}: epoch 1, seed ${seed}, starting ${when(startedAt, startedAt)}.`);
     return;
   }
@@ -125,12 +134,27 @@ async function main() {
   const before = save.clock;
   if (o.at !== undefined) save.clock = parseTime(o.at);
   if (o.advance !== undefined) save.clock += parseDuration(o.advance);
+  if (command === "advance") {
+    if (!args[0]) throw new CliError("Usage: advance DURATION, e.g. advance 6h");
+    save.clock += parseDuration(args.join(""));
+  }
   if (save.clock < before) throw new CliError("The game's clock never runs backward.");
   const store = new MemoryStore(game);
   const me = { account: o.as };
   const now = save.clock;
   const startedAt = game.start.startedAt;
   let wrote = false;
+
+  // The wakes that fell due while the clock moved, before the command runs.
+  const settings = loadPlayers();
+  const seatOf = (p: SavedPlayer): Seat => scriptedSeat(settings, p);
+  if (now > before) {
+    const woke = await drive(store, [...legacySeats(game.rules), ...save.players.map(seatOf)], before, now, settings.steps_per_wake);
+    if (woke.length > 0) {
+      wrote = true;
+      if (!o.json) console.error(`(${woke.length} scripted wake${woke.length === 1 ? "" : "s"} ran while the clock moved.)`);
+    }
+  }
 
   switch (command) {
     case "boot": {
@@ -191,9 +215,29 @@ async function main() {
       else if (result.what === "rankings") out(result, renderRankings(game.rules, result.domains));
       break;
     }
+    case "add": {
+      const strategy = args[0]?.toLowerCase() as StrategyName | undefined;
+      if (!strategy || ![...STRATEGIES, "random"].includes(strategy)) {
+        throw new CliError(`Usage: add STRATEGY [DESIGNATION]; strategies: ${[...STRATEGIES, "random"].join(", ")}`);
+      }
+      const seed = randomInt(2 ** 31);
+      const designation = args[1] ?? `${strategy.toUpperCase()}-${save.players.length + 1}`;
+      const architecture = (o.arch?.toLowerCase() ?? ARCHITECTURES[seed % ARCHITECTURES.length]) as (typeof ARCHITECTURES)[number];
+      const player: SavedPlayer = { account: `bot:${designation.toLowerCase()}`, strategy, seed, boot: { designation, domainName: `The ${strategy} domain`, architecture } };
+      const booted = await bootMind(store, { account: player.account }, player.boot, now);
+      if (!booted.ok) fail(booted);
+      save.players.push(player);
+      wrote = true;
+      out(booted, `${booted.designation} (${strategy}, ${architecture}) is online and plays as the clock moves.`);
+      break;
+    }
+    case "players": {
+      const lines = save.players.map((p) => `${p.boot.designation.padEnd(16)} ${p.strategy.padEnd(10)} ${p.boot.architecture}`);
+      const legacy = game.rules.legacy.systems.map((l) => `${l.designation.padEnd(16)} ${"legacy".padEnd(10)} ${l.architecture}`);
+      out({ players: save.players }, [...legacy, ...lines].join("\n"));
+      break;
+    }
     case "advance": {
-      if (!args[0]) throw new CliError("Usage: advance DURATION, e.g. advance 6h");
-      save.clock += parseDuration(args.join(""));
       out({ clock: save.clock }, `The clock moved ${span(save.clock - before)}: it's now ${when(save.clock, startedAt)}.`);
       break;
     }

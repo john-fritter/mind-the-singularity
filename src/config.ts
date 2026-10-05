@@ -3,6 +3,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
 import { RulesSchema, type Rules } from "./engine/rules.js";
+import { PlayersSchema, type Players } from "./players/settings.js";
 
 export const RULES_PATH = path.join(import.meta.dirname, "..", "config", "rules.yaml");
 
@@ -49,4 +50,23 @@ let cachedSite: Site | undefined;
 export function loadSite(): Site {
   cachedSite ??= parseSite(readFileSync(SITE_PATH, "utf-8"), "config/site.yaml");
   return cachedSite;
+}
+
+export const PLAYERS_PATH = path.join(import.meta.dirname, "..", "config", "players.yaml");
+
+/** Parses and validates the scripted players' YAML. Throws one error listing every problem. */
+export function parsePlayers(text: string, source = "players"): Players {
+  const result = PlayersSchema.safeParse(YAML.parse(text));
+  if (!result.success) {
+    throw new Error(`${source} is invalid:\n${z.prettifyError(result.error)}`);
+  }
+  return result.data;
+}
+
+let cachedPlayers: Players | undefined;
+
+/** The scripted players' knobs, read from config/players.yaml once per process. */
+export function loadPlayers(): Players {
+  cachedPlayers ??= parsePlayers(readFileSync(PLAYERS_PATH, "utf-8"), "config/players.yaml");
+  return cachedPlayers;
 }

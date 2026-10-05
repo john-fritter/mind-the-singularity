@@ -397,3 +397,63 @@ file; `src/cli/` the CLI (`npm run play`). No numbers in
 - **The boundaries test** now also checks that only `src/game/` imports the
   engine's entry points (`engine/world.ts`).
 - **"a Oracle" became "an Oracle"** in the boot line of the Record.
+
+## 2026-10-05 — Phase 2d: scripted players and the legacy systems
+
+John agreed the 2d proposal and its calls. The players are in
+`src/players/`: a `Plan` that builds a wake's orders against the brief, the
+planned strategies and the random player, the legacy player, and a driver
+that runs wakes on the clock. Their knobs are in a new
+`config/players.yaml`. No numbers in `config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **Legacy systems boot with the epoch** as the starting domain times their
+  `scale`, marked `legacy`, each owned by a reserved `legacy:<DESIGNATION>`
+  account, and order through `submitOrders` like anyone.
+- **They're players, not settle timers.** The build plan's "time without a
+  tick" lists legacy raids among the timers; its 2d section and the Phase 1
+  entry put them on the one write path, which won. Something has to wake
+  them: the CLI and the simulator now, the server's interval timer in
+  Phase 3.
+- **The engine knows a domain is legacy in one place:** legacy domains
+  don't count toward the quorum. Never researching is the player's
+  behavior. A deleted legacy system stays deleted; its seat never reboots.
+- **The order mix is exact over a day:** wake k spends
+  `floor(k × per-wake × share)` less what the wakes before it spent, per
+  kind. A legacy system keeps its last wake and its next raid time in its
+  scratchpad, as an agent would.
+- **Players see their brief, the rules and the engine's pure formulas**,
+  never the world. The boundaries test lists what `src/players/` may
+  import.
+- **Builder, raider, turtle and converger are one planner** with four
+  settings; random rolls its own. They wake every 3 hours at a seeded
+  offset. A wake may take two steps, as an agent may make two calls: the
+  raider probes, then decides whether to attack from the report.
+- **"Could have known would fail"** is tested by a whole epoch with every
+  kind of player: the only failures allowed are crashes, firewall blocks
+  and a target's hostile cap, which the brief can't show.
+- **The CLI** runs due wakes whenever the clock moves, and `add STRATEGY`
+  boots a scripted opponent (account `bot:<designation>`), kept in the
+  save's new `players` list.
+
+**Smaller calls, made here:**
+
+- **The game layer boots the legacy systems, not `createWorld`**: the
+  engine's `bootLegacy` runs in `startWorld` (`src/game/game.ts`), which
+  `newGame` and replay share. Engine tests keep worlds with only the minds
+  they boot.
+- **A legacy system's brief** hears from the epoch's start until its first
+  orders, since it has no boot entry in the log.
+- **The plan's estimate is a lower bound.** Cycles, land and purchases are
+  exact; capital, compute and users get each cycle's income and upkeep as
+  the engine pays them, but no program bonuses and no user growth (Blight
+  may stall it). An order goes in only if the estimate says it works.
+  Orders that cost nothing go first, so research finishing mid-wake can't
+  make `set_research` fail; attacks and hostile programs go only before
+  any cycle is spent, since a cycle can change power and so range.
+- **Scripted players reboot** after deletion once the wait is over, with
+  the same boot input.
+- **Speed:** an epoch with four legacy systems and seven players takes
+  about five seconds, mostly settling copies for briefs. 2e may want that
+  faster for 200 epochs.

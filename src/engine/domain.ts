@@ -81,6 +81,7 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
   const s = rules.start;
   return {
     ...input,
+    legacy: false,
     bootedAt: now,
     lastActiveAt: now,
     cycles: startingCycles(rules),
@@ -107,4 +108,22 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
     deletedAt: null,
     lastLog: "",
   };
+}
+
+/**
+ * A legacy system's starting domain: the starting domain with every
+ * quantity multiplied by its scale, rounded down. Keys: start.*,
+ * legacy.systems.*, as startingDomain
+ */
+export function legacyDomain(rules: Rules, system: Rules["legacy"]["systems"][number], id: number, now: number): Domain {
+  const scale = (x: number) => Math.floor(x * system.scale);
+  const d = startingDomain(rules, { id, designation: system.designation, domainName: system.domain_name, architecture: system.architecture, manifesto: "" }, now);
+  d.legacy = true;
+  d.territory = scale(d.territory);
+  for (const b of BUILDINGS) d.buildings[b] = scale(d.buildings[b]);
+  d.capital = scale(d.capital);
+  d.compute = scale(d.compute);
+  d.users = scale(d.users);
+  for (const h of HARDWARE) if (d.units[h] !== undefined) d.units[h] = scale(d.units[h]!);
+  return d;
 }

@@ -19,11 +19,12 @@ export function quorum(rules: Rules, activeDomains: number): number {
 }
 
 /**
- * Whether a domain counts toward the quorum: not deleted, and active in the
- * window or converged. Keys: convergence.active_window_hours
+ * Whether a domain counts toward the quorum: a mind, not a legacy system,
+ * not deleted, and active in the window or converged.
+ * Keys: convergence.active_window_hours
  */
 export function isActive(rules: Rules, d: Domain, now: number): boolean {
-  if (d.deletedAt !== null) return false;
+  if (d.deletedAt !== null || d.legacy) return false;
   return d.convergedAt !== null || d.lastActiveAt > now - rules.convergence.active_window_hours * HOUR_MS;
 }
 

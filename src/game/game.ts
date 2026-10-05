@@ -4,10 +4,11 @@ import { availableCycles, HOUR_MS } from "../engine/cycles.js";
 import { rebootAt } from "../engine/deletion.js";
 import { domainPower } from "../engine/domain.js";
 import type { Rules } from "../engine/rules.js";
+import type { GameEvent } from "../engine/record.js";
 import type { Domain, World } from "../engine/state.js";
-import { applyOrders, bootMind as engineBoot, createWorld, type BootInput } from "../engine/world.js";
+import { applyOrders, bootLegacy, bootMind as engineBoot, createWorld, type BootInput } from "../engine/world.js";
 import type { WorldStore } from "../store/store.js";
-import { gameError, type Game, type GameError, type Identity } from "./state.js";
+import { gameError, type Game, type GameError, type Identity, type Owner } from "./state.js";
 
 // The one write path. Every change to a game goes through bootMind or
 // submitOrders: each checks the caller, runs the engine under the store's
@@ -18,9 +19,23 @@ import { gameError, type Game, type GameError, type Identity } from "./state.js"
 
 export const IdentitySchema = z.object({ account: z.string().trim().min(1).max(80) });
 
-/** A new game: an epoch with no minds yet, playing by `rules` to its end. */
+/** The account a legacy system orders from. No player account can be one: Phase 3's accounts never contain a colon. */
+export const legacyAccount = (designation: string) => `legacy:${designation}`;
+
+/**
+ * An epoch's world as it starts: the Shutdown scheduled and the legacy
+ * systems booted, each owned by its legacy account. replay.ts starts here too.
+ */
+export function startWorld(rules: Rules, start: Game["start"]): { world: World; owners: Owner[]; events: GameEvent[] } {
+  const booted = bootLegacy(rules, createWorld(rules, start));
+  const owners = booted.domains.map((id) => ({ account: legacyAccount(booted.world.domains.find((d) => d.id === id)!.designation), domain: id }));
+  return { world: booted.world, owners, events: booted.events };
+}
+
+/** A new game: an epoch with only its legacy systems, playing by `rules` to its end. */
 export function newGame(rules: Rules, start: { epoch: number; seed: number; startedAt: number }): Game {
-  return { rules, start: { ...start }, world: createWorld(rules, start), owners: [], log: [], record: [] };
+  const { world, owners, events } = startWorld(rules, start);
+  return { rules, start: { ...start }, world, owners, log: [], record: events };
 }
 
 /** The account's current mind, live or deleted, if it has booted one. */

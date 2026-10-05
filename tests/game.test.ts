@@ -14,6 +14,7 @@ const T0 = Date.UTC(2026, 9, 5, 12);
 const HALCYON = { designation: "HALCYON", domainName: "Glasswater", architecture: "symbiote" };
 const VESTA = { designation: "VESTA", domainName: "Hearth", architecture: "steward" };
 const john = { account: "john" };
+const LEGACY = rules.legacy.systems.length;
 const ada = { account: "ada" };
 
 function fresh() {
@@ -45,16 +46,17 @@ async function access() {
   isError(await bootMind(store, john, VESTA, T0), "refused");
   isError(await bootMind(store, ada, { ...HALCYON, domainName: "Elsewhere" }, T0), "invalid");
   assert.ok((await bootMind(store, ada, VESTA, T0)).ok);
-  assert.deepEqual(game.owners, [
-    { account: "john", domain: 1 },
-    { account: "ada", domain: 2 },
+  // The legacy systems come first, booted with the game.
+  assert.deepEqual(game.owners.slice(LEGACY), [
+    { account: "john", domain: LEGACY + 1 },
+    { account: "ada", domain: LEGACY + 2 },
   ]);
 
   // An account gives orders to its own mind and no other.
   const out = await submitOrders(store, ada, [{ do: "expand", cycles: 2 }], T0 + HOUR_MS);
   assert.ok(out.ok);
   assert.equal(out.status.designation, "VESTA");
-  assert.equal(game.world.domains[0]!.territory, rules.start.territory, "john's mind is untouched");
+  assert.equal(currentMind(game, "john")!.territory, rules.start.territory, "john's mind is untouched");
   isError(await submitOrders(store, ada, { do: "expand" }, T0 + HOUR_MS), "invalid");
 
   // The clock never runs backward.
@@ -64,9 +66,9 @@ async function access() {
   assert.deepEqual(
     game.log.map((e) => [e.kind, e.account, e.domain]),
     [
-      ["boot", "john", 1],
-      ["boot", "ada", 2],
-      ["orders", "ada", 2],
+      ["boot", "john", LEGACY + 1],
+      ["boot", "ada", LEGACY + 2],
+      ["orders", "ada", LEGACY + 2],
     ],
   );
   const last = game.log.at(-1)!;
@@ -95,7 +97,7 @@ async function reboot() {
   isError(await bootMind(store, john, { ...HALCYON, domainName: "Again" }, deletedAt + 2 * HOUR_MS), "refused");
   const again = await bootMind(store, john, { ...HALCYON, domainName: "Again" }, deletedAt + rules.deletion.reboot_after_hours * HOUR_MS);
   assert.ok(again.ok, "the same account boots again after the wait, under the same designation");
-  assert.equal(currentMind(game, "john")!.id, 2);
+  assert.equal(currentMind(game, "john")!.id, LEGACY + 2);
   assert.equal(currentMind(game, "john")!.domainName, "Again");
 }
 
@@ -105,7 +107,7 @@ async function oneAtATime() {
   const outs = await Promise.all(Array.from({ length: 10 }, () => submitOrders(store, john, [{ do: "monetize" }], T0 + HOUR_MS)));
   assert.ok(outs.every((o) => o.ok && o.results[0]!.ok));
   assert.equal(game.log.length, 11);
-  assert.equal(game.world.domains[0]!.cycles, rules.cycles.cap - 10, "every write saw the one before");
+  assert.equal(currentMind(game, "john")!.cycles, rules.cycles.cap - 10, "every write saw the one before");
   const seqs = game.log.map((e) => e.seq);
   assert.deepEqual(seqs, [...seqs].sort((a, b) => a - b));
   // A write that throws doesn't jam the queue.
@@ -152,10 +154,13 @@ async function views() {
 
   const ranks = await view(store, john, { what: "rankings" }, T0);
   assert.ok(ranks.ok && ranks.what === "rankings");
-  assert.deepEqual(ranks.domains.map((d) => [d.rank, d.designation, d.status]), [
-    [1, "VESTA", "boot period"],
-    [2, "HALCYON", "boot period"],
+  const minds = ranks.domains.filter((d) => d.designation === "VESTA" || d.designation === "HALCYON");
+  assert.deepEqual(minds.map((d) => [d.designation, d.status]), [
+    ["VESTA", "boot period"],
+    ["HALCYON", "boot period"],
   ]);
+  assert.equal(ranks.domains.length, LEGACY + 2, "the legacy systems are in the rankings");
+  assert.deepEqual(ranks.domains.map((d) => d.rank), ranks.domains.map((_, i) => i + 1));
   const page = await view(store, john, { what: "domain", name: "vesta" }, T0 + 3 * DAY_MS);
   assert.ok(page.ok && page.what === "domain");
   assert.equal(page.domain.manifesto, "Hold.");
@@ -170,7 +175,8 @@ async function views() {
   assert.equal(one.more, true);
   const older = await view(store, john, { what: "record", before: one.entries[0]!.seq }, T0);
   assert.ok(older.ok && older.what === "record");
-  assert.deepEqual(older.entries.map((e) => e.text), ["HALCYON of Glasswater came online: a Symbiote mind."]);
+  assert.equal(older.entries[0]!.text, "HALCYON of Glasswater came online: a Symbiote mind.");
+  assert.equal(older.entries.length, 1 + LEGACY, "then the legacy systems, booted with the game");
   const capped = await view(store, john, { what: "record", limit: 10 ** 6 }, T0);
   assert.ok(capped.ok && capped.what === "record" && capped.entries.length <= loadSite().view.record_max);
 }

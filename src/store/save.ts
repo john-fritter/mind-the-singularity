@@ -1,6 +1,8 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { z } from "zod";
+import { ARCHITECTURES, type Architecture } from "../engine/architectures.js";
 import { RulesSchema } from "../engine/rules.js";
+import { STRATEGIES, type StrategyName } from "../players/settings.js";
 import type { Game } from "../game/state.js";
 
 // A game on disk: one JSON file holding the game and the local clock it's
@@ -10,11 +12,20 @@ import type { Game } from "../game/state.js";
 
 export const SAVE_VERSION = 1;
 
+/** A scripted player added to a local game, so it plays on as the clock moves. */
+export interface SavedPlayer {
+  account: string;
+  strategy: StrategyName;
+  seed: number;
+  boot: { designation: string; domainName: string; architecture: Architecture };
+}
+
 export interface SaveFile {
   version: typeof SAVE_VERSION;
   /** The local game's clock, in milliseconds since the Unix epoch. */
   clock: number;
   game: Game;
+  players: SavedPlayer[];
 }
 
 // The rules are checked in full, since the game plays by them. The world,
@@ -23,6 +34,17 @@ export interface SaveFile {
 const SaveSchema = z.strictObject({
   version: z.literal(SAVE_VERSION),
   clock: z.number().finite(),
+  // Saves from before scripted players have none.
+  players: z
+    .array(
+      z.strictObject({
+        account: z.string(),
+        strategy: z.enum([...STRATEGIES, "random"]),
+        seed: z.number().int(),
+        boot: z.strictObject({ designation: z.string(), domainName: z.string(), architecture: z.enum(ARCHITECTURES) }),
+      }),
+    )
+    .default([]),
   game: z.strictObject({
     rules: RulesSchema,
     start: z.strictObject({ epoch: z.number().int(), seed: z.number().int(), startedAt: z.number().finite() }),
