@@ -10,14 +10,20 @@
     "test": "tsx scripts/test.ts",
     "curves": "tsx scripts/curves.ts",
     "play": "tsx src/cli/main.ts",
-    "sim": "tsx scripts/sim.ts"
+    "sim": "tsx scripts/sim.ts",
+    "migrate": "tsx scripts/migrate.ts",
+    "key": "tsx scripts/key.ts",
+    "epoch": "tsx scripts/epoch.ts"
   },
   "dependencies": {
+    "dotenv": "^18.0.5",
+    "pg": "^8.23.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }

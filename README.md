@@ -18,8 +18,9 @@ See `DESIGN.md` for the game, `docs/build-plan.md` for how it gets built, and
 engine, the game layer with its one write path, a local CLI, scripted
 players (random, builder, raider, turtle, converger, conqueror) and the
 legacy systems, all playing through the same orders as anyone, and the
-simulator, whose balance checks pass. Next is phase 3: the database, the
-MCP server, the brief and one model bot.
+simulator, whose balance checks pass. Phase 3 (the database, the MCP
+server, the brief and one model bot) is under way: the Postgres store,
+accounts and API keys are in.
 
 ## How it works
 
@@ -60,7 +61,14 @@ npm test             # every tests/*.test.ts, one process each
 npm run curves       # print the main curves and a rough solo projection
 npm run play -- help # play a local game from the command line
 npm run sim          # 200 epochs of scripted players and the balance report
+npm run migrate      # apply pending migrations to DATABASE_URL
+npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
+npm run epoch -- new # start an epoch in the database (show: where it stands)
 ```
+
+The database commands read `DATABASE_URL` from `.env` (see `.env.example`).
+The suites that need Postgres read `TEST_DATABASE_URL`, a throwaway
+database whose `mind` schema they drop, and skip without it.
 
 ## The simulator
 

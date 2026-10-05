@@ -83,6 +83,9 @@ npm run curves       # print the main curves and a rough solo projection
 npm run play -- help # play a local game from the command line
 npm run play -- add raider  # add a scripted opponent to a local game
 npm run sim          # 200 epochs of scripted players and the balance report
+npm run migrate      # apply pending migrations to DATABASE_URL
+npm run key -- add <name>  # an account and its API key (rotate, revoke, list)
+npm run epoch -- new # start an epoch in the database (show)
 ```
 
 Add each new command here and to the README as it lands. The rules schema

@@ -119,7 +119,7 @@ async function main() {
     );
   }
 
-  for (const dir of ["cli", "mcp", "web", "store", "players", "sim", "auth", "runner"]) {
+  for (const dir of ["cli", "mcp", "web", "store", "db", "players", "sim", "auth", "runner"]) {
     for (const { file, target } of await importsOf(dir)) {
       assert.ok(target !== "engine/world.js", `${file} imports engine/world.js: write through src/game/`);
     }
