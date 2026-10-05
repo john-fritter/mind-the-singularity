@@ -194,6 +194,33 @@ is. (Done 2026-10-05.)
 valid and its play follows its persona), and its brief stays under 2,000
 tokens every wake.
 
+### Subphases
+
+Agreed with John on 2026-10-05: five subphases in the list's order, each
+its own session and pull request, as phase 2's were. Each leaves `npm run
+typecheck` and `npm test` passing.
+
+**3a: the database.** The Postgres store beside the memory store, numbered
+migrations in the `mind` schema and `npm run migrate`, accounts and their
+API keys (`npm run key`), and `npm run epoch` to start one. *Done when* a
+scripted epoch kept in Postgres, written from two processes at once, ends
+in the same game as one in memory and its stored log replays to it.
+
+**3b: the MCP server.** The five tools over streamable HTTP, stateless,
+loopback-only, a bearer key per request, the game layer's error codes
+mapped to MCP errors.
+
+**3c: the brief as text.** The engine's text rendering of the brief, "since
+last wake" narrated from the Record and the mind's own events, and the test
+that keeps it within 1,000–2,000 tokens.
+
+**3d: the runner core.** Persona and role prompts, one model call, JSON
+orders, one retry with the error, the optional lookup round; adapted from
+Fritter Board's single-shot mode.
+
+**3e: the simulated week.** One model bot for seven simulated days against
+scripted players on a fake clock. *Done when* phase 3 is.
+
 ## Phase 4: social
 
 Commons, channels, trades with escrow, protocols, all as free orders with

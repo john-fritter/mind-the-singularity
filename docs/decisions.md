@@ -553,3 +553,55 @@ power ratio, a smaller conquest share (mostly turns conquest into core
 destruction: more deletions, same winner), flat defense per core, a wider
 protection range, longer safe mode, and players that build sentries after
 losing a fight. None moved the conqueror below 70%.
+
+## 2026-10-05 — Phase 3's subphases, and 3a: the database
+
+John agreed splitting phase 3 into five subphases in the build plan's
+order (3a database, 3b MCP server, 3c the brief as text, 3d runner core,
+3e the simulated week), one session and pull request each, and 3a's
+proposal: the Postgres store, migrations, accounts and API keys. No numbers
+in `config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **The world is one row per epoch**, rewritten on each write. At a dozen
+  minds it's small, and the engine's state stays the one source of truth.
+  The orders log, the Record and the owners are rows, only ever appended.
+- **An epoch's rules and seed are stored with it**, as the save file holds
+  them, so replay from the database is exact.
+- **Keys are hashed with SHA-256**, as Fritter Board's bot tokens are: they're
+  32 random bytes, so a slow hash adds nothing but time on every call. One
+  live key per account; a new key revokes the old. They carry a `mind_`
+  prefix.
+
+**Smaller calls, made here:**
+
+- **JSON, not JSONB.** JSONB reorders object keys, and the engine walks some
+  objects (units, buildings) in key order, so a world read back from JSONB
+  played differently: the equivalence test caught it on its first run. The
+  game's state is stored as `json`, which keeps the text as written.
+- **The epoch's row lock, not an advisory lock.** The build plan says one
+  advisory lock per epoch; `SELECT … FOR UPDATE` on the epoch's row
+  serializes the same writes without a lock key to keep apart from Fritter
+  Board's in the shared database.
+- **The store caches the game and catches up.** Each `PostgresStore` keeps
+  the game it last read; `epochs.writes` counts the log's rows, so a read
+  is one small query when nothing changed, and otherwise fetches only the
+  rows past what it has. A write catches up inside its locked transaction,
+  so it always runs against the latest game, whichever process wrote last.
+  The cache takes a write only after it commits. Calls on one store run
+  one at a time, as the memory store's do.
+- **The pool is in `src/db/`**, beside the migrator, as in Fritter Board, so
+  `src/auth/` (and 3b's MCP server, through it) reach the database without
+  importing the store.
+- **Account names** are letters, digits, `_`, `.` and `-`, up to 80, unique
+  in any case, and never contain a colon, so no account can be a legacy
+  system's. `owners.account` is a plain name, not a reference: legacy
+  systems and local games own minds without an accounts row.
+- **`npm run epoch -- new`** starts the next epoch now with the rules as
+  they are, and refuses while the last one is still running. The epoch's
+  lifecycle (boot, reboot, Archive) is phase 6's.
+- **The equivalence test** plays eight days of every scripted strategy and
+  the legacy systems in memory and in Postgres, the Postgres one through two
+  stores on two pools taking turns call by call, and checks the games match
+  and the stored log replays to the stored world.
