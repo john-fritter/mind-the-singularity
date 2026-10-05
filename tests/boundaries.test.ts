@@ -25,7 +25,7 @@ const PLAYERS_MAY_IMPORT = [
   "game/read.js",
   "game/state.js",
   "store/store.js",
-  ...["architectures", "context", "cycles", "economy", "names", "power", "programs", "rng", "rules", "units"].map((m) => `engine/${m}.js`),
+  ...["architectures", "combat", "context", "cycles", "economy", "names", "power", "programs", "rng", "rules", "units"].map((m) => `engine/${m}.js`),
 ];
 
 async function files(dir: string): Promise<string[]> {

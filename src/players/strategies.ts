@@ -40,25 +40,29 @@ export class Planned implements Player {
     if (s.countermeasure !== null) plan.setCountermeasure(plan.program("battle"), s.countermeasure);
 
     if (s.attack) {
-      const target = weakest(plan.targets());
+      // A hunter goes after a converged mind first, by conquest: beating one collapses the convergence.
+      const converged = s.singularity === "hunt" ? weakest(plan.targets().filter((t) => t.status === "converged")) : undefined;
+      const target = converged ?? weakest(plan.targets());
+      const mode = converged ? "conquest" : s.attack.mode;
       if (target && plan.attack > 0) {
         const probed = previous?.find((r) => r.ok && r.status?.designation === target.designation)?.status;
-        if (step === 1 && !probed && plan.knows("probe") && plan.cycles >= 1 + rules.action_cycles.attack) {
-          // Look first; the second step decides.
-          plan.probe(target.designation);
+        // Look first, if it can; the second step decides.
+        if (step === 1 && !probed && plan.knows("probe") && plan.cycles >= 1 + rules.action_cycles.attack && plan.probe(target.designation)) {
           return plan.orders();
         }
         const defense = probed ? forceTotals(rules, probed.units).defense : target.power * s.attack.blind_defense_per_power;
         if (plan.attack >= s.attack.margin * defense) {
-          plan.attackWith(target.designation, s.attack.mode, plan.program("battle"));
+          plan.attackWith(target.designation, mode, plan.program("battle"));
         } else if (s.attack.hostile) {
           plan.hostile(plan.program("hostile"), target.designation);
         }
       }
     }
 
-    // The Singularity, once known, comes before everything else.
-    const converging = s.singularity && plan.knows("singularity") && brief.you.convergedAt === null;
+    // The Singularity, once known, comes before everything else: for a
+    // leader always, for a joiner while a convergence is underway.
+    const stance = s.singularity === "lead" || (s.singularity === "join" && brief.convergence !== null);
+    const converging = stance && plan.knows("singularity") && brief.you.convergedAt === null;
     if (converging) plan.converge();
     if (converging && !plan.canConverge()) {
       // Save for it: cycles up to its cost, compute from Spin Up, and datacenters for the storage.

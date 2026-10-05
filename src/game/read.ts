@@ -144,7 +144,12 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   const boot = game.log.find((e) => e.kind === "boot" && e.domain === me.id);
   const sinceSeq = lastOrders?.seq ?? (boot ? boot.seq - 1 : 0);
   // A battle the mind fought comes with its private report, which says more.
-  const fresh = settled.record.filter((e) => e.seq > sinceSeq && visibleTo(e, me.id) && !(e.type === "battle" && e.domains.includes(me.id)));
+  // The Record is in sequence order, so only its tail can be new.
+  let from = settled.record.length;
+  while (from > 0 && settled.record[from - 1]!.seq > sinceSeq) from--;
+  const fresh = settled.record
+    .slice(from)
+    .filter((e) => visibleTo(e, me.id) && !(e.type === "battle" && e.domains.includes(me.id)));
   const kept = fresh.slice(-site.brief.events);
 
   const force = forceTotals(rules, me.units);

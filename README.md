@@ -58,7 +58,25 @@ npm run typecheck
 npm test             # every tests/*.test.ts, one process each
 npm run curves       # print the main curves and a rough solo projection
 npm run play -- help # play a local game from the command line
+npm run sim          # 200 epochs of scripted players and the balance report
 ```
+
+## The simulator
+
+`npm run sim` runs whole epochs of scripted players on a fake clock, spread
+over one process per core, and prints a balance report: power, rank and wins
+by strategy, resource curves, convergences, collapses and Singularities,
+deletions, cycles wasted at the cap, and phase 2's checks as PASS or FAIL.
+
+```bash
+npm run sim -- --epochs 40 --minds 8 --days 60 --seed 1
+npm run sim -- --players builder,raider --rules /tmp/try.yaml   # try a change first
+npm run sim -- --json report.json                              # every number
+```
+
+Each epoch draws `--minds` minds from `--players` (each strategy once while
+there's room) with random architectures, alongside the legacy systems. Epoch
+i is seeded `--seed` + i, so a run is reproducible.
 
 ## Playing locally
 
