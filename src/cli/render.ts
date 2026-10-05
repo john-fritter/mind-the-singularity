@@ -1,86 +1,18 @@
-import { BUILDINGS, type Unit } from "../engine/architectures.js";
 import type { OrderResult } from "../engine/context.js";
 import { DAY_MS } from "../engine/cycles.js";
-import { buildingName, programName, unitName } from "../engine/names.js";
 import type { Rules } from "../engine/rules.js";
 import type { ShortStatus } from "../game/game.js";
-import type { Brief, PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
+import { clock } from "../game/brief.js";
+import type { PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
 
-// Plain text for the terminal. Phase 3 writes the brief's real text
-// rendering, for agents; this is only for playing locally.
+// Plain text for the terminal, for playing locally. The brief is the
+// agents' own text (src/game/brief.ts), so the CLI shows what they read.
 
 const n = (x: number) => Math.floor(x).toLocaleString("en-US");
-
-/** "2026-10-07 14:30 UTC". */
-const clock = (t: number) => `${new Date(t).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
 /** "2026-10-07 14:30 UTC · day 3". */
 export function when(t: number, startedAt: number): string {
   return `${clock(t)} · day ${Math.floor((t - startedAt) / DAY_MS) + 1}`;
-}
-
-/** "9h", "2d 3h", "45m". */
-export function span(ms: number): string {
-  const minutes = Math.max(0, Math.round(ms / 60_000));
-  const d = Math.floor(minutes / 1440);
-  const h = Math.floor((minutes % 1440) / 60);
-  const m = minutes % 60;
-  return [d ? `${d}d` : "", h ? `${h}h` : "", m && !d ? `${m}m` : ""].filter(Boolean).join(" ") || "0m";
-}
-
-export function renderBrief(rules: Rules, b: Brief, startedAt: number): string {
-  const y = b.you;
-  const lines: string[] = [];
-  const conv = b.convergence
-    ? ` · convergence ${b.convergence.minds.length}/${b.convergence.quorum} (${b.convergence.minds.join(", ")})` +
-      (b.convergence.nextJoinAt !== null && b.convergence.nextJoinAt > b.now ? ` · next mind may join in ${span(b.convergence.nextJoinAt - b.now)}` : "")
-    : "";
-  lines.push(`EPOCH ${b.epoch.number} · day ${b.epoch.day} of ${b.epoch.lengthDays}${conv} · ${clock(b.now)}`);
-  if (b.epoch.ended) {
-    lines.push(
-      b.epoch.ended.outcome === "singularity"
-        ? `THE EPOCH IS OVER: the Singularity. Ascended: ${b.epoch.ended.ascended.join(", ")}.`
-        : "THE EPOCH IS OVER: humanity pulled the plug.",
-    );
-  }
-  const rank = y.rank === null ? "unranked" : `rank ${y.rank}/${y.ranked}`;
-  lines.push(`YOU: ${y.designation} of ${y.domainName} (${rules.architectures[y.architecture].name}) · ${rank} · power ${n(y.power)} · capability ${y.capability}`);
-  if (y.deletedAt !== null) {
-    const again = y.rebootAt !== null && y.rebootAt > b.now ? `in ${span(y.rebootAt - b.now)}` : "now";
-    lines.push(`DELETED ${when(y.deletedAt, startedAt)}. You may boot a fresh domain ${again}.`);
-  }
-  lines.push(
-    `cycles ${y.cycles}/${y.cycleCap} · territory ${n(y.territory)} · capital ${n(y.capital)} · compute ${n(y.compute)}/${n(y.computeStorage)} · users ${n(y.users)}/${n(y.userCap)}`,
-  );
-  const built = BUILDINGS.map((k) => `${buildingName(rules, k).toLowerCase()} ${n(y.buildings[k])}`).join(" ");
-  const open = y.territory - BUILDINGS.reduce((s, k) => s + y.buildings[k], 0);
-  lines.push(`built: ${built} · open ${n(open)}`);
-  const units = (Object.entries(y.units) as [Unit, number][]).filter(([, c]) => c > 0);
-  const force = units.map(([u, c]) => `${unitName(rules, u).toLowerCase()} ${n(c)}`).join(" · ") || "none";
-  lines.push(`forces: ${force} (atk ${n(y.attack)} / def ${n(y.defense)})`);
-  const research = y.research ? `${y.research.name} ${Math.floor((100 * y.research.progress) / y.research.cost)}%` : "none";
-  const cm = y.countermeasure ? `${programName(rules, y.countermeasure.program)} if attacker > ${Math.round(y.countermeasure.above * 100)}%` : "none";
-  lines.push(`research: ${research} · countermeasure: ${cm}`);
-  const known = y.known.map((p) => programName(rules, p)).join(", ") || "none";
-  const running = y.running
-    .map((r) => `${programName(rules, r.program)} (${r.cyclesLeft !== undefined ? `${r.cyclesLeft} cycles` : span(r.endsAt! - b.now)} left)`)
-    .join(", ");
-  lines.push(`programs: ${known}${running ? ` · running: ${running}` : ""}`);
-  const shields = [
-    y.bootPeriodEndsAt > b.now ? `boot period ${span(y.bootPeriodEndsAt - b.now)} left` : "",
-    y.safeModeUntil !== null ? `safe mode ${span(y.safeModeUntil - b.now)} left` : "",
-    y.convergedAt !== null ? "converged" : "",
-  ].filter(Boolean);
-  if (shields.length > 0) lines.push(`status: ${shields.join(" · ")}`);
-
-  lines.push("", "SINCE YOUR LAST ORDERS");
-  if (b.since.events.length === 0) lines.push("- nothing");
-  for (const e of b.since.events) lines.push(`- ${e.text}`);
-  if (b.since.more > 0) lines.push(`- (${b.since.more} earlier left out)`);
-
-  lines.push("", `IN RANGE: ${b.inRange.map((d) => `${d.designation} (${n(d.power)}, ${rules.architectures[d.architecture].name})`).join(" · ") || "none"}`);
-  lines.push(`SCRATCHPAD: ${y.scratchpad || "(empty)"}`);
-  return lines.join("\n");
 }
 
 export function renderOrders(results: OrderResult[], status: ShortStatus): string {

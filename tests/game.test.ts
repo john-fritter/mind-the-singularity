@@ -127,7 +127,7 @@ async function readsDontWrite() {
   const warnAt = T0 + (rules.epoch.length_days - rules.epoch.shutdown_warning_days) * DAY_MS;
   const later = warnAt + HOUR_MS;
   const b = brief(await getBrief(store, john, later));
-  const warning = b.since.events.find((e) => e.type === "shutdown_warning");
+  const warning = b.since.world.find((e) => e.type === "shutdown_warning");
   assert.ok(warning, "the brief shows a timer that fired since");
   assert.equal(b.epoch.day, rules.epoch.length_days - rules.epoch.shutdown_warning_days + 1);
   const record = await view(store, ada, { what: "record", type: "shutdown_warning" }, later);
@@ -143,7 +143,8 @@ async function readsDontWrite() {
   assert.equal(brief(await getBrief(store, john, T0)).now, later);
 
   // "Since last wake" is since the mind's last orders.
-  assert.deepEqual(brief(await getBrief(store, john, later)).since.events, []);
+  const since = brief(await getBrief(store, john, later)).since;
+  assert.deepEqual([since.yours, since.world, since.fights, since.from], [[], [], [], later]);
 }
 
 async function views() {

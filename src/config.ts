@@ -30,7 +30,7 @@ const count = z.number().int().positive();
 
 /** Server tunables. Every object is strict, as the rules' are. */
 export const SiteSchema = z.strictObject({
-  brief: z.strictObject({ events: count }),
+  brief: z.strictObject({ yours: count, world: count, fights: count, names_per_line: count, in_range: count, max_chars: count, scanned: count }),
   view: z.strictObject({ record_default: count, record_max: count }),
 });
 export type Site = z.infer<typeof SiteSchema>;

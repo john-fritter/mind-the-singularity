@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { loadRules } from "../src/config.js";
 import { HOUR_MS } from "../src/engine/cycles.js";
 import { bootMind, currentMind, newGame, submitOrders } from "../src/game/game.js";
+import { briefText } from "../src/game/brief.js";
 import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
 
@@ -49,9 +50,13 @@ async function main() {
   const theirs = (await getBrief(store, vesta, T)) as Brief;
   const text = JSON.stringify(theirs);
   assert.ok(!text.includes(SECRET), "a scratchpad leaked into another mind's brief");
-  assert.ok(!theirs.since.events.some((e) => e.type === "probed"), "the target was told of a probe");
-  assert.ok(theirs.since.events.some((e) => e.type === "battle_report"), "the defender gets its battle report");
-  assert.ok(theirs.since.events.every((e) => e.public || e.domains.includes(currentMind(game, "vesta")!.id)));
+  const seen = [...theirs.since.yours, ...theirs.since.world, ...theirs.since.fights];
+  assert.ok(!seen.some((e) => e.type === "probed"), "the target was told of a probe");
+  assert.ok(theirs.since.yours.some((e) => e.type === "battle_report"), "the defender gets its battle report");
+  assert.ok(seen.every((e) => e.public || e.domains.includes(currentMind(game, "vesta")!.id)));
+  assert.ok(theirs.since.world.every((e) => e.public) && theirs.since.fights.every((e) => e.public));
+  const theirText = briefText(rules, theirs);
+  assert.ok(!theirText.includes(SECRET) && !theirText.includes("Probed"), "the brief's text leaked something private");
   for (const d of theirs.inRange) assert.deepEqual(Object.keys(d).sort(), SUMMARY_KEYS);
 
   // HALCYON's own brief shows what's its own.

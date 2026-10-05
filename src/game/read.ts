@@ -115,15 +115,21 @@ export interface Brief {
   };
   convergence: { minds: string[]; quorum: number; nextJoinAt: number | null; collapsesAt: number | null } | null;
   you: YourStatus;
-  /** What you can see that happened since your last orders, newest kept; `more` were left out. */
-  since: { events: ShownEvent[]; more: number };
+  /**
+   * What happened since your last orders (or your boot): `from` is when
+   * that was. Your own events, private ones included, newest kept up to
+   * site.yaml's brief.yours; then the public events about other minds, the
+   * fights (battles, hostile programs) apart from the rest, newest kept up
+   * to brief.scanned between them. `left` counts what the caps left out.
+   */
+  since: { from: number; yours: ShownEvent[]; world: ShownEvent[]; fights: ShownEvent[]; left: number };
   /** Minds you could attack now (your own boot period aside), strongest first. */
   inRange: PublicSummary[];
 }
 
 const designationOf = (world: World, id: number) => world.domains.find((d) => d.id === id)?.designation ?? "?";
 
-/** The brief's data for the account's mind. Phase 3 renders it as text. */
+/** The brief's data for the account's mind. `briefText` (brief.ts) writes it out for agents. */
 export async function getBrief(store: WorldStore, identity: Identity, now: number): Promise<Brief | GameError> {
   const id = IdentitySchema.safeParse(identity);
   if (!id.success) return gameError("invalid", "An account name is needed, at most 80 characters.");
@@ -143,14 +149,18 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   // system, booted with the game and in no boot entry, from the start.
   const boot = game.log.find((e) => e.kind === "boot" && e.domain === me.id);
   const sinceSeq = lastOrders?.seq ?? (boot ? boot.seq - 1 : 0);
-  // A battle the mind fought comes with its private report, which says more.
+  const sinceAt = lastOrders?.at ?? boot?.at ?? world.startedAt;
   // The Record is in sequence order, so only its tail can be new.
   let from = settled.record.length;
   while (from > 0 && settled.record[from - 1]!.seq > sinceSeq) from--;
-  const fresh = settled.record
-    .slice(from)
-    .filter((e) => visibleTo(e, me.id) && !(e.type === "battle" && e.domains.includes(me.id)));
-  const kept = fresh.slice(-site.brief.events);
+  const fresh = settled.record.slice(from).filter((e) => visibleTo(e, me.id));
+  // A battle the mind fought comes with its private report, which says more.
+  const yours = fresh.filter((e) => e.domains.includes(me.id) && e.type !== "battle");
+  const allOthers = fresh.filter((e) => !e.domains.includes(me.id));
+  const others = allOthers.slice(-site.brief.scanned);
+  const isFight = (e: GameEvent) => e.type === "battle" || e.type === "hostile";
+  const keptYours = yours.slice(-site.brief.yours);
+  const left = yours.length - keptYours.length + allOthers.length - others.length;
 
   const force = forceTotals(rules, me.units);
   const target = me.researchTarget;
@@ -191,7 +201,13 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
       deletedAt: me.deletedAt,
       rebootAt: rebootAt(rules, me),
     },
-    since: { events: kept.map((e) => shown(rules, e)), more: fresh.length - kept.length },
+    since: {
+      from: sinceAt,
+      yours: keptYours.map((e) => shown(rules, e)),
+      world: others.filter((e) => !isFight(e)).map((e) => shown(rules, e)),
+      fights: others.filter(isFight).map((e) => shown(rules, e)),
+      left,
+    },
     inRange:
       me.deletedAt !== null
         ? []

@@ -160,9 +160,10 @@ async function memoryGame() {
   assert.equal(out.status.designation, "HALCYON");
   assert.ok((await call(halcyon, "submit_orders", { orders: "expand" })).error, "orders are a list");
 
-  const mine = await json(halcyon, "get_brief");
-  assert.equal(mine.you.designation, "HALCYON");
-  assert.equal(mine.you.scratchpad, SECRET);
+  // The brief is text, the same text the game layer writes.
+  const mine = (await call(halcyon, "get_brief")).text;
+  assert.match(mine, /^YOU: HALCYON of /m);
+  assert.match(mine, new RegExp(`^SCRATCHPAD: ${SECRET}$`, "m"));
 
   // What VESTA can reach: its brief, HALCYON's page, the Record, the rankings. None of it is HALCYON's private state.
   const theirs = [
@@ -175,7 +176,7 @@ async function memoryGame() {
   for (const r of theirs) {
     assert.ok(!r.error, r.text);
     assert.ok(!r.text.includes(SECRET), "HALCYON's scratchpad stays private");
-    assert.ok(!r.text.includes('"type":"probed"'), "a probe stays private");
+    assert.ok(!r.text.includes('"type":"probed"') && !r.text.includes("Probed "), "a probe stays private");
   }
   const page = JSON.parse(theirs[1]!.text).domain;
   assert.deepEqual(Object.keys(page).sort(), ["architecture", "bootedAt", "designation", "domainName", "manifesto", "power", "rank", "status", "territory"]);
@@ -195,7 +196,7 @@ async function memoryGame() {
   await remote.connect(
     new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), { requestInit: { headers: { authorization: "Bearer key-v" } } }),
   );
-  assert.equal((await json(remote, "get_brief")).you.designation, "VESTA");
+  assert.match((await call(remote, "get_brief")).text, /^YOU: VESTA of /m);
   await remote.close();
   await new Promise((r) => server.close(r));
 
@@ -240,7 +241,7 @@ async function postgres() {
     clock.now = T0 + HOUR_MS;
     const out = await json(client, "submit_orders", { orders: [{ do: "expand", cycles: 1 }] });
     assert.ok(out.results[0].ok);
-    assert.equal((await json(client, "get_brief")).epoch.number, 1);
+    assert.match((await call(client, "get_brief")).text, /^EPOCH 1 · /);
 
     // A new epoch replaces the old: the account has no mind in it yet.
     await createEpoch(pool, newGame(rules, { epoch: 2, seed: 4, startedAt: T0 + 2 * HOUR_MS }));
