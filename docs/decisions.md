@@ -187,3 +187,64 @@ upkeep and housing went up. The projection now reaches about 900 sectors
 and capability 4 by day 12, and the full research path around day 39 for a
 player with a fifth of its buildings in labs. That fits "a Singularity in
 some epochs, not most", but it is a guess for the simulator to test.
+
+## 2026-10-05 — Phase 2 in subphases
+
+Phase 2 is too much for one session and one review, so John agreed to
+split it into five subphases, each its own session and pull request: 2a
+one domain, 2b minds against each other, 2c the game layer, store and
+CLI, 2d scripted players and legacy systems, 2e the simulator and tuning.
+`docs/build-plan.md` gives each a definition of done. He also agreed that
+in tuning, numbers in `config/rules.yaml` may change as the simulator
+needs, with each change and its reason logged here.
+
+## 2026-10-05 — Phase 2a: one domain
+
+The engine now runs a domain on its own: `createWorld`, `bootMind`,
+`applyOrders` and `settle` in `src/engine/world.ts`, each returning a new
+world and the events it produced without changing the one it was given.
+Choices the design didn't make:
+
+- **Times are milliseconds** since the Unix epoch, as plain numbers, so
+  the world is plain JSON a store can save as it is.
+- **Cycles accrue on a fixed grid** from the domain's boot, one per
+  `cycles.interval_minutes`. The stored balance is synced only when
+  cycles are spent; reads compute it. A part-finished interval is never
+  lost, and cycles lost to the cap are counted (`cyclesWasted`) for the
+  simulator's report.
+- **The action comes first, then the cycle's economy.** A building
+  finished this cycle earns this cycle, and an order that can't do
+  anything fails before spending a cycle. An order that can do part of
+  what was asked does that part and says why it stopped.
+- **`cycles` in an order is cycles to spend.** Expand, Monetize and Spin Up
+  take it; with each costing one cycle, that's the number of times.
+- **A Build or Manufacture batch can mix kinds** (`{"buildings": {"city":
+  5, "lab": 5}}`) as well as take one (`{"building": "city", "count":
+  12}`), since a batch's size is shared. It stops after a batch that hit a
+  limit other than its size (capital, land, housing, users), rather than
+  spending a cycle per building as income trickles in.
+- **Whole numbers in state.** Income and growth round down; upkeep rounds
+  up. Unpaid upkeep takes what capital (or compute) there is and loses
+  `economy.shortfall_loss_share` of each hardware (or deployment) type;
+  buildings are never abandoned.
+- **Research overflow is lost** and the target clears when a program is
+  learned, so the brief can show the mind has nothing being researched.
+- **A self program run again restarts** its duration rather than
+  stacking. Abundance Protocol's capital bonus counts toward Monetize,
+  which is "one cycle's income".
+- **A crash is a failed order** that still spent its compute and cycle.
+- **Names or ids.** Orders may name buildings, units and programs by id or
+  display name, in any case.
+- **The Record isn't in the world.** Each call returns its events; the
+  store appends them. Events carry the names they need as they were, so
+  entries read right after a mind is deleted. Public events are the
+  Record; private ones go only to the domains they're about.
+- **One sequence counter** numbers both orders and events. Each order
+  draws from an RNG seeded by the epoch seed and its sequence number; a
+  malformed order takes no number. The RNG is sfc32 seeded through
+  FNV-1a, in `src/engine/rng.ts`.
+- **Submitting orders marks a mind active** (for the quorum's "woke in
+  the last 72 hours"). Phase 3 can decide whether reading the brief
+  counts too.
+- **Battle, hostile, Probe and Singularity runs are refused** until 2b
+  writes them.
