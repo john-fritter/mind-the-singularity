@@ -97,7 +97,7 @@ async function main() {
   const dir = mkdtempSync(path.join(tmpdir(), "mind-replay-"));
   try {
     const file = path.join(dir, "game.json");
-    writeSave(file, { version: 1, clock: game.world.now, game });
+    writeSave(file, { version: 1, clock: game.world.now, game, players: [] });
     const loaded = readSave(file);
     assert.deepEqual(loaded.game, game);
     assert.deepEqual(replay(loaded.game).world, game.world);

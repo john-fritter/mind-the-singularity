@@ -139,9 +139,10 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   const order = ranked(rules, world);
 
   const lastOrders = game.log.findLast((e) => e.kind === "orders" && e.domain === me.id);
-  // A mind that hasn't given orders yet hears from its own boot on.
-  const boot = game.log.find((e) => e.kind === "boot" && e.domain === me.id)!;
-  const sinceSeq = lastOrders?.seq ?? boot.seq - 1;
+  // A mind that hasn't given orders yet hears from its own boot on; a legacy
+  // system, booted with the game and in no boot entry, from the start.
+  const boot = game.log.find((e) => e.kind === "boot" && e.domain === me.id);
+  const sinceSeq = lastOrders?.seq ?? (boot ? boot.seq - 1 : 0);
   // A battle the mind fought comes with its private report, which says more.
   const fresh = settled.record.filter((e) => e.seq > sinceSeq && visibleTo(e, me.id) && !(e.type === "battle" && e.domains.includes(me.id)));
   const kept = fresh.slice(-site.brief.events);

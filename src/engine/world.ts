@@ -5,7 +5,7 @@ import { reportUpkeepLosses } from "./cycle.js";
 import { shutdownTimers } from "./convergence.js";
 import { syncCycles } from "./cycles.js";
 import { rebootAt } from "./deletion.js";
-import { startingDomain } from "./domain.js";
+import { legacyDomain, startingDomain } from "./domain.js";
 import { parseOrder } from "./orders.js";
 import { emit, type GameEvent } from "./record.js";
 import { rngFor } from "./rng.js";
@@ -103,6 +103,31 @@ export function bootMind(rules: Rules, world: World, raw: BootInput, now: number
     architecture: domain.architecture,
   });
   return { ok: true, world: next, domain: domain.id, events };
+}
+
+/**
+ * Boots every legacy system in the rules, in their order, at the epoch's
+ * start. A world needs this once, before any mind boots; the game layer
+ * does it when it creates a game. Keys: legacy.systems, as legacyDomain
+ */
+export function bootLegacy(rules: Rules, world: World): { world: World; domains: number[]; events: GameEvent[] } {
+  if (world.domains.length > 0) throw new Error("legacy systems boot before any mind");
+  const next = structuredClone(world);
+  const events: GameEvent[] = [];
+  const now = next.startedAt;
+  const domains = rules.legacy.systems.map((system) => {
+    const domain = legacyDomain(rules, system, next.nextDomainId++, now);
+    next.domains.push(domain);
+    emit(next, events, now, {
+      type: "booted",
+      domain: domain.id,
+      designation: domain.designation,
+      domainName: domain.domainName,
+      architecture: domain.architecture,
+    });
+    return domain.id;
+  });
+  return { world: next, domains, events };
 }
 
 export interface OrdersOutcome {

@@ -22,6 +22,8 @@ export interface Domain {
   domainName: string;
   architecture: Architecture;
   manifesto: string;
+  /** A legacy system: a code-run domain from rules.legacy, booted with the epoch. It doesn't count toward the quorum. */
+  legacy: boolean;
   bootedAt: number;
   /** The last time its mind submitted orders. */
   lastActiveAt: number;

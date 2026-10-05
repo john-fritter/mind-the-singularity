@@ -1,0 +1,83 @@
+# The scripted players (src/players/): how the four dumb strategies and the
+# random player play. These aren't game rules; config/rules.yaml has those.
+# Phase 2e tunes these in the simulator. The legacy systems' own mixes are
+# game rules, under `legacy` in config/rules.yaml.
+#
+# Each wake a planned strategy, in order: picks its next research target
+# from `research`; sets its countermeasure; attacks (if it does); runs its
+# self program and deployments; spends the cycles above reserve_cycles,
+# `expand` and `manufacture` shares of them on those and the rest on Build
+# batches in the `buildings` mix; and puts whatever couldn't be used into
+# Expand (when land is short) or `leftover`.
+
+# 8 a day, the rate the bot runner is planned to wake bots at.
+wake_every_hours: 3
+steps_per_wake: 2
+
+strategies:
+  # Economy first; never attacks.
+  builder:
+    research: [self, deploy1, probe, battle, deploy2, hostile, deploy3]
+    self: true
+    deploy: false
+    countermeasure: 1
+    attack: null
+    singularity: false
+    reserve_cycles: 0
+    reserve_compute: 0
+    expand: 0.35
+    manufacture: 0
+    leftover: monetize
+    buildings: { city: 0.45, datacenter: 0.15, factory: 0.05, lab: 0.2, core: 0.1, firewall: 0.05 }
+    hardware: { drones: 0, sentries: 1, walkers: 0 }
+
+  # Builds a force and raids the weakest mind in range when it can win.
+  raider:
+    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile]
+    self: true
+    deploy: true
+    countermeasure: 1.5
+    attack: { mode: raid, margin: 1.3, blind_defense_per_power: 0.25, hostile: true }
+    singularity: false
+    reserve_cycles: 0
+    reserve_compute: 300
+    expand: 0.25
+    manufacture: 0.35
+    leftover: spin_up
+    buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
+    hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
+
+  # Cores, firewalls and sentries; banks cycles; never attacks.
+  turtle:
+    research: [self, deploy1, battle, probe, deploy2, deploy3, hostile]
+    self: true
+    deploy: true
+    countermeasure: 0.5
+    attack: null
+    singularity: false
+    reserve_cycles: 24
+    reserve_compute: 500
+    expand: 0.25
+    manufacture: 0.25
+    leftover: monetize
+    buildings: { city: 0.3, datacenter: 0.15, factory: 0.1, lab: 0.1, core: 0.2, firewall: 0.15 }
+    hardware: { drones: 0, sentries: 0.8, walkers: 0.2 }
+
+  # Labs, the shortest path to the Singularity, and runs it the moment it can.
+  converger:
+    research: [self, probe, deploy1, battle, deploy2, hostile, deploy3, singularity]
+    self: true
+    deploy: false
+    countermeasure: 1
+    attack: null
+    singularity: true
+    reserve_cycles: 0
+    reserve_compute: 0
+    expand: 0.35
+    manufacture: 0
+    leftover: spin_up
+    buildings: { city: 0.3, datacenter: 0.25, factory: 0, lab: 0.35, core: 0.05, firewall: 0.05 }
+    hardware: { drones: 0, sentries: 1, walkers: 0 }
+
+random:
+  actions_per_wake: 6

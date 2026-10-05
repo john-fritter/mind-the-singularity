@@ -11,10 +11,22 @@ import path from "node:path";
 //   server;
 // - the MCP server and the web view go through src/game/, never the store;
 // - only src/game/ calls the engine's entry points (engine/world.ts), so
-//   every write goes through its checks and its log.
+//   every write goes through its checks and its log;
+// - scripted players see what an agent sees: src/players/ reaches the game
+//   through src/game/, and takes from the engine only ids, types and pure
+//   formulas, never the world, its state or the order code.
 // A directory that doesn't exist yet passes trivially.
 
 const SRC = path.join(import.meta.dirname, "..", "src");
+
+/** What src/players/ may import from outside itself. */
+const PLAYERS_MAY_IMPORT = [
+  "game/game.js",
+  "game/read.js",
+  "game/state.js",
+  "store/store.js",
+  ...["architectures", "context", "cycles", "economy", "names", "power", "programs", "rng", "rules", "units"].map((m) => `engine/${m}.js`),
+];
 
 async function files(dir: string): Promise<string[]> {
   if (!existsSync(dir)) return [];
@@ -111,6 +123,13 @@ async function main() {
     for (const { file, target } of await importsOf(dir)) {
       assert.ok(target !== "engine/world.js", `${file} imports engine/world.js: write through src/game/`);
     }
+  }
+
+  for (const { file, target } of await importsOf("players")) {
+    assert.ok(
+      target.startsWith("players/") || PLAYERS_MAY_IMPORT.includes(target),
+      `${file} imports ${target}: a player sees only its brief, the rules and their formulas`,
+    );
   }
 
   for (const dir of ["mcp", "web"]) {

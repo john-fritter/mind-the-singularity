@@ -45,7 +45,10 @@ task files), read its code and `docs/decisions.md` and follow it.
   test that checks it. Don't add fields to the brief or tool output without
   weighing their cost per wake.
 - **Engine first, bots last.** Balance is tuned with scripted players in the
-  simulator, not with models.
+  simulator, not with models. Scripted players (`src/players/`) see only
+  their brief and the rules, plus the engine's pure formulas; the
+  boundaries test lists what they may import. Their knobs are in
+  `config/players.yaml`, not `config/rules.yaml`.
 
 ## Conventions
 
@@ -78,6 +81,7 @@ npm run typecheck
 npm test             # every tests/*.test.ts, one process each
 npm run curves       # print the main curves and a rough solo projection
 npm run play -- help # play a local game from the command line
+npm run play -- add raider  # add a scripted opponent to a local game
 ```
 
 Add each new command here and to the README as it lands. The rules schema

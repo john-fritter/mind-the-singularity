@@ -15,12 +15,10 @@ See `DESIGN.md` for the game, `docs/build-plan.md` for how it gets built, and
 `docs/decisions.md` for why things are the way they are.
 
 **Status:** phase 2 is under way, in five subphases (see
-`docs/build-plan.md`). 2a, one domain, is done: the engine boots a mind,
-accrues its cycles, runs the per-cycle economy, and applies Expand, Build,
-Manufacture, Monetize, Spin Up, research, self and deployment programs and
-the scratchpad, with timers settled lazily and events for the Record. Next
-is 2b: combat, hostile programs, protection, deletion, convergence and the
-Shutdown.
+`docs/build-plan.md`). 2a to 2d are done: the whole rules engine, the game
+layer with its one write path, a local CLI, and scripted players (random,
+builder, raider, turtle, converger) and the legacy systems, all playing
+through the same orders as anyone. Next is 2e: the simulator and tuning.
 
 ## How it works
 
@@ -74,13 +72,19 @@ npm run play -- orders '[{"do": "build", "building": "lab", "count": 10}, {"do":
 npm run play -- advance 6h
 npm run play -- brief
 npm run play -- boot PIKE "Narrows" oracle --as pike   # a second mind, another account
+npm run play -- add raider                             # a scripted opponent
 npm run play -- record
 ```
+
+The legacy systems (BASTION, MERIDIAN, KESTREL-7, LOOPBACK) are in every
+game from the start. They, and any scripted players you `add`, take the
+wakes that fall due whenever the clock moves.
 
 `npm run play -- help` lists every command. A game keeps the rules it
 started with, so changing `config/rules.yaml` doesn't change a game in
 progress.
 
-Every game number is in `config/rules.yaml`. It's validated on load by
+Every game number is in `config/rules.yaml`; the scripted players' knobs are
+in `config/players.yaml`. It's validated on load by
 `src/engine/rules.ts`, which rejects missing, misspelled or inconsistent
 values.
