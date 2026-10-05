@@ -14,11 +14,13 @@ much care as the engine. Humans can play too, by the same rules.
 See `DESIGN.md` for the game, `docs/build-plan.md` for how it gets built, and
 `docs/decisions.md` for why things are the way they are.
 
-**Status:** phase 1, the numbers, is done: every cost, stat, rate and
-formula constant is in `config/rules.yaml`, validated by a strict schema,
-and each formula is written once in `src/engine/`. The numbers are first
-guesses. Next is phase 2: the engine, the command line, scripted players and
-the simulator that tunes them.
+**Status:** phase 2 is under way, in five subphases (see
+`docs/build-plan.md`). 2a, one domain, is done: the engine boots a mind,
+accrues its cycles, runs the per-cycle economy, and applies Expand, Build,
+Manufacture, Monetize, Spin Up, research, self and deployment programs and
+the scratchpad, with timers settled lazily and events for the Record. Next
+is 2b: combat, hostile programs, protection, deletion, convergence and the
+Shutdown.
 
 ## How it works
 

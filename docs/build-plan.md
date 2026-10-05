@@ -129,6 +129,49 @@ most. The replay test passes. John can play a local game from the CLI.
 phase 6, since "a Singularity is plausible" and "nobody deleted on day one"
 can't be measured without them.
 
+### Subphases
+
+Phase 2 is too big for one session and one review, so it's done in five
+subphases, each its own session and pull request. Each leaves `npm run
+typecheck` and `npm test` passing. Phase 2 is done when 2e's checks pass.
+
+**2a: one domain.** The engine for everything a mind can do without
+touching another: the world and domain state, the seeded RNG, cycle
+accrual, the per-cycle economy and unpaid upkeep, booting a mind, the order
+schema, Expand, Build, Manufacture, Monetize, Spin Up, research and
+`set_research`, executing self and deployment programs (with crashes),
+the scratchpad, `settle` with its timer queue, and Record events with their
+templates. *Done when* tests cover each of these against hand-worked
+numbers, a seeded random-orders run keeps every invariant (no negative
+amounts, buildings within territory, compute within storage), the same
+seed and orders give the same world, the engine never mutates its input,
+and settling twice to the same moment changes nothing. (Done 2026-10-05.)
+
+**2b: minds against each other.** Attack (conquest and raid), battle
+programs and countermeasures, hostile programs and firewalls, Probe, the
+protection rules (boot period, range, retaliation, safe mode, the hostile
+cap), deletion and the reboot wait, convergence, the Singularity and its
+collapse, and the Shutdown. *Done when* tests cover each rule, including a
+battle replayed from its seed, a deletion, a convergence that collapses and
+one that reaches quorum.
+
+**2c: the game layer, the memory store, the CLI.** `submitOrders` and the
+read functions in `src/game/`, the in-memory store with a JSON save file,
+the orders log, and the CLI (boot, brief data, orders, view domains and the
+Record, `--at` and `--advance`). *Done when* the replay test rebuilds a
+game from its start and orders log, and John can play a local game from
+the CLI.
+
+**2d: scripted players and the legacy systems.** Random, builder, raider,
+turtle and converger, and the legacy systems, each seeing only the brief's
+data and submitting orders through `submitOrders`. *Done when* each one
+plays a whole epoch without a failing order it could have known would
+fail.
+
+**2e: the simulator and tuning.** `npm run sim` and its report, and
+`config/rules.yaml` tuned until phase 2's checks pass. *Done when* phase 2
+is.
+
 ## Phase 3: database, MCP server, the brief, one model bot
 
 1. **Postgres store** in its own `mind` schema; migrations; the game layer

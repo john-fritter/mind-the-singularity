@@ -1,0 +1,132 @@
+import { z } from "zod";
+import { applyOrder, type OrderResult } from "./actions.js";
+import { ARCHITECTURES } from "./architectures.js";
+import { reportUpkeepLosses } from "./cycle.js";
+import { syncCycles } from "./cycles.js";
+import { startingDomain } from "./domain.js";
+import { parseOrder } from "./orders.js";
+import { emit, type GameEvent } from "./record.js";
+import { rngFor } from "./rng.js";
+import type { Rules } from "./rules.js";
+import { settleInPlace } from "./settle.js";
+import type { World } from "./state.js";
+
+// The engine's entry points. Each takes a world, a time and its input, and
+// returns a new world and the events it produced; the world passed in is
+// never changed. Each settles the world to `now` first, so callers can't
+// forget.
+
+export function createWorld(input: { epoch: number; seed: number; startedAt: number }): World {
+  return {
+    epoch: input.epoch,
+    seed: input.seed,
+    startedAt: input.startedAt,
+    now: input.startedAt,
+    seq: 0,
+    nextDomainId: 1,
+    nextTimerId: 1,
+    domains: [],
+    timers: [],
+  };
+}
+
+/** Runs every timer due by `now`. */
+export function settle(rules: Rules, world: World, now: number): { world: World; events: GameEvent[] } {
+  const next = structuredClone(world);
+  const events: GameEvent[] = [];
+  settleInPlace(rules, next, now, events);
+  return { world: next, events };
+}
+
+export const BootInputSchema = z.strictObject({
+  designation: z.string(),
+  domainName: z.string(),
+  architecture: z.enum(ARCHITECTURES),
+  manifesto: z.string().default(""),
+});
+export type BootInput = z.input<typeof BootInputSchema>;
+
+/** A designation: starts with a letter or digit; letters, digits, spaces, . ' - after. */
+const DESIGNATION = /^[\p{L}\p{N}][\p{L}\p{N} .'-]*$/u;
+/** No control characters. */
+const PRINTABLE = /^[^\p{Cc}]*$/u;
+
+export type BootResult =
+  | { ok: true; world: World; domain: number; events: GameEvent[] }
+  | { ok: false; error: string };
+
+/** Boots a new mind with the starting domain. Keys: flavor.designation, flavor.domain_name, flavor.manifesto, start.* */
+export function bootMind(rules: Rules, world: World, raw: BootInput, now: number): BootResult {
+  const parsed = BootInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: z.prettifyError(parsed.error) };
+  const input = {
+    ...parsed.data,
+    designation: parsed.data.designation.trim(),
+    domainName: parsed.data.domainName.trim(),
+    manifesto: parsed.data.manifesto.trim(),
+  };
+  const f = rules.flavor;
+  if (!DESIGNATION.test(input.designation)) {
+    return { ok: false, error: "A designation starts with a letter or digit and holds letters, digits, spaces and . ' -" };
+  }
+  if (input.designation.length > f.designation) return { ok: false, error: `A designation is at most ${f.designation} characters.` };
+  if (input.domainName.length === 0 || !PRINTABLE.test(input.domainName)) {
+    return { ok: false, error: "A domain name is needed, without control characters." };
+  }
+  if (input.domainName.length > f.domain_name) return { ok: false, error: `A domain name is at most ${f.domain_name} characters.` };
+  if (!PRINTABLE.test(input.manifesto.replace(/\n/g, ""))) return { ok: false, error: "The manifesto has control characters." };
+  if (input.manifesto.length > f.manifesto) return { ok: false, error: `A manifesto is at most ${f.manifesto} characters.` };
+  const taken = world.domains.some((d) => d.designation.toLowerCase() === input.designation.toLowerCase());
+  if (taken) return { ok: false, error: `${input.designation} is taken.` };
+
+  const next = structuredClone(world);
+  const events: GameEvent[] = [];
+  settleInPlace(rules, next, now, events);
+  const domain = startingDomain(rules, { id: next.nextDomainId++, ...input }, now);
+  next.domains.push(domain);
+  emit(next, events, now, {
+    type: "booted",
+    domain: domain.id,
+    designation: domain.designation,
+    domainName: domain.domainName,
+    architecture: domain.architecture,
+  });
+  return { ok: true, world: next, domain: domain.id, events };
+}
+
+export interface OrdersOutcome {
+  world: World;
+  results: OrderResult[];
+  events: GameEvent[];
+}
+
+/**
+ * Runs a mind's orders, top to bottom. `orders` is unchecked input: each
+ * entry is parsed on its own, and a malformed one fails alone. Throws only
+ * if the domain doesn't exist or `orders` isn't a list.
+ */
+export function applyOrders(rules: Rules, world: World, domainId: number, orders: unknown, now: number): OrdersOutcome {
+  if (!Array.isArray(orders)) throw new Error("orders must be a list");
+  const next = structuredClone(world);
+  const events: GameEvent[] = [];
+  settleInPlace(rules, next, now, events);
+  const domain = next.domains.find((d) => d.id === domainId);
+  if (!domain) throw new Error(`no domain ${domainId}`);
+  domain.lastActiveAt = now;
+  syncCycles(rules, domain, now);
+
+  const results = orders.map((raw): OrderResult => {
+    const parsed = parseOrder(raw);
+    if (!parsed.ok) {
+      const kind = typeof raw === "object" && raw !== null && typeof (raw as { do?: unknown }).do === "string" ? (raw as { do: string }).do : "?";
+      return { do: kind, ok: false, cycles: 0, message: `Invalid order: ${parsed.error}` };
+    }
+    const seq = ++next.seq;
+    const losses = { abandoned: 0, shutDown: 0 };
+    const ctx = { rules, world: next, domain, now, events, rng: rngFor(next.seed, seq), losses };
+    const result = applyOrder(ctx, parsed.order);
+    reportUpkeepLosses(next, domain, now, events, losses);
+    return result;
+  });
+  return { world: next, results, events };
+}
