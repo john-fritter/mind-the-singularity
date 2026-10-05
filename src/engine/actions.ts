@@ -1,52 +1,23 @@
 import { PROGRAM_INFO, programsOf, type Building, type Hardware, type Program, type Tier } from "./architectures.js";
+import { attack, executeAgainst } from "./conflict.js";
+import { fail, n, outOfCycles, spend, type OrderContext, type OrderResult } from "./context.js";
+import { converge, currentQuorum, nextJoinAt } from "./convergence.js";
 import { HOUR_MS } from "./cycles.js";
-import { addCompute, cycleIncome, passCycle, type UpkeepLosses } from "./cycle.js";
+import { addCompute, cycleIncome } from "./cycle.js";
 import { capability, housingRoom, openLand, singularityUnlocked } from "./domain.js";
 import { buildingCost, buildRate, expansionYield, manufactureCapacity, monetizeYield, spinUpYield } from "./economy.js";
 import { buildingName, programName, resolveBuilding, resolveProgram, resolveUnit, unitName } from "./names.js";
 import type { Order } from "./orders.js";
 import { deployCount, programCompute, programCrashChance, researchCost, scaledShare } from "./programs.js";
-import type { GameEvent } from "./record.js";
-import type { Rng } from "./rng.js";
 import type { Rules } from "./rules.js";
-import type { Domain, World } from "./state.js";
 
-// What each order does. Every function here mutates the world it's given;
+export type { OrderContext, OrderResult } from "./context.js";
+
+// What each order does to the mind's own domain; orders aimed at other minds
+// are in conflict.ts. Every function here mutates the world it's given;
 // world.ts hands them a copy. An order that can't do anything fails without
 // spending a cycle. One that can do part of what was asked does that part
 // and says why it stopped.
-
-export interface OrderContext {
-  rules: Rules;
-  world: World;
-  domain: Domain;
-  now: number;
-  events: GameEvent[];
-  /** Seeded for this order (see rng.ts). */
-  rng: Rng;
-  losses: UpkeepLosses;
-}
-
-export interface OrderResult {
-  do: string;
-  ok: boolean;
-  /** Cycles the order spent. */
-  cycles: number;
-  message: string;
-}
-
-const n = (x: number) => x.toLocaleString("en-US");
-const fail = (order: { do: string }, message: string): OrderResult => ({ do: order.do, ok: false, cycles: 0, message });
-const outOfCycles = (order: { do: string }, cost: number, have: number): OrderResult =>
-  fail(order, `Out of cycles: this costs ${cost}, ${have} left.`);
-
-/** Spends cycles, running one cycle's economy for each. */
-function spend(ctx: OrderContext, cycles: number): void {
-  for (let i = 0; i < cycles; i++) {
-    ctx.domain.cycles--;
-    passCycle(ctx.rules, ctx.world, ctx.domain, ctx.now, ctx.events, ctx.losses);
-  }
-}
 
 /** Runs a repeatable one-cycle-cost action up to `cycles` cycles' worth. Returns the cycles spent. */
 function repeat(ctx: OrderContext, cost: number, cycles: number, step: () => void): number {
@@ -260,7 +231,13 @@ function execute(ctx: OrderContext, order: Extract<Order, { do: "execute" }>): O
   const name = programName(rules, program);
   if (!domain.known.includes(program)) return fail(order, `You don't know ${name}.`);
   const info = PROGRAM_INFO.get(program)!;
-  if (info.kind !== "deploy" && info.kind !== "self") return fail(order, `${name} can't be executed yet.`);
+  if (info.kind === "hostile" || info.kind === "probe") {
+    if (order.target === undefined) return fail(order, `${name} needs a target.`);
+    return executeAgainst(ctx, order, program, order.target);
+  }
+  if (order.target !== undefined) return fail(order, `${name} doesn't take a target.`);
+  if (info.kind === "battle") return fail(order, `${name} runs with an attack or as a countermeasure, not on its own.`);
+  if (info.kind === "singularity") return runSingularity(ctx, order);
 
   const cycles = rules.action_cycles.execute;
   if (domain.cycles < cycles) return outOfCycles(order, cycles, domain.cycles);
@@ -293,6 +270,54 @@ function execute(ctx: OrderContext, order: Extract<Order, { do: "execute" }>): O
   }
   spend(ctx, cycles);
   return { do: order.do, ok: true, cycles, message };
+}
+
+/**
+ * The Singularity: converges the mind. Refused during the join gap and for a
+ * mind already converged. Keys: programs.singularity.cycles, as programCompute,
+ * convergence.join_gap_hours
+ */
+function runSingularity(ctx: OrderContext, order: Extract<Order, { do: "execute" }>): OrderResult {
+  const { rules, world, domain, now } = ctx;
+  const name = programName(rules, "singularity");
+  if (domain.convergedAt !== null) return fail(order, "You have already converged.");
+  const joinAt = nextJoinAt(rules, world);
+  if (joinAt !== null && now < joinAt) {
+    return fail(order, `The next mind may converge in ${n(Math.ceil((joinAt - now) / HOUR_MS))}h.`);
+  }
+  const cycles = rules.programs.singularity.cycles;
+  if (domain.cycles < cycles) return outOfCycles(order, cycles, domain.cycles);
+  const compute = programCompute(rules, "singularity");
+  if (domain.compute < compute) return fail(order, `${name} needs ${n(compute)} compute; you have ${n(domain.compute)}.`);
+  domain.compute -= compute;
+  if (ctx.rng.next() < programCrashChance(rules, "singularity", capability(domain))) {
+    spend(ctx, cycles);
+    return { do: order.do, ok: false, cycles, message: `${name} crashed: ${n(compute)} compute spent, nothing happened.` };
+  }
+  spend(ctx, cycles);
+  converge(rules, world, domain, now, ctx.events);
+  const c = world.ended ? "The quorum is reached." : `Convergence ${n(world.convergence!.minds.length)}/${n(currentQuorum(rules, world, now))}.`;
+  return { do: order.do, ok: true, cycles, message: `${name}: you have converged. ${c}` };
+}
+
+function setCountermeasure(ctx: OrderContext, order: Extract<Order, { do: "set_countermeasure" }>): OrderResult {
+  const { rules, domain } = ctx;
+  if (order.program === null) {
+    domain.countermeasure = null;
+    return { do: order.do, ok: true, cycles: 0, message: "Countermeasure cleared." };
+  }
+  const program = resolveProgram(rules, order.program);
+  if (!program) return fail(order, `No such program: ${order.program}.`);
+  const name = programName(rules, program);
+  if (!domain.known.includes(program)) return fail(order, `You don't know ${name}.`);
+  if (PROGRAM_INFO.get(program)!.kind !== "battle") return fail(order, `${name} isn't a battle program.`);
+  domain.countermeasure = { program, above: order.above! };
+  return {
+    do: order.do,
+    ok: true,
+    cycles: 0,
+    message: `Countermeasure: ${name} when an attacker's attack exceeds ${Math.round(order.above! * 100)}% of your defense.`,
+  };
 }
 
 function setResearch(ctx: OrderContext, order: Extract<Order, { do: "set_research" }>): OrderResult {
@@ -343,5 +368,9 @@ export function applyOrder(ctx: OrderContext, order: Order): OrderResult {
       return setResearch(ctx, order);
     case "scratchpad":
       return scratchpad(ctx, order);
+    case "attack":
+      return attack(ctx, order);
+    case "set_countermeasure":
+      return setCountermeasure(ctx, order);
   }
 }

@@ -1,5 +1,6 @@
 import { BUILDINGS, HARDWARE, PROGRAM_INFO, ARCHITECTURES, ARCHITECTURE_CONTENT, type Building, type Program, type Unit } from "./architectures.js";
 import type { Rules } from "./rules.js";
+import type { Domain, World } from "./state.js";
 import { unitStats } from "./units.js";
 
 // Display names come from config/rules.yaml. Orders may name a building, unit
@@ -50,4 +51,10 @@ export function resolveUnit(rules: Rules, text: string): Unit | undefined {
 
 export function resolveProgram(rules: Rules, text: string): Program | undefined {
   return resolve([...PROGRAM_INFO.keys()], (p) => programName(rules, p), text);
+}
+
+/** A mind still in the game, by designation, in any case. */
+export function resolveDomain(world: World, text: string): Domain | undefined {
+  const key = text.trim().toLowerCase();
+  return world.domains.find((d) => d.deletedAt === null && d.designation.toLowerCase() === key);
 }

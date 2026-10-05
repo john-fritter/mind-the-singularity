@@ -18,7 +18,7 @@ const T0 = Date.UTC(2026, 9, 5, 12);
 
 /** A world with one freshly booted mind, and a way to change its domain before a test. */
 function setup(architecture: Architecture = "steward", change?: (d: Domain) => void, seed = 1): World {
-  const booted = bootMind(rules, createWorld({ epoch: 1, seed, startedAt: T0 }), { designation: "HALCYON", domainName: "Glasswater", architecture }, T0);
+  const booted = bootMind(rules, createWorld(rules, { epoch: 1, seed, startedAt: T0 }), { designation: "HALCYON", domainName: "Glasswater", architecture }, T0);
   assert.ok(booted.ok);
   change?.(booted.world.domains[0]!);
   return booted.world;
@@ -40,7 +40,7 @@ function boot() {
   assert.equal(capability(d), 0);
   assert.equal(domainPower(rules, d), 3150);
 
-  const fresh = createWorld({ epoch: 1, seed: 1, startedAt: T0 });
+  const fresh = createWorld(rules, { epoch: 1, seed: 1, startedAt: T0 });
   const ok = (input: object) => bootMind(rules, fresh, { designation: "A", domainName: "B", architecture: "oracle", ...input }, T0);
   assert.ok(ok({}).ok);
   assert.ok(ok({ designation: "Pale Choir-7" }).ok);
@@ -237,6 +237,9 @@ function programs() {
   assert.equal(poor.d.cycles, 96);
 }
 
+/** The world's program timers, leaving out the Shutdown's. */
+const programTimers = (w: World) => w.timers.filter((t) => t.kind === "program_ends");
+
 /** Runs orders on seeds until one doesn't crash. */
 function runUncrashed(architecture: Architecture, change: (d: Domain) => void, orders: unknown[]) {
   for (let seed = 1; ; seed++) {
@@ -250,12 +253,12 @@ function selfPrograms() {
   const hard = runUncrashed("steward", (d) => (d.known = ["hardening"]), [{ do: "execute", program: "hardening" }]);
   assert.equal(hard.results[0]!.message, "Hardening running for 12 hours.");
   assert.deepEqual(hard.d.running, [{ program: "hardening", endsAt: T0 + 12 * HOUR_MS }]);
-  assert.equal(hard.world.timers.length, 1);
+  assert.equal(programTimers(hard.world).length, 1);
   const early = settle(rules, hard.world, T0 + 12 * HOUR_MS - 1);
   assert.deepEqual(early.events, []);
   const ended = settle(rules, early.world, T0 + 12 * HOUR_MS);
   assert.deepEqual(domainOf(ended.world).running, []);
-  assert.deepEqual(ended.world.timers, []);
+  assert.deepEqual(programTimers(ended.world), []);
   assert.deepEqual(ended.events.map((e) => describe(rules, e)), ["Hardening ended."]);
   const again = settle(rules, ended.world, T0 + 12 * HOUR_MS);
   assert.deepEqual(again.events, []);
@@ -266,7 +269,7 @@ function selfPrograms() {
   const twice = runUncrashed("steward", (d) => (d.known = ["hardening"]), [{ do: "execute", program: "hardening" }]);
   const rerun = applyOrders(rules, twice.world, 1, [{ do: "execute", program: "hardening" }], T0 + 6 * HOUR_MS);
   if (rerun.results[0]!.ok) {
-    assert.equal(rerun.world.timers.length, 1);
+    assert.equal(programTimers(rerun.world).length, 1);
     assert.deepEqual(domainOf(settle(rules, rerun.world, T0 + 12 * HOUR_MS).world).running.length, 1);
   }
 
@@ -286,9 +289,9 @@ function selfPrograms() {
   assert.equal(assimilated.results[0]!.message, `Assimilation: ${converted} users converted into ${converted * 1.5} compute.`);
   assert.equal(assimilated.d.compute, 1000 + converted * 1.5 + 90);
 
-  // Battle and hostile programs need another domain (phase 2b).
+  // Battle programs run only with an attack or as a countermeasure.
   const battle = run(setup("steward", (d) => (d.known = ["restoration"])), [{ do: "execute", program: "restoration" }]);
-  assert.equal(battle.results[0]!.ok, false);
+  assert.equal(battle.results[0]!.message, "Restoration runs with an attack or as a countermeasure, not on its own.");
   assert.equal(battle.d.cycles, 96);
 }
 

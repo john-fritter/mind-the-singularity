@@ -2,7 +2,9 @@ import { z } from "zod";
 import { applyOrder, type OrderResult } from "./actions.js";
 import { ARCHITECTURES } from "./architectures.js";
 import { reportUpkeepLosses } from "./cycle.js";
+import { shutdownTimers } from "./convergence.js";
 import { syncCycles } from "./cycles.js";
+import { rebootAt } from "./deletion.js";
 import { startingDomain } from "./domain.js";
 import { parseOrder } from "./orders.js";
 import { emit, type GameEvent } from "./record.js";
@@ -16,8 +18,9 @@ import type { World } from "./state.js";
 // never changed. Each settles the world to `now` first, so callers can't
 // forget.
 
-export function createWorld(input: { epoch: number; seed: number; startedAt: number }): World {
-  return {
+/** A new epoch, with the Shutdown and its warning scheduled. Keys: as shutdownTimers */
+export function createWorld(rules: Rules, input: { epoch: number; seed: number; startedAt: number }): World {
+  const world: World = {
     epoch: input.epoch,
     seed: input.seed,
     startedAt: input.startedAt,
@@ -27,7 +30,11 @@ export function createWorld(input: { epoch: number; seed: number; startedAt: num
     nextTimerId: 1,
     domains: [],
     timers: [],
+    convergence: null,
+    ended: null,
   };
+  shutdownTimers(rules, world);
+  return world;
 }
 
 /** Runs every timer due by `now`. */
@@ -76,12 +83,16 @@ export function bootMind(rules: Rules, world: World, raw: BootInput, now: number
   if (input.domainName.length > f.domain_name) return { ok: false, error: `A domain name is at most ${f.domain_name} characters.` };
   if (!PRINTABLE.test(input.manifesto.replace(/\n/g, ""))) return { ok: false, error: "The manifesto has control characters." };
   if (input.manifesto.length > f.manifesto) return { ok: false, error: `A manifesto is at most ${f.manifesto} characters.` };
-  const taken = world.domains.some((d) => d.designation.toLowerCase() === input.designation.toLowerCase());
-  if (taken) return { ok: false, error: `${input.designation} is taken.` };
 
   const next = structuredClone(world);
   const events: GameEvent[] = [];
   settleInPlace(rules, next, now, events);
+  if (next.ended) return { ok: false, error: "The epoch has ended." };
+  // A deleted mind's designation is free again once its reboot wait is over.
+  const taken = next.domains.some(
+    (d) => d.designation.toLowerCase() === input.designation.toLowerCase() && (d.deletedAt === null || now < rebootAt(rules, d)!),
+  );
+  if (taken) return { ok: false, error: `${input.designation} is taken.` };
   const domain = startingDomain(rules, { id: next.nextDomainId++, ...input }, now);
   next.domains.push(domain);
   emit(next, events, now, {
@@ -112,15 +123,18 @@ export function applyOrders(rules: Rules, world: World, domainId: number, orders
   settleInPlace(rules, next, now, events);
   const domain = next.domains.find((d) => d.id === domainId);
   if (!domain) throw new Error(`no domain ${domainId}`);
-  domain.lastActiveAt = now;
+  const refused = (raw: unknown, message: string): OrderResult => ({ do: kindOf(raw), ok: false, cycles: 0, message });
+  if (domain.deletedAt !== null) {
+    return { world: next, results: orders.map((raw) => refused(raw, "This mind has been deleted.")), events };
+  }
+  if (!next.ended) domain.lastActiveAt = now;
   syncCycles(rules, domain, now);
 
   const results = orders.map((raw): OrderResult => {
+    // A Singularity, or the Shutdown, ends everything after it.
+    if (next.ended) return refused(raw, "The epoch has ended.");
     const parsed = parseOrder(raw);
-    if (!parsed.ok) {
-      const kind = typeof raw === "object" && raw !== null && typeof (raw as { do?: unknown }).do === "string" ? (raw as { do: string }).do : "?";
-      return { do: kind, ok: false, cycles: 0, message: `Invalid order: ${parsed.error}` };
-    }
+    if (!parsed.ok) return refused(raw, `Invalid order: ${parsed.error}`);
     const seq = ++next.seq;
     const losses = { abandoned: 0, shutDown: 0 };
     const ctx = { rules, world: next, domain, now, events, rng: rngFor(next.seed, seq), losses };
@@ -129,4 +143,9 @@ export function applyOrders(rules: Rules, world: World, domainId: number, orders
     return result;
   });
   return { world: next, results, events };
+}
+
+/** An order's `do`, if it has one, for reporting a refused order. */
+function kindOf(raw: unknown): string {
+  return typeof raw === "object" && raw !== null && typeof (raw as { do?: unknown }).do === "string" ? (raw as { do: string }).do : "?";
 }

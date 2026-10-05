@@ -248,3 +248,82 @@ Choices the design didn't make:
   counts too.
 - **Battle, hostile, Probe and Singularity runs are refused** until 2b
   writes them.
+
+## 2026-10-05 — Phase 2b: minds against each other
+
+John agreed the 2b proposal and its calls. Attacks, battle programs and
+countermeasures, hostile programs and Probe are in `src/engine/conflict.ts`;
+the protection rules in `protection.ts`; deletion in `deletion.ts`; the
+Singularity, its collapse and the Shutdown in `convergence.ts`. No numbers
+in `config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **The whole force attacks and defends.** DESIGN.md has no partial send,
+  and Archmage sends everything.
+- **Hostile programs pass the same shields as attacks**: boot period,
+  range (with retaliation) and safe mode. Probe passes none of them; it
+  isn't hostile.
+- **The hostile cap counts every program that reached the target** in a
+  rolling 24 hours, blocked ones included, so spam can't grind a domain.
+  A crashed program never reaches it and doesn't count.
+- **Attacking or running a hostile program ends your own safe mode**, so it
+  can't be a free base to strike from.
+- **A countermeasure fires** when the attacker's raw attack (units' base
+  stats) exceeds `above` × the defender's raw defense, `above` between 0
+  and 2. It costs its compute and no cycle, can crash, and doesn't fire
+  without the compute.
+- **The last log moves to Phase 5** with the other flavor fields; the
+  domain has a `lastLog` field waiting for it.
+- **The quorum is measured at each join**, from minds active in the last
+  72 hours; converged minds count as active.
+
+**Smaller calls, made here:**
+
+- **Orders:** `{"do": "attack", "target", "mode": "conquest"|"raid",
+  "program"?}`, `{"do": "execute", "program", "target"}` for hostile
+  programs and Probe, `{"do": "set_countermeasure", "program", "above"}`
+  (`"program": null` clears it). Targets are designations, any case.
+- **A battle program run with an attack** costs its compute but no cycle
+  beyond the attack's 2. If it crashes the attack goes on without it.
+- **Draws come in a fixed order** so a battle replays from its seed: the
+  attacker's program crash, the countermeasure's crash, the random factor,
+  then each Adversarial Input miss, the attacker's first.
+- **Program effects in a fight** are multipliers fed to Phase 1's
+  formulas: Overclock and Arc Strike on the attacker's strength, Hardening
+  on the defender's, Arc Strike as a countermeasure on the defender's,
+  Entanglement and Adversarial Input on the enemy's; Restoration and False
+  Signature on the caster's losses; Recycle Casualties after them.
+- **Conquest:** a lopsided win's core goes first. The sectors taken are
+  capped so the defender's cores still fit. The defender's other buildings
+  go in proportion to the land taken, and more if that's what it takes to
+  fit what's left. **Raid:** stolen users arrive up to the raider's user
+  cap; the rest are lost.
+- **Losing buildings takes what they held.** Compute past the new storage
+  is lost and hardware past the new housing is abandoned, in proportion.
+  The random-orders test caught compute above storage after a conquest;
+  DESIGN.md already says compute past storage is lost.
+- **Blight's stall and Exfiltration's cycles don't scale with capability.**
+  They're a duration and a count; the shares do scale, capped at 1.
+- **Exfiltrated cycles** arrive up to the thief's cap. Stolen compute
+  arrives up to its storage.
+- **Retaliation** counts attacks (won or repelled) and hostile programs
+  (landed or blocked) in the last 24 hours. A repelled attack is aggression
+  but not a hit toward safe mode.
+- **A converged mind never enters safe mode**, and converging ends one it
+  was in.
+- **The Record:** a public one-line `battle` event and a private
+  `battle_report` to both sides with strengths, programs and losses.
+  Hostile programs are public, blocked or not, as acts of war. Probes are
+  private to the prober; the target isn't told.
+- **A deleted domain stays in the world**, marked with `deletedAt`, so the
+  Record and the Archive can name it. It can't act or be targeted, its
+  timers go, and its designation is free again after the reboot wait.
+  Which account may reboot is 2c's job. If a conquest deletes a converged
+  mind, the convergence collapses as "deleted", not "beaten".
+- **The Singularity costs `programs.singularity.cycles`** (48) instead of
+  execute's 1. It's refused during the join gap and for a mind already
+  converged; a collapsed mind may run it again.
+- **The Shutdown and its warning are timers** set when the world is created,
+  so `createWorld` now takes the rules. An ended epoch clears its timers and
+  refuses every order and boot.

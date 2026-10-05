@@ -79,9 +79,11 @@ export function passCycle(
   domain.capital += Math.floor(income.capital);
   addCompute(rules, domain, income.compute);
 
-  // 2. Users move toward their cap.
+  // 2. Users move toward their cap. Blight stalls growth, not shrinking.
   const cap = userCap(rules, domain.buildings.city, domain.territory);
-  domain.users = Math.max(0, domain.users + Math.floor(userChange(rules, domain.users, cap, growthMultiplier(rules, domain, now))));
+  let change = userChange(rules, domain.users, cap, growthMultiplier(rules, domain, now));
+  if (change > 0 && domain.growthStalledUntil !== null && now < domain.growthStalledUntil) change = 0;
+  domain.users = Math.max(0, domain.users + Math.floor(change));
 
   // 3. Research.
   const target = domain.researchTarget;
