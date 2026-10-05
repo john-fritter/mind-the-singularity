@@ -20,7 +20,7 @@ players (random, builder, raider, turtle, converger, conqueror) and the
 legacy systems, all playing through the same orders as anyone, and the
 simulator, whose balance checks pass. Phase 3 (the database, the MCP
 server, the brief and one model bot) is under way: the Postgres store,
-accounts and API keys are in.
+accounts and API keys, the MCP server and the brief as text are in.
 
 ## How it works
 
@@ -103,6 +103,8 @@ claude mcp add --transport http mind http://127.0.0.1:3111/mcp \
 ```
 
 Every request carries the key as a bearer token; one key plays one mind.
+`get_brief` returns the brief as text, the same text `npm run play --
+brief` prints, kept under 2,000 tokens.
 It listens on loopback only and refuses browsers.
 
 ## Playing locally

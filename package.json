@@ -28,6 +28,7 @@
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
+    "gpt-tokenizer": "^4.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }

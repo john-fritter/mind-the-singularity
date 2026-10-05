@@ -653,3 +653,57 @@ server is built (`src/mcp/`, `npm run mcp`). No numbers in
   architectures' ids from the engine.
 - **New dependencies,** Fritter Board's: `@modelcontextprotocol/sdk`, `hono`,
   `@hono/node-server`. Phase 5's web view will use Hono too.
+
+## 2026-10-05 — Phase 3c: the brief as text
+
+John agreed the 3c proposal: one text rendering of the brief, written by
+code from the brief's data (`src/game/brief.ts`), returned by the MCP
+`get_brief` and printed by the CLI's `brief`. Scripted players still read
+the data. No numbers in `config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **2,000 tokens is a ceiling; 1,000 is a target, not a floor.** The test
+  checks only the ceiling. A quiet wake is about 330 tokens, and padding it
+  would only spend tokens. This reads CLAUDE.md's and the build plan's
+  "1,000–2,000" that way; CLAUDE.md now says so.
+- **"Since last wake" is narrated in three parts**: your own events in
+  full (battles from your private report), the world's big moments, and
+  other minds' fights folded into one line per attacker with no amounts
+  (`RAIDER-7 raided MERIDIAN ×2, LOOPBACK; failed against PIKE`). Before,
+  the newest 20 visible events were kept, so a busy day's raids elsewhere
+  could push out the battle that took your sectors.
+- **Tokens are counted with `gpt-tokenizer`** (o200k), a dev dependency
+  used only by `tests/brief.test.ts`. No tokenizer matches every model the
+  runner may use, so the worst case keeps a margin.
+
+**Smaller calls, made here:**
+
+- **The text is written in `src/game/`, not `src/engine/`.** The build plan
+  says "the engine's text rendering", but the brief's data is assembled in
+  `src/game/read.ts` and the engine can't import from there. The event
+  templates stay in `src/engine/record.ts`. It is still engine-written in
+  DESIGN.md's sense: code and templates, no model.
+- **A length budget backs the caps.** `config/site.yaml` caps each part
+  (your events 6, the world's lines 5, fight lines 5, names per folded line
+  4, minds in range 10), and `max_chars` (5,600) caps the whole. Forty-
+  character names in every slot can pass the budget with every cap
+  respected; then lines go, least useful first: other minds' fights, the
+  world's moments, your oldest events, the weakest in range. Your newest
+  event and the strongest mind in range always stay. A character budget,
+  not tokens, so the server needs no tokenizer; the test shows the budget
+  holds: the built worst case with the longest names is about 1,830
+  tokens, one with every cap full and short names about 1,850.
+- **Measured on a 60-day epoch** of a dozen scripted minds: median about
+  330 tokens, max about 600. Phase 4's channels, Commons and offers have
+  room, and will share the same budget.
+- **The brief's data changed shape:** `since` is now `{ from, yours,
+  world, fights, left }`. `from` is when the window opened (the last
+  orders, else the boot), so the text can say `SINCE LAST WAKE (7h)`.
+  Other minds' events are read up to `brief.scanned` (200), newest kept.
+- **Times are relative** ("in 9h") with the current UTC time once in the
+  header. The final week adds `SHUTDOWN in 5d` to the header, and a
+  convergence shows when it collapses unless a mind joins.
+- **Small additions to the text:** what your next attack costs in cycles,
+  "converged" on minds in range (anyone may hit them), boots and safe
+  modes folded to one line each, and a note of how much was left out.

@@ -19,6 +19,7 @@ import { loadRules } from "../config.js";
 import { ARCHITECTURES } from "../engine/architectures.js";
 import { loadPlayers } from "../config.js";
 import { bootMind, newGame, submitOrders } from "../game/game.js";
+import { briefText, span } from "../game/brief.js";
 import { getBrief, view } from "../game/read.js";
 import { replay } from "../game/replay.js";
 import type { GameError } from "../game/state.js";
@@ -26,7 +27,7 @@ import { drive, legacySeats, scriptedSeat, type Seat } from "../players/drive.js
 import { STRATEGIES, type StrategyName } from "../players/settings.js";
 import { MemoryStore } from "../store/memory.js";
 import { readSave, writeSave, type SaveFile, type SavedPlayer } from "../store/save.js";
-import { renderBrief, renderOrders, renderPage, renderRankings, renderRecord, span, when } from "./render.js";
+import { renderOrders, renderPage, renderRankings, renderRecord, when } from "./render.js";
 
 const HELP = `Play Mind: the Singularity locally.
 
@@ -170,7 +171,7 @@ async function main() {
     case "brief": {
       const brief = await getBrief(store, me, now);
       if ("ok" in brief) fail(brief);
-      else out(brief, renderBrief(game.rules, brief, startedAt));
+      else out(brief, briefText(game.rules, brief));
       break;
     }
     case "orders": {

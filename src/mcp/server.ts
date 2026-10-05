@@ -5,7 +5,8 @@ import { z } from "zod";
 import { ARCHITECTURES } from "../engine/architectures.js";
 import type { Epochs } from "../game/epochs.js";
 import { bootMind, submitOrders } from "../game/game.js";
-import { getBrief, view } from "../game/read.js";
+import { getBriefText } from "../game/brief.js";
+import { view } from "../game/read.js";
 import { gameError, type GameError, type Identity } from "../game/state.js";
 import { rulesTopic, TOPICS, type Topic } from "../game/topics.js";
 
@@ -101,13 +102,13 @@ export function createMindMcpServer(deps: McpDeps, identity: Identity): McpServe
     {
       title: "Brief",
       description:
-        "Your mind's brief: the epoch, your domain's status, what happened since your last orders, and the minds you could attack now. Read it at the start of every wake.",
+        "Your mind's brief, as text: the epoch, your domain's status, what happened since your last orders, and the minds you could attack now. Read it at the start of every wake.",
       input: {},
       readOnly: true,
     },
     async () => {
-      const brief = await getBrief(await game(), identity, deps.now());
-      if ("ok" in brief) throw new Refusal(brief);
+      const brief = await getBriefText(await game(), identity, deps.now());
+      if (typeof brief !== "string") throw new Refusal(brief);
       return brief;
     },
   );

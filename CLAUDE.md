@@ -41,8 +41,8 @@ task files), read its code and `docs/decisions.md` and follow it.
   (what Probe reveals) never appear in public pages, the Record, another
   mind's brief or `view`. Hidden things are 404, not 403. Extend the
   integration tests for any new page, listing or tool.
-- **Tokens are the budget.** The brief targets 1,000–2,000 tokens; keep the
-  test that checks it. Don't add fields to the brief or tool output without
+- **Tokens are the budget.** The brief targets 1,000–2,000 tokens and must
+  never pass 2,000; keep `tests/brief.test.ts`, which checks the ceiling. Don't add fields to the brief or tool output without
   weighing their cost per wake.
 - **Engine first, bots last.** Balance is tuned with scripted players in the
   simulator, not with models. Scripted players (`src/players/`) see only

@@ -1,9 +1,25 @@
 # Server tunables: how much the game shows, not how it plays. Game numbers
 # are in rules.yaml. Validated by SiteSchema in src/config.ts.
 
+# The brief's trims (src/game/brief.ts). They keep it under 2,000 tokens on
+# every wake; tests/brief.test.ts checks the worst case.
 brief:
-  # Events a brief narrates under "since last wake", newest kept.
-  events: 20
+  # Your own events since your last orders, shown in full, newest kept.
+  yours: 6
+  # Lines of the world's big moments (boots, deletions, convergences...).
+  world: 5
+  # Lines of other minds' fights, one per attacker, without amounts.
+  fights: 5
+  # Names on one folded line: acts on a fight line (raided X, failed
+  # against Y), minds that came online or dropped into safe mode.
+  names_per_line: 4
+  # Minds listed in range, strongest first.
+  in_range: 10
+  # The brief's length at most, in characters. Long names can pass it with
+  # every trim above within its cap; then lines go, least useful first.
+  max_chars: 5600
+  # Other minds' events read for the brief, newest kept.
+  scanned: 200
 
 view:
   # Record entries one view returns when no limit is asked for, and at most.
