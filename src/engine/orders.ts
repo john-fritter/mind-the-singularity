@@ -33,7 +33,22 @@ export const OrderSchema = z.discriminatedUnion("do", [
     .refine((o) => oneOrMany(o.unit, o.count, o.units), { message: "give unit and count, or units" }),
   z.strictObject({ do: z.literal("monetize"), cycles }),
   z.strictObject({ do: z.literal("spin_up"), cycles }),
-  z.strictObject({ do: z.literal("execute"), program: label }),
+  z.strictObject({ do: z.literal("execute"), program: label, target: label.optional() }),
+  z.strictObject({
+    do: z.literal("attack"),
+    target: label,
+    mode: z.enum(["conquest", "raid"]),
+    /** A battle program to run with the attack. */
+    program: label.optional(),
+  }),
+  z
+    .strictObject({
+      do: z.literal("set_countermeasure"),
+      program: label.nullable(),
+      /** Fires when the attacker's attack exceeds this share of the domain's defense. */
+      above: z.number().min(0).max(2).optional(),
+    })
+    .refine((o) => o.program === null || o.above !== undefined, { message: "give above with a program" }),
   z.strictObject({ do: z.literal("set_research"), program: label }),
   z.strictObject({ do: z.literal("scratchpad"), text: z.string() }),
 ]);

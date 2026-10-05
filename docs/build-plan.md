@@ -153,7 +153,7 @@ protection rules (boot period, range, retaliation, safe mode, the hostile
 cap), deletion and the reboot wait, convergence, the Singularity and its
 collapse, and the Shutdown. *Done when* tests cover each rule, including a
 battle replayed from its seed, a deletion, a convergence that collapses and
-one that reaches quorum.
+one that reaches quorum. (Done 2026-10-05.)
 
 **2c: the game layer, the memory store, the CLI.** `submitOrders` and the
 read functions in `src/game/`, the in-memory store with a JSON save file,

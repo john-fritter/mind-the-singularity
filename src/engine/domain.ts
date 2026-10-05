@@ -97,5 +97,14 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
     researchProgress: {},
     running: [],
     scratchpad: "",
+    countermeasure: null,
+    hits: [],
+    safeModeUntil: null,
+    hostileReceived: [],
+    aggressors: [],
+    growthStalledUntil: null,
+    convergedAt: null,
+    deletedAt: null,
+    lastLog: "",
   };
 }
