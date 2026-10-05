@@ -517,3 +517,39 @@ in the project has the tables).
 - **`power.per_force_point` 0.25 → 0.13.** At 0.25 a sentry wall or an army
   outweighed territory and buildings, so army-heavy strategies topped the
   rankings. Turtles top 56% of epochs after it, so the check still fails.
+
+## 2026-10-05 — Tuning round 2
+
+Agreed with John on 200- and 600-epoch runs (`/mnt/project-files/phase-2e/findings.md`
+in the project has the tables). On round 1's numbers a player that conquers
+instead of raiding topped every epoch, so conquest was tuned.
+
+- **Attacks get dearer the more a mind attacks** (a DESIGN.md change). An
+  attack costs `action_cycles.attack` plus
+  `combat.attack_cycles_per_recent_attack` (2) for each attack the mind made
+  in the last 24 hours. The domain keeps `attacksMade`; the brief shows the
+  next attack's cost (`attackCycles`), so players plan with it. A flat
+  higher cost was a cliff, not a lever: bots wake with about 6 cycles, so 5
+  cycles left conquerors top 100% of epochs and 6 left them 50% only because
+  they could no longer probe and attack in one wake.
+- **`expansion.yield_min` 1 → 6.** At 1, Expand was worth 1–2 sectors a
+  cycle once a domain passed 1,250 sectors, against about 10% of a victim's
+  land for one conquest, so conquest was the only way to grow. John approved
+  5 first; 5 passed the 50% check by one point over 600 epochs (conqueror
+  49%), so he picked 6 for margin (conqueror 44%).
+- **A conqueror strategy**, in `config/players.yaml` and the default sim
+  field: the raider's build, attacking by conquest, Singularity stance
+  `never`. Without it no one challenges a convergence and the Singularity
+  happens in 75% of epochs.
+- **Leftover seats are dealt in turn** from epoch to epoch (by the seed)
+  instead of drawn at random, so every strategy holds about as many seats
+  over a run; a random draw gave one strategy more seats and more wins.
+- **A fourth planner bug:** a hostile program a target's cap refuses spends
+  nothing, so the plan's estimate now keeps the lower of before and after
+  for programs that may be refused.
+
+**Tried and dropped** (round 3 in findings.md): conquest share scaled by
+power ratio, a smaller conquest share (mostly turns conquest into core
+destruction: more deletions, same winner), flat defense per core, a wider
+protection range, longer safe mode, and players that build sentries after
+losing a fight. None moved the conqueror below 70%.
