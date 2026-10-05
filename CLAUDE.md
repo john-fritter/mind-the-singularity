@@ -77,6 +77,7 @@ npm install
 npm run typecheck
 npm test             # every tests/*.test.ts, one process each
 npm run curves       # print the main curves and a rough solo projection
+npm run play -- help # play a local game from the command line
 ```
 
 Add each new command here and to the README as it lands. The rules schema

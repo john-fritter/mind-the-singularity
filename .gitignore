@@ -21,3 +21,8 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 dist/
+
+# Local games (npm run play)
+game.json
+game.json.tmp
+*.save.json

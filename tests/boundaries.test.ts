@@ -9,7 +9,9 @@ import path from "node:path";
 // - the runner is an MCP client: src/runner/ imports only itself and the
 //   config loaders, never the engine, the game layer, the store or the MCP
 //   server;
-// - the MCP server and the web view go through src/game/, never the store.
+// - the MCP server and the web view go through src/game/, never the store;
+// - only src/game/ calls the engine's entry points (engine/world.ts), so
+//   every write goes through its checks and its log.
 // A directory that doesn't exist yet passes trivially.
 
 const SRC = path.join(import.meta.dirname, "..", "src");
@@ -103,6 +105,12 @@ async function main() {
       target.startsWith("runner/") || target === "config.js",
       `${file} imports ${target}: the runner reaches the game only through MCP`,
     );
+  }
+
+  for (const dir of ["cli", "mcp", "web", "store", "players", "sim", "auth", "runner"]) {
+    for (const { file, target } of await importsOf(dir)) {
+      assert.ok(target !== "engine/world.js", `${file} imports engine/world.js: write through src/game/`);
+    }
   }
 
   for (const dir of ["mcp", "web"]) {

@@ -1,0 +1,11 @@
+# Server tunables: how much the game shows, not how it plays. Game numbers
+# are in rules.yaml. Validated by SiteSchema in src/config.ts.
+
+brief:
+  # Events a brief narrates under "since last wake", newest kept.
+  events: 20
+
+view:
+  # Record entries one view returns when no limit is asked for, and at most.
+  record_default: 25
+  record_max: 200
