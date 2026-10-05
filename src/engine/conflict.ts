@@ -1,9 +1,9 @@
 import { BUILDINGS, HARDWARE, PROGRAM_INFO, type Program } from "./architectures.js";
-import { attackerStrength, battleOutcome, conquestSectors, defenderStrength, raidSpoils, unitsLost } from "./combat.js";
+import { attackCycles, attackerStrength, battleOutcome, conquestSectors, defenderStrength, raidSpoils, unitsLost } from "./combat.js";
 import { fail, n, outOfCycles, spend, type OrderContext, type OrderResult } from "./context.js";
 import { collapse } from "./convergence.js";
 import { addCompute } from "./cycle.js";
-import { HOUR_MS, syncCycles } from "./cycles.js";
+import { DAY_MS, HOUR_MS, syncCycles } from "./cycles.js";
 import { deleteMind } from "./deletion.js";
 import { capability, isRunning, totalBuildings, unitCounts } from "./domain.js";
 import { computeStorage, hardwareHousing, userCap } from "./economy.js";
@@ -162,7 +162,8 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
   if (typeof target === "string") return fail(order, target);
   const shield = shieldedBecause(rules, me, target, now);
   if (shield) return fail(order, shield);
-  const cost = rules.action_cycles.attack;
+  me.attacksMade = me.attacksMade.filter((t) => t > now - DAY_MS);
+  const cost = attackCycles(rules, me.attacksMade.length);
   if (me.cycles < cost) return outOfCycles(order, cost, me.cycles);
   const mine = forceTotals(rules, me.units);
   if (mine.attack <= 0) return fail(order, "You have no units that can attack.");
@@ -272,6 +273,7 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
   if (target.buildings.core === 0) deleteMind(world, target, now, ctx.events, me);
   else if (outcome.attackerWins && order.mode === "conquest" && target.convergedAt !== null) collapse(world, now, ctx.events, "defeated");
   spend(ctx, cost);
+  me.attacksMade.push(now);
   return { do: order.do, ok: true, cycles: cost, message: describe(rules, reported) };
 }
 

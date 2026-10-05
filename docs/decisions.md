@@ -457,3 +457,99 @@ that runs wakes on the clock. Their knobs are in a new
 - **Speed:** an epoch with four legacy systems and seven players takes
   about five seconds, mostly settling copies for briefs. 2e may want that
   faster for 200 epochs.
+
+## 2026-10-05 — Phase 2e: the simulator
+
+John agreed the 2e proposal and its calls. `npm run sim` is in
+`scripts/sim.ts` and `src/sim/`: `epoch.ts` runs one epoch, `run.ts` spreads
+epochs over child processes, `report.ts` adds them up and runs the checks.
+
+**Agreed with John:**
+
+- **Phase 2's checks, as numbers:** no strategy finishes top in more than
+  50% of epochs; no mind is deleted in its first 24 hours; the Singularity
+  happens in 10% to 50% of epochs. The report prints each as PASS or FAIL,
+  plus a fourth: no failed order the brief could have foreseen.
+- **Each epoch draws its minds**: `--minds` from `--players`, each strategy
+  once while there's room, random architectures, plus the legacy systems.
+  Epoch i is seeded `--seed` + i, so `--jobs` changes nothing.
+- **A Singularity stance per strategy** (`singularity` in
+  `config/players.yaml`, from DESIGN.md's mind profile): lead runs it as soon
+  as it can; join only while a convergence is underway; hunt attacks
+  converged minds by conquest first; never. A boolean before.
+- **Player bugs are fixed; player knobs aren't tuned to pass.** Balance is
+  tuned in `config/rules.yaml`, each round agreed with John on before/after
+  reports.
+
+**Smaller calls, made here:**
+
+- **Speed.** `settle` returns a shallow copy with only the clock moved when no
+  timer is due, instead of a deep copy; the engine never changes a world it
+  was given, so sharing is safe. The brief scans only the Record's tail for
+  what's new. An epoch went from about 6.6s to 3.5s, and 200 epochs take
+  about 2 minutes on 4 cores.
+- **The simulator reads the whole world** to measure it, as the admin view
+  will; it isn't a player. It drives the players a day at a time so wake
+  logs don't pile up, and samples every mind on days 10, 20 ... 60.
+- **Rank is among the scripted minds**, by final power; a deleted mind
+  counts 0. A strategy "wins" an epoch when one of its minds is top.
+- **Three planner bugs found by the simulator:** a Probe that couldn't be
+  sent (no compute) ended the wake with no orders, so a raider whose
+  deployments ate its compute stopped acting for good; a won conquest raised
+  building prices (they scale with territory) past the plan's estimate, so
+  the plan now prices buildings at an upper bound on its territory; and a
+  Probe could be aimed at no one, failing and throwing off the plan's
+  income. Players may now import `engine/combat.js` for `conquestSectors`.
+- **`--rules`** runs another rules file, for trying a change before making it.
+
+## 2026-10-05 — Tuning round 1
+
+Agreed with John on 200-epoch runs (`/mnt/project-files/phase-2e/findings.md`
+in the project has the tables).
+
+- **Raiders join a convergence instead of hunting it.** A converged mind
+  loses range and safe mode, so with every raider hunting, each convergence
+  was conquered at the next raider wake (about 3 hours), the converger re-ran
+  the Singularity daily and was farmed for land, and raiders topped 64% of
+  epochs. No rules change tried (defender core bonus, cheaper research, an
+  army for the converger) let a convergence survive. With raiders joining,
+  random minds still beat converged ones now and then. Singularity: 0% → 28%.
+- **`power.per_force_point` 0.25 → 0.13.** At 0.25 a sentry wall or an army
+  outweighed territory and buildings, so army-heavy strategies topped the
+  rankings. Turtles top 56% of epochs after it, so the check still fails.
+
+## 2026-10-05 — Tuning round 2
+
+Agreed with John on 200- and 600-epoch runs (`/mnt/project-files/phase-2e/findings.md`
+in the project has the tables). On round 1's numbers a player that conquers
+instead of raiding topped every epoch, so conquest was tuned.
+
+- **Attacks get dearer the more a mind attacks** (a DESIGN.md change). An
+  attack costs `action_cycles.attack` plus
+  `combat.attack_cycles_per_recent_attack` (2) for each attack the mind made
+  in the last 24 hours. The domain keeps `attacksMade`; the brief shows the
+  next attack's cost (`attackCycles`), so players plan with it. A flat
+  higher cost was a cliff, not a lever: bots wake with about 6 cycles, so 5
+  cycles left conquerors top 100% of epochs and 6 left them 50% only because
+  they could no longer probe and attack in one wake.
+- **`expansion.yield_min` 1 → 6.** At 1, Expand was worth 1–2 sectors a
+  cycle once a domain passed 1,250 sectors, against about 10% of a victim's
+  land for one conquest, so conquest was the only way to grow. John approved
+  5 first; 5 passed the 50% check by one point over 600 epochs (conqueror
+  49%), so he picked 6 for margin (conqueror 44%).
+- **A conqueror strategy**, in `config/players.yaml` and the default sim
+  field: the raider's build, attacking by conquest, Singularity stance
+  `never`. Without it no one challenges a convergence and the Singularity
+  happens in 75% of epochs.
+- **Leftover seats are dealt in turn** from epoch to epoch (by the seed)
+  instead of drawn at random, so every strategy holds about as many seats
+  over a run; a random draw gave one strategy more seats and more wins.
+- **A fourth planner bug:** a hostile program a target's cap refuses spends
+  nothing, so the plan's estimate now keeps the lower of before and after
+  for programs that may be refused.
+
+**Tried and dropped** (round 3 in findings.md): conquest share scaled by
+power ratio, a smaller conquest share (mostly turns conquest into core
+destruction: more deletions, same winner), flat defense per core, a wider
+protection range, longer safe mode, and players that build sentries after
+losing a fight. None moved the conqueror below 70%.

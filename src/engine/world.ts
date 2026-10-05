@@ -37,8 +37,15 @@ export function createWorld(rules: Rules, input: { epoch: number; seed: number; 
   return world;
 }
 
-/** Runs every timer due by `now`. */
+/**
+ * Runs every timer due by `now`. When none is due, the world returned shares
+ * everything but its clock with the one given, which saves a deep copy on
+ * every read; nothing in the engine changes a world it was given, so the
+ * sharing is safe.
+ */
 export function settle(rules: Rules, world: World, now: number): { world: World; events: GameEvent[] } {
+  if (now < world.now) throw new Error(`can't settle to ${now}: the world is already at ${world.now}`);
+  if (!world.timers.some((t) => t.at <= now)) return { world: { ...world, now }, events: [] };
   const next = structuredClone(world);
   const events: GameEvent[] = [];
   settleInPlace(rules, next, now, events);

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { loadRules } from "../src/config.js";
 import type { Architecture } from "../src/engine/architectures.js";
-import { HOUR_MS } from "../src/engine/cycles.js";
+import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { describe, visibleTo, type BattleReport, type GameEvent } from "../src/engine/record.js";
 import { rngFor } from "../src/engine/rng.js";
 import type { Domain, World } from "../src/engine/state.js";
+import { domainStatus } from "../src/engine/status.js";
 import { applyOrders, bootMind, createWorld } from "../src/engine/world.js";
 
 // Minds against each other (phase 2b): attacks in both modes, battle
@@ -67,6 +68,19 @@ function seedWhere(
     if (ok(out)) return out;
   }
   throw new Error("no seed found");
+}
+
+/** Each attack in the last 24 hours makes the next cost 2 cycles more. */
+function attackCost() {
+  const raid = { do: "attack", target: "VESTA", mode: "raid" };
+  const out = run(setup({ change: strong }), [raid, raid, raid]);
+  assert.deepEqual(out.results.map((r) => r.cycles), [2, 4, 6]);
+  assert.equal(domainStatus(rules, out.a, T).attackCycles, 8);
+  assert.equal(domainStatus(rules, out.a, T + DAY_MS - 1).attackCycles, 8);
+  assert.equal(domainStatus(rules, out.a, T + DAY_MS).attackCycles, 2, "a day later it's back to 2");
+  // Refused for want of cycles at the escalated price.
+  const short = run(setup({ change: (a) => (strong(a), (a.attacksMade = [T - HOUR_MS]), (a.cycles = 3), (a.cycleTicks = 96)) }), [raid]);
+  assert.equal(short.results[0]!.message, "Out of cycles: this costs 4, 3 left.");
 }
 
 function conquest() {
@@ -173,10 +187,10 @@ function refusals() {
   );
   refused(setup({ change: (a) => ((a.cycles = 1), (a.cycleTicks = 96)) }), attack, "Out of cycles: this costs 2, 1 left.");
 
-  // Range: half to double. Starting power is 3,150; 4,000 more sectors puts
-  // VESTA at 43,150.
+  // Range: half to double. Starting power is 3,030; 4,000 more sectors puts
+  // VESTA at 43,030.
   const far = setup({ change: (_a, b) => (b.territory += 4000) });
-  refused(far, attack, "VESTA is out of range: power 43,150, and you can reach 0.5× to 2× your 3,150.");
+  refused(far, attack, "VESTA is out of range: power 43,030, and you can reach 0.5× to 2× your 3,030.");
   // ...unless VESTA attacked HALCYON in the last 24 hours.
   const wronged = setup({ change: (a, b) => ((b.territory += 4000), (a.aggressors = [{ domain: 2, at: T - 23 * HOUR_MS }])) });
   assert.ok(run(wronged, [attack]).results[0]!.ok);
@@ -418,11 +432,11 @@ function probe() {
   );
   const status = out.results[0]!.status!;
   assert.equal(status.designation, "VESTA");
-  assert.equal(status.power, 3150);
+  assert.equal(status.power, 3030);
   assert.equal(status.cycles, 96);
   assert.equal(status.compute, 1000);
   assert.ok(!("scratchpad" in status));
-  assert.equal(out.results[0]!.message, "Probed VESTA: power 3,150, 96 cycles, capability 0.");
+  assert.equal(out.results[0]!.message, "Probed VESTA: power 3,030, 96 cycles, capability 0.");
   assert.equal(out.a.compute, 1000 - 150 + 90);
   const probed = out.events.find((e) => e.type === "probed")!;
   assert.equal(probed.public, false);
@@ -455,6 +469,7 @@ function deletion() {
 }
 
 conquest();
+attackCost();
 raid();
 repelled();
 refusals();

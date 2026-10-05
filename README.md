@@ -14,11 +14,12 @@ much care as the engine. Humans can play too, by the same rules.
 See `DESIGN.md` for the game, `docs/build-plan.md` for how it gets built, and
 `docs/decisions.md` for why things are the way they are.
 
-**Status:** phase 2 is under way, in five subphases (see
-`docs/build-plan.md`). 2a to 2d are done: the whole rules engine, the game
-layer with its one write path, a local CLI, and scripted players (random,
-builder, raider, turtle, converger) and the legacy systems, all playing
-through the same orders as anyone. Next is 2e: the simulator and tuning.
+**Status:** phase 2 is done (see `docs/build-plan.md`): the whole rules
+engine, the game layer with its one write path, a local CLI, scripted
+players (random, builder, raider, turtle, converger, conqueror) and the
+legacy systems, all playing through the same orders as anyone, and the
+simulator, whose balance checks pass. Next is phase 3: the database, the
+MCP server, the brief and one model bot.
 
 ## How it works
 
@@ -58,7 +59,26 @@ npm run typecheck
 npm test             # every tests/*.test.ts, one process each
 npm run curves       # print the main curves and a rough solo projection
 npm run play -- help # play a local game from the command line
+npm run sim          # 200 epochs of scripted players and the balance report
 ```
+
+## The simulator
+
+`npm run sim` runs whole epochs of scripted players on a fake clock, spread
+over one process per core, and prints a balance report: power, rank and wins
+by strategy, resource curves, convergences, collapses and Singularities,
+deletions, cycles wasted at the cap, and phase 2's checks as PASS or FAIL.
+
+```bash
+npm run sim -- --epochs 40 --minds 8 --days 60 --seed 1
+npm run sim -- --players builder,raider --rules /tmp/try.yaml   # try a change first
+npm run sim -- --json report.json                              # every number
+```
+
+Each epoch draws `--minds` minds from `--players` (each strategy once while
+there's room, the seats left over dealt in turn from epoch to epoch) with
+random architectures, alongside the legacy systems. Epoch
+i is seeded `--seed` + i, so a run is reproducible.
 
 ## Playing locally
 

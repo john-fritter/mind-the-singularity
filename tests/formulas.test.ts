@@ -89,8 +89,8 @@ function structure() {
 function economy() {
   // Expansion: 10 at the start, falling as the domain grows, never below the minimum.
   assert.equal(expansionYield(rules, 250), 10);
-  assert.equal(expansionYield(rules, 500), 5);
-  assert.equal(expansionYield(rules, 1250), 2);
+  assert.equal(expansionYield(rules, 500), 6, "the floor");
+  assert.equal(expansionYield(rules, 1250), 6, "the floor");
   assert.equal(expansionYield(rules, 100000), rules.expansion.yield_min);
   assert.ok(nonincreasing(TERRITORIES, (t) => expansionYield(rules, t)));
   assert.ok(TERRITORIES.every((t) => Number.isInteger(expansionYield(rules, t))));
@@ -212,7 +212,7 @@ function powerAndRange() {
   assert.deepEqual(force, { attack: 450, defense: 550, capitalUpkeep: 100, computeUpkeep: 0 });
   const built = Object.values(s.buildings).reduce((a, b) => a + b, 0);
   const start = { territory: s.territory, buildings: built, attack: force.attack, defense: force.defense, capability: 0 };
-  assert.equal(power(rules, start), 3150);
+  assert.equal(power(rules, start), 3030);
   for (const key of ["territory", "buildings", "attack", "defense", "capability"] as const) {
     assert.ok(power(rules, { ...start, [key]: start[key] + 10 }) > power(rules, start), `power rises with ${key}`);
   }

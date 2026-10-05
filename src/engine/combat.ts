@@ -87,6 +87,15 @@ export function battleOutcome(rules: Rules, attacker: number, defender: number):
   };
 }
 
+/**
+ * Cycles an attack costs: the base, plus more for each attack the mind made
+ * in the last day, so no mind can attack without limit.
+ * Keys: action_cycles.attack, combat.attack_cycles_per_recent_attack
+ */
+export function attackCycles(rules: Rules, recentAttacks: number): number {
+  return rules.action_cycles.attack + Math.ceil(recentAttacks * rules.combat.attack_cycles_per_recent_attack);
+}
+
 /** Units of one type lost, given its side's loss share. Keys: combat.ranged_loss_factor */
 export function unitsLost(rules: Rules, units: number, lossShare: number, ranged: boolean): number {
   return Math.floor(units * lossShare * (ranged ? rules.combat.ranged_loss_factor : 1));

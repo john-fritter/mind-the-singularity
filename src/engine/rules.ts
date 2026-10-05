@@ -255,6 +255,7 @@ const CombatSchema = z
     ranged_loss_factor: share,
     lopsided_ratio: z.number().gt(1),
     lopsided_cores: positiveCount,
+    attack_cycles_per_recent_attack: nonnegative,
     conquest_territory_share: share,
     raid_capital_share: share,
     raid_user_share: share,

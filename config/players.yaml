@@ -9,20 +9,24 @@
 # `expand` and `manufacture` shares of them on those and the rest on Build
 # batches in the `buildings` mix; and puts whatever couldn't be used into
 # Expand (when land is short) or `leftover`.
+#
+# `singularity` is the strategy's stance, from DESIGN.md's mind profile:
+# lead runs it as soon as it can; join runs it only while a convergence is
+# underway; hunt attacks converged minds by conquest; never ignores it.
 
 # 8 a day, the rate the bot runner is planned to wake bots at.
 wake_every_hours: 3
 steps_per_wake: 2
 
 strategies:
-  # Economy first; never attacks.
+  # Economy first; never attacks; joins a convergence.
   builder:
-    research: [self, deploy1, probe, battle, deploy2, hostile, deploy3]
+    research: [self, deploy1, probe, battle, deploy2, hostile, deploy3, singularity]
     self: true
     deploy: false
     countermeasure: 1
     attack: null
-    singularity: false
+    singularity: join
     reserve_cycles: 0
     reserve_compute: 0
     expand: 0.35
@@ -31,14 +35,17 @@ strategies:
     buildings: { city: 0.45, datacenter: 0.15, factory: 0.05, lab: 0.2, core: 0.1, firewall: 0.05 }
     hardware: { drones: 0, sentries: 1, walkers: 0 }
 
-  # Builds a force and raids the weakest mind in range when it can win.
+  # Builds a force and raids the weakest mind in range when it can win;
+  # joins a convergence.
   raider:
-    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile]
+    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile, singularity]
     self: true
     deploy: true
     countermeasure: 1.5
     attack: { mode: raid, margin: 1.3, blind_defense_per_power: 0.25, hostile: true }
-    singularity: false
+    # Joins rather than hunts: with every raider hunting, no convergence
+    # outlived the next raider wake (docs/decisions.md, 2e tuning).
+    singularity: join
     reserve_cycles: 0
     reserve_compute: 300
     expand: 0.25
@@ -47,14 +54,15 @@ strategies:
     buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
 
-  # Cores, firewalls and sentries; banks cycles; never attacks.
+  # Cores, firewalls and sentries; banks cycles; never attacks; joins a
+  # convergence.
   turtle:
-    research: [self, deploy1, battle, probe, deploy2, deploy3, hostile]
+    research: [self, deploy1, battle, probe, deploy2, deploy3, hostile, singularity]
     self: true
     deploy: true
     countermeasure: 0.5
     attack: null
-    singularity: false
+    singularity: join
     reserve_cycles: 24
     reserve_compute: 500
     expand: 0.25
@@ -70,7 +78,7 @@ strategies:
     deploy: false
     countermeasure: 1
     attack: null
-    singularity: true
+    singularity: lead
     reserve_cycles: 0
     reserve_compute: 0
     expand: 0.35
@@ -78,6 +86,24 @@ strategies:
     leftover: spin_up
     buildings: { city: 0.3, datacenter: 0.25, factory: 0, lab: 0.35, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0, sentries: 1, walkers: 0 }
+
+  # The raider's build, but takes land: conquers the weakest mind in range
+  # when it can win. Added in 2e so the simulator tests conquest, which any
+  # agent will try.
+  conqueror:
+    research: [probe, deploy1, self, battle, deploy2, deploy3, hostile, singularity]
+    self: true
+    deploy: true
+    countermeasure: 1.5
+    attack: { mode: conquest, margin: 1.3, blind_defense_per_power: 0.25, hostile: true }
+    singularity: never
+    reserve_cycles: 0
+    reserve_compute: 300
+    expand: 0.25
+    manufacture: 0.35
+    leftover: spin_up
+    buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
+    hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
 
 random:
   actions_per_wake: 6

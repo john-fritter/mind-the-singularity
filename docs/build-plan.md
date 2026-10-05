@@ -170,7 +170,7 @@ fail. (Done 2026-10-05.)
 
 **2e: the simulator and tuning.** `npm run sim` and its report, and
 `config/rules.yaml` tuned until phase 2's checks pass. *Done when* phase 2
-is.
+is. (Done 2026-10-05.)
 
 ## Phase 3: database, MCP server, the brief, one model bot
 

@@ -14,6 +14,8 @@ const shares = <K extends string>(keys: readonly [K, ...K[]]) =>
 export const RESEARCH_KINDS = ["probe", "deploy1", "deploy2", "deploy3", "self", "battle", "hostile", "singularity"] as const;
 export type ResearchKind = (typeof RESEARCH_KINDS)[number];
 
+export const SINGULARITY_STANCES = ["lead", "join", "hunt", "never"] as const;
+
 const StrategySchema = z
   .strictObject({
     /** Programs to research, in order; ones already known are skipped. */
@@ -36,8 +38,13 @@ const StrategySchema = z
         hostile: z.boolean(),
       })
       .nullable(),
-    /** Run the Singularity as soon as it can, banking cycles and compute for it once it's known. */
-    singularity: z.boolean(),
+    /**
+     * Its Singularity stance, from DESIGN.md's mind profile. lead: run it as
+     * soon as it can, banking cycles and compute for it once it's known.
+     * join: the same, but only while a convergence is underway. hunt: attack
+     * converged minds by conquest, which collapses a convergence. never.
+     */
+    singularity: z.enum(SINGULARITY_STANCES),
     /** Cycles left unspent at the end of a wake. */
     reserve_cycles: z.number().int().min(0),
     /** Compute kept back from deployments and programs. */
@@ -53,7 +60,7 @@ const StrategySchema = z
   .refine((s) => s.expand + s.manufacture <= 1, { message: "expand and manufacture can't take more than every cycle" });
 export type Strategy = z.infer<typeof StrategySchema>;
 
-export const STRATEGIES = ["builder", "raider", "turtle", "converger"] as const;
+export const STRATEGIES = ["builder", "raider", "turtle", "converger", "conqueror"] as const;
 export type StrategyName = (typeof STRATEGIES)[number] | "random";
 
 export const PlayersSchema = z.strictObject({

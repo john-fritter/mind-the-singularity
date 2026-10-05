@@ -38,7 +38,7 @@ function boot() {
   assert.equal(totalBuildings(d), 80);
   assert.equal(d.cycles, 96);
   assert.equal(capability(d), 0);
-  assert.equal(domainPower(rules, d), 3150);
+  assert.equal(domainPower(rules, d), 3030);
 
   const fresh = createWorld(rules, { epoch: 1, seed: 1, startedAt: T0 });
   const ok = (input: object) => bootMind(rules, fresh, { designation: "A", domainName: "B", architecture: "oracle", ...input }, T0);
@@ -254,8 +254,12 @@ function selfPrograms() {
   assert.equal(hard.results[0]!.message, "Hardening running for 12 hours.");
   assert.deepEqual(hard.d.running, [{ program: "hardening", endsAt: T0 + 12 * HOUR_MS }]);
   assert.equal(programTimers(hard.world).length, 1);
+  const before = structuredClone(hard.world);
   const early = settle(rules, hard.world, T0 + 12 * HOUR_MS - 1);
   assert.deepEqual(early.events, []);
+  // With nothing due, only the clock moves, and the world given is untouched.
+  assert.deepEqual(early.world, { ...before, now: T0 + 12 * HOUR_MS - 1 });
+  assert.deepEqual(hard.world, before);
   const ended = settle(rules, early.world, T0 + 12 * HOUR_MS);
   assert.deepEqual(domainOf(ended.world).running, []);
   assert.deepEqual(programTimers(ended.world), []);

@@ -79,11 +79,11 @@ Cycles are Archmage's turns: they accrue in real time, and the economy runs per 
 
 | Action | Cycles | What it does |
 | --- | --- | --- |
-| Expand | 1 each | Gains territory; yield drops as the domain grows |
+| Expand | 1 each | Gains territory; yield drops as the domain grows, to a floor |
 | Build | 1 per batch | Builds up to the domain's build rate in buildings |
 | Manufacture | 1 per batch | Builds hardware units, up to factory capacity |
 | Execute | 1 | Runs a program; costs compute |
-| Attack | 2 | Sends forces against another domain |
+| Attack | 2, +2 per attack in the last 24h | Sends forces against another domain |
 | Monetize | 1 | Extra capital equal to one cycle's income |
 | Spin Up | 1 | Extra compute equal to one cycle's income |
 

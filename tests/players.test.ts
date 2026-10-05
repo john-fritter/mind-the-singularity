@@ -12,6 +12,7 @@ import { replay } from "../src/game/replay.js";
 import { apportion } from "../src/players/plan.js";
 import { drive, legacySeats, scriptedSeat, wakesBetween, type Seat, type WakeLog } from "../src/players/drive.js";
 import { STRATEGIES, type StrategyName } from "../src/players/settings.js";
+import { foreseeableFailures } from "../src/sim/epoch.js";
 import { MemoryStore } from "../src/store/memory.js";
 
 // Phase 2d: the scripted players and the legacy systems. Each plays a whole
@@ -21,13 +22,6 @@ import { MemoryStore } from "../src/store/memory.js";
 const rules = loadRules();
 const settings = loadPlayers();
 const T0 = Date.UTC(2026, 9, 5);
-
-/**
- * Failures the brief can't foresee: a program crashing, a firewall blocking
- * a hostile program, and a target's hostile cap (other minds' programs
- * aren't in the brief).
- */
-const UNFORESEEABLE = [/ crashed: /, /firewalls blocked/, /has taken all the hostile programs it can today/];
 
 function seats(strategies: readonly StrategyName[]): Seat[] {
   return [
@@ -51,22 +45,9 @@ async function epoch(seed: number, days: number) {
   return { game, logs };
 }
 
-function failuresIn(logs: WakeLog[]): string[] {
-  const out: string[] = [];
-  for (const log of logs) {
-    if (log.error) out.push(`${log.account}: ${log.error}`);
-    for (const step of log.steps) {
-      for (const r of step.results) {
-        if (!r.ok && !UNFORESEEABLE.some((re) => re.test(r.message))) out.push(`${log.kind} ${log.account} ${r.do}: ${r.message}`);
-      }
-    }
-  }
-  return out;
-}
-
 async function wholeEpoch() {
   const { game, logs } = await epoch(11, rules.epoch.length_days);
-  assert.deepEqual(failuresIn(logs), [], "an order failed that the brief showed would fail");
+  assert.deepEqual(foreseeableFailures(logs), [], "an order failed that the brief showed would fail");
   const last = await getBrief(new MemoryStore(game), { account: "player-0" }, T0 + rules.epoch.length_days * DAY_MS);
   assert.ok(!("ok" in last) && last.epoch.ended !== null, "the epoch ran to its end");
 
@@ -99,7 +80,7 @@ async function wholeEpoch() {
 
 async function anotherSeed() {
   const { logs } = await epoch(29, 20);
-  assert.deepEqual(failuresIn(logs), []);
+  assert.deepEqual(foreseeableFailures(logs), []);
 }
 
 /** A legacy system's first day: booted scaled, its day's cycles spent in its mix. */

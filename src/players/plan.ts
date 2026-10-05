@@ -12,6 +12,7 @@ import {
   userCap,
   userChange,
 } from "../engine/economy.js";
+import { conquestSectors } from "../engine/combat.js";
 import { deployCount, programCompute, scaledShare } from "../engine/programs.js";
 import type { Rules } from "../engine/rules.js";
 import { forceTotals } from "../engine/units.js";
@@ -58,11 +59,19 @@ export class Plan {
   compute: number;
   users: number;
   territory: number;
+  /**
+   * Territory to price buildings at: an upper bound, since a won conquest
+   * adds land (and building costs rise with territory) and the plan can't
+   * know whether it will win.
+   */
+  costTerritory: number;
   buildings: Record<Building, number>;
   units: Partial<Record<Unit, number>>;
   readonly known: Program[];
   readonly running = new Set<Program>();
   researchTarget: Program | null;
+  /** Whether this plan has an attack in it. */
+  private attacked = false;
   /** Cycles this plan has spent so far. */
   spent = 0;
 
@@ -76,6 +85,7 @@ export class Plan {
     this.compute = y.compute;
     this.users = y.users;
     this.territory = y.territory;
+    this.costTerritory = y.territory;
     this.buildings = { ...y.buildings };
     this.units = { ...y.units };
     this.known = [...y.known];
@@ -120,9 +130,16 @@ export class Plan {
     return this.known.includes(program);
   }
 
-  /** One cycle's economy, as a lower bound: income only where upkeep or shrinking outweighs it. */
-  private passCycles(k: number): void {
+  /**
+   * One cycle's economy, as a lower bound: income only where upkeep or
+   * shrinking outweighs it. `uncertain` is for an order that may be refused
+   * for a reason the brief can't show (a target's hostile cap): refused, it
+   * spends no cycle and earns nothing, so the estimate keeps the lower of
+   * the two outcomes.
+   */
+  private passCycles(k: number, uncertain = false): void {
     const r = this.rules;
+    const before = { capital: this.capital, compute: this.compute, users: this.users };
     for (let i = 0; i < k; i++) {
       this.cycles--;
       this.spent++;
@@ -137,6 +154,11 @@ export class Plan {
       this.capital = capital >= capitalUpkeep ? capital - capitalUpkeep : 0;
       const computeUpkeep = Math.ceil(force.computeUpkeep);
       this.compute = compute >= computeUpkeep ? compute - computeUpkeep : 0;
+    }
+    if (uncertain) {
+      this.capital = Math.min(this.capital, before.capital);
+      this.compute = Math.min(this.compute, before.compute);
+      this.users = Math.min(this.users, before.users);
     }
   }
 
@@ -182,14 +204,17 @@ export class Plan {
   }
 
   attackWith(target: string, mode: "conquest" | "raid", program?: Program): boolean {
-    const cost = this.rules.action_cycles.attack;
-    if (!this.canSpend(cost) || !this.targets().some((t) => t.designation === target) || this.attack <= 0) return false;
+    // One attack a wake: each makes the next cost more, and the brief gives only the next one's cost.
+    const cost = this.brief.you.attackCycles;
+    if (this.attacked || !this.canSpend(cost) || !this.targets().some((t) => t.designation === target) || this.attack <= 0) return false;
     if (this.brief.now < this.brief.you.bootPeriodEndsAt) return false;
     const order: Record<string, unknown> = { do: "attack", target, mode };
     if (program !== undefined && this.knows(program) && PROGRAM_INFO.get(program)!.kind === "battle" && this.compute >= programCompute(this.rules, program)) {
       order.program = program;
       this.compute -= programCompute(this.rules, program);
     }
+    if (mode === "conquest") this.costTerritory += conquestSectors(this.rules, this.targets().find((t) => t.designation === target)!.territory);
+    this.attacked = true;
     this.spending.push(order);
     // A fight costs units; assume none, which only overstates upkeep.
     this.passCycles(cost);
@@ -205,16 +230,16 @@ export class Plan {
     if (this.compute < compute) return false;
     this.compute -= compute;
     this.spending.push({ do: "execute", program, target });
-    this.passCycles(cost);
+    this.passCycles(cost, true);
     return true;
   }
 
-  /** Probe: any live mind, shields or not. */
+  /** Probe: any live mind, shields or not; the brief names those in range. */
   probe(target: string): boolean {
     const cost = this.rules.action_cycles.execute;
     const compute = programCompute(this.rules, "probe");
     if (!this.canSpend(cost) || !this.knows("probe") || this.compute < compute) return false;
-    if (target === this.brief.you.designation) return false;
+    if (!this.brief.inRange.some((t) => t.designation === target)) return false;
     this.compute -= compute;
     this.spending.push({ do: "execute", program: "probe", target });
     this.passCycles(cost);
@@ -228,7 +253,9 @@ export class Plan {
     const k = Math.min(Math.floor(cycles / cost), Math.floor(this.cycles / cost));
     if (k <= 0 || !this.canSpend(cost)) return 0;
     for (let i = 0; i < k; i++) {
-      this.territory += expansionYield(this.rules, this.territory);
+      const gained = expansionYield(this.rules, this.territory);
+      this.territory += gained;
+      this.costTerritory += gained;
       this.passCycles(cost);
     }
     this.spending.push({ do: "expand", cycles: k * cost });
@@ -245,7 +272,7 @@ export class Plan {
       const want = new Map<Building, number>();
       let capital = this.capital;
       for (const [b, k] of apportion(mix, size)) {
-        const price = buildingCost(this.rules, b, this.territory);
+        const price = buildingCost(this.rules, b, this.costTerritory);
         const n = Math.min(k, Math.floor(capital / price));
         if (n > 0) want.set(b, n);
         capital -= n * price;
