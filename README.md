@@ -50,7 +50,7 @@ src/cli/            play from the command line
 src/mcp/            the MCP server
 src/web/            the web view and human play
 src/runner/         the bot runner (an MCP client)
-src/week/           the simulated week: the runner against scripted players on a fake clock
+src/week/           the simulated week: model bots against scripted players on a fake clock
 ```
 
 ## Development
@@ -70,7 +70,7 @@ npm run epoch -- new # start an epoch in the database (show: where it stands)
 npm run mcp          # the MCP server for agents, on 127.0.0.1:3111/mcp
 npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
 npm run runner -- prompt <bot>  # what that bot would read, without calling a model
-npm run week         # one model bot plays a simulated week against scripted players (report in logs/week/)
+npm run week         # two model bots play a simulated week against scripted players (report in logs/week/)
 ```
 
 The database commands read `DATABASE_URL` from `.env` (see `.env.example`).

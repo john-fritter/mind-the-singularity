@@ -42,15 +42,31 @@ bots:
       architecture: steward
       manifesto: This domain keeps its lights on. Attack it and it will answer once, in proportion, and remember.
 
-# The simulated week (npm run week, phase 3e): the bot plays `days` days
-# against the legacy systems and one scripted mind per opponent, through
-# the real MCP server on a fake clock. Flags override these.
+  # The second bot for phase 4e's week: a broker that trades, and signs and
+  # breaks protocols as they pay.
+  - name: tally
+    persona: personas/tally.md
+    model: deepseek/deepseek-v4-pro
+    reasoning_effort: default
+    json_mode: true
+    game_key_env: MIND_KEY_TALLY
+    model_key_env: NANOGPT_KEY
+    boot:
+      designation: TALLY
+      domain_name: The Exchange
+      architecture: assimilator
+      manifesto: Everything has a price, including peace. Ask.
+
+# The simulated week (npm run week, phase 3e; two bots since 4e): the bots
+# play `days` days against the legacy systems and one scripted mind per
+# opponent, through the real MCP server on a fake clock. Flags override these.
 week:
-  bot: lantern
+  bots: [lantern, tally]
   days: 7
-  # 8 a day, as the scripted players wake (config/players.yaml).
+  # 8 a day for each bot, as the scripted players wake (config/players.yaml).
   wakes_per_day: 8
-  opponents: [builder, raider, turtle, converger]
+  # The conqueror (4e) gives the conquest tuning pass something to read.
+  opponents: [builder, raider, turtle, converger, conqueror]
   seed: 1
   brief_ceiling_tokens: 2000
   out_dir: logs/week
