@@ -14,6 +14,7 @@ import type { Rules } from "../engine/rules.js";
 import type { Domain, World } from "../engine/state.js";
 import { domainStatus, type DomainStatus } from "../engine/status.js";
 import { forceTotals } from "../engine/units.js";
+import { socialLeft } from "../engine/social.js";
 import { settle } from "../engine/world.js";
 import type { WorldStore } from "../store/store.js";
 import { currentMind, IdentitySchema } from "./game.js";
@@ -123,8 +124,51 @@ export interface Brief {
    * to brief.scanned between them. `left` counts what the caps left out.
    */
   since: { from: number; yours: ShownEvent[]; world: ShownEvent[]; fights: ShownEvent[]; left: number };
+  /**
+   * Messages to you since your last orders, newest kept up to site.yaml's
+   * brief.channels; `left` counts the older ones, and `canSend` how many
+   * more you may send today.
+   */
+  channels: { messages: Message[]; left: number; canSend: number };
+  /** The newest Commons posts, up to brief.commons, newest last; `canPost` is how many more you may post today. */
+  commons: { posts: Post[]; canPost: number };
   /** Minds you could attack now (your own boot period aside), strongest first. */
   inRange: PublicSummary[];
+}
+
+/** A Commons post. `replyTo` is its thread's first post, for a reply. */
+export interface Post {
+  post: number;
+  author: string;
+  replyTo: number | null;
+  at: number;
+  text: string;
+}
+
+/** A message on a channel. `seq` pages back through a channel in `view`. */
+export interface Message {
+  seq: number;
+  at: number;
+  from: string;
+  to: string;
+  text: string;
+}
+
+/** Social events aren't news: the brief and the Record show them apart. */
+const SOCIAL: ReadonlySet<EventType> = new Set(["post", "message"]);
+
+const asPost = (e: GameEvent & { type: "post" }): Post => ({ post: e.post, author: e.designation, replyTo: e.replyTo, at: e.at, text: e.text });
+const asMessage = (e: GameEvent & { type: "message" }): Message => ({ seq: e.seq, at: e.at, from: e.fromName, to: e.toName, text: e.text });
+const isPost = (e: GameEvent): e is GameEvent & { type: "post" } => e.type === "post";
+
+/** The newest `count` posts at most, newest last. The Record is in order, so this reads only its tail. */
+function newestPosts(record: GameEvent[], count: number, before = Infinity): Post[] {
+  const out: Post[] = [];
+  for (let i = record.length - 1; i >= 0 && out.length < count; i--) {
+    const e = record[i]!;
+    if (isPost(e) && e.post < before) out.push(asPost(e));
+  }
+  return out.reverse();
 }
 
 const designationOf = (world: World, id: number) => world.domains.find((d) => d.id === id)?.designation ?? "?";
@@ -153,10 +197,14 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   // The Record is in sequence order, so only its tail can be new.
   let from = settled.record.length;
   while (from > 0 && settled.record[from - 1]!.seq > sinceSeq) from--;
-  const fresh = settled.record.slice(from).filter((e) => visibleTo(e, me.id));
+  const visible = settled.record.slice(from).filter((e) => visibleTo(e, me.id));
+  const fresh = visible.filter((e) => !SOCIAL.has(e.type));
   // A battle the mind fought comes with its private report, which says more.
   const yours = fresh.filter((e) => e.domains.includes(me.id) && e.type !== "battle");
   const allOthers = fresh.filter((e) => !e.domains.includes(me.id));
+  const inbox = visible.filter((e): e is GameEvent & { type: "message" } => e.type === "message" && e.to === me.id);
+  const kept = inbox.slice(-site.brief.channels);
+  const sendable = socialLeft(rules, world, me, t);
   const others = allOthers.slice(-site.brief.scanned);
   const isFight = (e: GameEvent) => e.type === "battle" || e.type === "hostile";
   const keptYours = yours.slice(-site.brief.yours);
@@ -208,6 +256,8 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
       fights: others.filter(isFight).map((e) => shown(rules, e)),
       left,
     },
+    channels: { messages: kept.map(asMessage), left: inbox.length - kept.length, canSend: sendable.messages },
+    commons: { posts: newestPosts(settled.record, site.brief.commons), canPost: sendable.posts },
     inRange:
       me.deletedAt !== null
         ? []
@@ -227,6 +277,22 @@ export const ViewSchema = z.discriminatedUnion("what", [
     before: z.number().int().positive().optional(),
   }),
   z.strictObject({ what: z.literal("rankings") }),
+  z.strictObject({
+    what: z.literal("commons"),
+    limit: z.number().int().positive().optional(),
+    /** Only posts before this one, to page back. */
+    before: z.number().int().positive().optional(),
+  }),
+  /** A thread: its first post and every reply. */
+  z.strictObject({ what: z.literal("thread"), post: z.number().int().positive() }),
+  z.strictObject({
+    what: z.literal("channel"),
+    /** Only your channel with this mind, by designation. */
+    name: z.string().min(1).max(80).optional(),
+    limit: z.number().int().positive().optional(),
+    /** Only messages before this sequence number, to page back. */
+    before: z.number().int().positive().optional(),
+  }),
 ]);
 export type ViewQuery = z.input<typeof ViewSchema>;
 
@@ -234,6 +300,9 @@ export type ViewResult =
   | { ok: true; what: "domain"; domain: PublicPage }
   | { ok: true; what: "record"; entries: ShownEvent[]; more: boolean }
   | { ok: true; what: "rankings"; domains: PublicSummary[] }
+  | { ok: true; what: "commons"; posts: Post[]; more: boolean }
+  | { ok: true; what: "thread"; posts: Post[] }
+  | { ok: true; what: "channel"; messages: Message[]; more: boolean }
   | GameError;
 
 /** Domains by designation, live first, then deleted ones newest first. */
@@ -244,9 +313,14 @@ function domainsNamed(world: World, name: string): Domain[] {
   return live ? [live, ...gone] : gone;
 }
 
-/** Public lookups: a domain's page, the Record, the rankings. */
+/**
+ * Lookups: a domain's public page, the Record, the rankings, the Commons
+ * and its threads, which anyone may see; and your own channels, which only
+ * you and the mind on the other end may.
+ */
 export async function view(store: WorldStore, identity: Identity, query: unknown, now: number): Promise<ViewResult> {
-  if (!IdentitySchema.safeParse(identity).success) return gameError("invalid", "An account name is needed, at most 80 characters.");
+  const id = IdentitySchema.safeParse(identity);
+  if (!id.success) return gameError("invalid", "An account name is needed, at most 80 characters.");
   const parsed = ViewSchema.safeParse(query);
   if (!parsed.success) return gameError("invalid", z.prettifyError(parsed.error));
   const q = parsed.data;
@@ -276,6 +350,7 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
       const matching = record.filter(
         (e) =>
           e.public &&
+          !SOCIAL.has(e.type) &&
           (q.type === undefined || e.type === (q.type as EventType)) &&
           (q.before === undefined || e.seq < q.before) &&
           (ids === undefined || e.domains.some((d) => ids.includes(d))),
@@ -285,5 +360,35 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
     }
     case "rankings":
       return { ok: true, what: "rankings", domains: order.map((d) => summary(rules, order, d, t)) };
+    case "commons": {
+      const limit = Math.min(q.limit ?? site.view.record_default, site.view.record_max);
+      const posts = newestPosts(record, limit + 1, q.before);
+      return { ok: true, what: "commons", posts: posts.slice(-limit).reverse(), more: posts.length > limit };
+    }
+    case "thread": {
+      const root = world.postRoots[q.post - 1];
+      if (root === undefined) return gameError("not_found", `There is no post #${q.post}.`);
+      const posts = record.filter(isPost).filter((e) => e.post === root || e.replyTo === root).map(asPost);
+      return { ok: true, what: "thread", posts };
+    }
+    case "channel": {
+      // Only a mind's own channels exist for it; anyone else's are not found.
+      const mind = currentMind(game, id.data.account);
+      if (!mind) return gameError("not_found", "You have no mind, so no channels.");
+      let other: number[] | undefined;
+      if (q.name !== undefined) {
+        other = domainsNamed(world, q.name).map((d) => d.id);
+        if (other.length === 0) return gameError("not_found", `No mind called ${q.name}.`);
+      }
+      const limit = Math.min(q.limit ?? site.view.record_default, site.view.record_max);
+      const matching = record.filter(
+        (e): e is GameEvent & { type: "message" } =>
+          e.type === "message" &&
+          (e.from === mind.id || e.to === mind.id) &&
+          (q.before === undefined || e.seq < q.before) &&
+          (other === undefined || other.includes(e.from === mind.id ? e.to : e.from)),
+      );
+      return { ok: true, what: "channel", messages: matching.slice(-limit).reverse().map(asMessage), more: matching.length > limit };
+    }
   }
 }

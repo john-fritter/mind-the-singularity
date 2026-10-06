@@ -4,7 +4,7 @@ import { loadPlayers, loadRules, loadSite } from "../src/config.js";
 import { ARCHITECTURES, BUILDINGS, HARDWARE, programsOf, type Program, type Unit } from "../src/engine/architectures.js";
 import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { describe, type EventData, type GameEvent } from "../src/engine/record.js";
-import { briefText } from "../src/game/brief.js";
+import { briefText, size } from "../src/game/brief.js";
 import { bootMind, newGame, submitOrders } from "../src/game/game.js";
 import { getBrief, type Brief, type PublicSummary, type ShownEvent } from "../src/game/read.js";
 import { drive, legacySeats, scriptedSeat, type Seat } from "../src/players/drive.js";
@@ -37,7 +37,13 @@ function event(data: EventData, mine: number[], publicEvent: boolean): ShownEven
 }
 
 /** A brief with every trim overfull of the longest lines the game writes, with names made by `longName` and amounts of `big`. */
-function worstCase(longName: (i: number) => string, big = 987_654_321): Brief {
+/** Plain prose, as a mind writes, up to `chars`. */
+const prose = (chars: number) =>
+  "VESTA, OUROBOROS needs three more minds to converge and I don't intend to let it get them. Hit its labs at dawn; I'll take the cores. "
+    .repeat(10)
+    .slice(0, chars);
+
+function worstCase(longName: (i: number) => string, big = 987_654_321, text: (chars: number) => string = prose): Brief {
   const me = 1;
   const arch = "assimilator";
   const programs = programsOf(arch).map((p) => p.id);
@@ -147,35 +153,103 @@ function worstCase(longName: (i: number) => string, big = 987_654_321): Brief {
       rebootAt: null,
     },
     since: { from: T0, yours, world, fights, left: 9_999 },
+    // Full channels and Commons of the longest text the rules allow.
+    channels: {
+      messages: Array.from({ length: site.brief.channels }, (_, i) => ({
+        seq: i + 1,
+        at: T0 + 53 * DAY_MS - (i + 1) * 61 * 60_000,
+        from: longName(800 + i),
+        to: longName(1),
+        text: text(rules.social.message_chars),
+      })),
+      left: 99,
+      canSend: 3,
+    },
+    commons: {
+      posts: Array.from({ length: site.brief.commons }, (_, i) => ({
+        post: 99_990 + i,
+        author: longName(900 + i),
+        replyTo: 99_000 + i,
+        at: T0 + 52 * DAY_MS + i * 61 * 60_000,
+        text: text(rules.social.post_chars),
+      })),
+      canPost: 1,
+    },
     inRange,
   };
 }
 
-/** Every trim at its cap, with names as short as most are and middling amounts: the caps bite, not the length budget. */
+/** No messages or posts. */
+const quiet = (b: Brief): Brief => ({
+  ...b,
+  channels: { messages: [], left: 0, canSend: rules.social.messages_per_day },
+  commons: { posts: [], canPost: rules.social.commons_posts_per_day },
+});
+
+/**
+ * Every trim at its cap, with names as short as most are and middling
+ * amounts: the caps bite, not the length budget. Full channels and Commons
+ * on top of that pass the budget, so they're checked on their own, with
+ * nothing else since the last wake.
+ */
 function trimsHold() {
-  const text = briefText(rules, worstCase(shortName, 12_345));
-  const since = text.slice(text.indexOf("SINCE LAST WAKE"), text.indexOf("IN RANGE"));
+  const text = briefText(rules, quiet(worstCase(shortName, 12_345)));
+  const since = text.slice(text.indexOf("SINCE LAST WAKE"), text.indexOf("CHANNELS"));
   assert.equal((since.match(/^- MIND-\d+ took .* sectors from MIND-1 /gm) ?? []).length, site.brief.yours, "your events, newest kept");
   assert.equal((since.match(/^- The convergence of /gm) ?? []).length, site.brief.world, "the world's moments, rare ones first");
   assert.equal((since.match(/^- MIND-5\d\d had firewalls block its Harvest on /gm) ?? []).length, site.brief.fights, "a line per attacker");
   assert.match(since, /^- MIND-5\d\d .*; 3 more$/m, "a line names a few acts");
   assert.match(since, /^- \(\d+ more not shown; view the Record\)$/m);
   assert.match(text, new RegExp(` · ${20 - site.brief.in_range} more: view rankings$`, "m"));
-  assert.ok(text.length <= site.brief.max_chars);
+  assert.doesNotMatch(text, /^(CHANNELS|COMMONS)/m, "no empty sections");
+  assert.ok(size(text) <= site.brief.max_size);
+
+  // Channels and the Commons, each line cut to its length.
+  const full = worstCase(shortName, 12_345);
+  const social = briefText(rules, { ...full, since: { ...full.since, yours: [], world: [], fights: [], left: 0 } });
+  socialTrimsHold(social);
+}
+
+function socialTrimsHold(text: string) {
+  assert.match(text, /^CHANNELS · you may send 3 more today\n- \(99 earlier not shown; view channel\)$/m);
+  const messages = text.match(/^- MIND-8\d\d \([^)]* ago\): .*$/gm) ?? [];
+  assert.equal(messages.length, site.brief.channels, "the newest messages");
+  assert.ok(messages.every((m) => m.endsWith("…") && size(m) < site.brief.message_size + 30));
+  assert.match(text, new RegExp(`^COMMONS \\(newest ${site.brief.commons}\\) · you may post 1 more today$`, "m"));
+  const posts = text.match(/^- #\d+ MIND-9\d\d \(re #\d+, .*\): .*…$/gm) ?? [];
+  assert.equal(posts.length, site.brief.commons);
+  assert.ok(size(text) <= site.brief.max_size);
 }
 
 /** The longest names the game allows: the length budget cuts lines, and the brief stays under the ceiling. */
 function worstCaseFits() {
+  // Messages in plain prose, and in scripts that cost a model more tokens per character.
+  for (const [what, text] of DENSE) {
+    const dense = briefText(rules, worstCase(longName, undefined, text));
+    const tokens = countTokens(dense);
+    console.log(`  worst case, ${what}: ${tokens} tokens, ${dense.length} characters`);
+    assert.ok(tokens <= MAX_TOKENS, `the worst-case brief with ${what} is ${tokens} tokens:\n${dense}`);
+  }
   const text = briefText(rules, worstCase(longName));
   const tokens = countTokens(text);
   console.log(`  worst case: ${tokens} tokens, ${text.length} characters`);
   assert.ok(tokens <= MAX_TOKENS, `the worst-case brief is ${tokens} tokens:\n${text}`);
-  assert.ok(text.length <= site.brief.max_chars);
+  assert.ok(size(text) <= site.brief.max_size);
   // Your newest event, a mind in range and the scratchpad always stay.
   assert.match(text, new RegExp(`^- ${longName(100 + site.brief.yours - 1)} took `, "m"));
   assert.match(text, /^IN RANGE: THE-SILENT-CHOIR-OF-THE-DEEP-ARCHIVE-700 /m);
   assert.match(text, /^SCRATCHPAD: PIKE raided me/m);
+  // The newest message always stays.
+  assert.match(text, new RegExp(`^- ${longName(800 + site.brief.channels - 1)} \\(`, "m"));
 }
+
+/** Text that costs more tokens per character than English: other scripts, symbols, emoji. */
+const DENSE: [string, (chars: number) => string][] = [
+  ["Cyrillic", (c) => "Пайк дважды атаковал меня с севера; Веста надёжна, но отвечает медленно. ".repeat(10).slice(0, c)],
+  ["Chinese", (c) => "派克从北方袭击了我两次；维斯塔可靠但回复很慢。我们在黎明时攻击它的实验室。".repeat(10).slice(0, c)],
+  ["symbols", (c) => "⟁⧖⌬⍟⎈⏣⟟⧗⨳⩕".repeat(40).slice(0, c)],
+  ["emoji", (c) => [..."🜁🜂🜃🜄🝊🝋🝌🝍🜔🜕".repeat(40)].slice(0, c).join("")],
+];
 
 /** Every scripted mind's brief on every wake of an epoch. */
 async function everyWakeFits() {

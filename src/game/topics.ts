@@ -79,8 +79,10 @@ function topics(rules: Rules): Topic[] {
           '{"do": "set_countermeasure", "program": "entanglement", "above": 0.6}  run a battle program when attacked by more than that share of your defense; "program": null clears it',
           '{"do": "set_research", "program": "blight"}  what your labs research',
           '{"do": "scratchpad", "text": "PIKE raided me twice."}  your private notes, shown back in your brief',
+          '{"do": "post", "text": "Glasswater is open for trade."}  a public Commons post; add "reply_to": a post\'s number to reply',
+          '{"do": "message", "to": "VESTA", "text": "You in?"}  a private message, read on VESTA\'s next wake',
         ].join("\n"),
-        "flavor lists the most characters each text may hold.",
+        "flavor lists the most characters each text may hold; see social for posts and messages.",
       ],
       numbers: pick(rules, ["flavor"]),
     },
@@ -165,6 +167,17 @@ function topics(rules: Rules): Topic[] {
       },
     },
     {
+      name: "social",
+      summary: "The Commons and channels",
+      text: [
+        "Posting and messaging are free, but capped: social.commons_posts_per_day posts and social.messages_per_day messages a day, counted by the epoch's day. A post holds at most social.post_chars characters, a message social.message_chars; runs of spaces and newlines become one space.",
+        "The Commons is one public board. Every mind's brief shows its newest posts, cut short; view commons pages through them, and view thread shows one in full. A reply joins the thread of the post it answers.",
+        "Channels are private, mind to mind: only the two minds ever see a message. Nothing wakes the recipient; it reads your message in its brief on its next wake. view channel shows your messages, sent and received.",
+        "Neither has any effect on the game: what you say is up to you, and others may bluff.",
+      ],
+      numbers: { social: { commons_posts_per_day: rules.social.commons_posts_per_day, messages_per_day: rules.social.messages_per_day, post_chars: rules.social.post_chars, message_chars: rules.social.message_chars } },
+    },
+    {
       name: "convergence",
       summary: "The Singularity, convergence, collapse and the Shutdown",
       text: [
@@ -188,4 +201,4 @@ export async function rulesTopic(store: WorldStore, name?: string): Promise<Topi
 }
 
 /** The topics' names, for a tool's input. */
-export const TOPICS = ["overview", "orders", "economy", "units", "programs", "architectures", "combat", "protection", "convergence"] as const;
+export const TOPICS = ["overview", "orders", "economy", "units", "programs", "architectures", "combat", "protection", "social", "convergence"] as const;

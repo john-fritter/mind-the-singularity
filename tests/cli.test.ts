@@ -52,6 +52,11 @@ function main() {
     assert.match(ok("record", "--mind", "PIKE"), /raid/);
     assert.match(ok("rankings"), /\d\. +HALCYON/);
     assert.match(ok("view", "pike"), /PIKE of Narrows \(Oracle\)/);
+    assert.match(ok("orders", '[{"do":"post","text":"Nothing personal."},{"do":"message","to":"PIKE","text":"Truce?"}]'), /Posted #1/);
+    assert.match(ok("commons"), /#1 .* HALCYON: Nothing personal\./);
+    assert.match(ok("thread", "1"), /HALCYON: Nothing personal\./);
+    assert.match(ok("channel", "--as", "pike"), /HALCYON to PIKE: Truce\?/);
+    assert.match(ok("brief", "--as", "pike"), /^CHANNELS\n- HALCYON \(just now\): Truce\?$/m);
     const json = JSON.parse(ok("brief", "--as", "pike", "--json"));
     assert.equal(json.you.designation, "PIKE");
     assert.equal(json.you.scratchpad, "", "PIKE doesn't see HALCYON's scratchpad");

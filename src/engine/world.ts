@@ -30,6 +30,7 @@ export function createWorld(rules: Rules, input: { epoch: number; seed: number; 
     nextTimerId: 1,
     domains: [],
     timers: [],
+    postRoots: [],
     convergence: null,
     ended: null,
   };

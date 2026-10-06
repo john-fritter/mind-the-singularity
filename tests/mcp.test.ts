@@ -116,13 +116,14 @@ async function rulesTopics(client: Client) {
 async function memoryGame() {
   const game = newGame(rules, { epoch: 1, seed: 11, startedAt: T0 });
   const clock = { now: T0 };
-  const keys = { "key-h": { account: "halcyon" }, "key-v": { account: "vesta" } };
+  const keys = { "key-h": { account: "halcyon" }, "key-v": { account: "vesta" }, "key-s": { account: "stranger" } };
   const app = appFor(fixedEpoch(new MemoryStore(game)), keys, clock);
 
   await refusals(app);
 
   const halcyon = await connect(app, "key-h");
   const vesta = await connect(app, "key-v");
+  const stranger = await connect(app, "key-s");
   const tools = (await halcyon.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(tools, ["boot_mind", "get_brief", "rules", "submit_orders", "view"]);
 
@@ -153,9 +154,11 @@ async function memoryGame() {
       { do: "execute", program: "probe", target: "VESTA" },
       { do: "execute", program: "probe", target: "VESTA" },
       { do: "execute", program: "probe", target: "VESTA" },
+      { do: "message", to: "VESTA", text: "Between us." },
+      { do: "post", text: "Hello, Commons." },
     ],
   });
-  assert.equal(out.results.length, 6);
+  assert.equal(out.results.length, 8);
   assert.ok(out.results[0].ok && out.results[1].ok && !out.results[2].ok);
   assert.equal(out.status.designation, "HALCYON");
   assert.ok((await call(halcyon, "submit_orders", { orders: "expand" })).error, "orders are a list");
@@ -172,12 +175,20 @@ async function memoryGame() {
     await call(vesta, "view", { what: "record" }),
     await call(vesta, "view", { what: "record", mind: "HALCYON" }),
     await call(vesta, "view", { what: "rankings" }),
+    await call(vesta, "view", { what: "commons" }),
+    await call(vesta, "view", { what: "thread", post: 1 }),
+    await call(vesta, "view", { what: "channel", name: "HALCYON" }),
   ];
   for (const r of theirs) {
     assert.ok(!r.error, r.text);
     assert.ok(!r.text.includes(SECRET), "HALCYON's scratchpad stays private");
     assert.ok(!r.text.includes('"type":"probed"') && !r.text.includes("Probed "), "a probe stays private");
   }
+  assert.match(theirs[0]!.text, /^- HALCYON \([^)]*\): Between us\.$/m, "VESTA reads its message");
+  assert.match(theirs[5]!.text, /Hello, Commons\./);
+  assert.match(theirs[7]!.text, /Between us\./);
+  // An account with no mind has no channels to find.
+  assert.match((await call(stranger, "view", { what: "channel", name: "VESTA" })).text, /^not_found: /);
   const page = JSON.parse(theirs[1]!.text).domain;
   assert.deepEqual(Object.keys(page).sort(), ["architecture", "bootedAt", "designation", "domainName", "manifesto", "power", "rank", "status", "territory"]);
   assert.match((await call(vesta, "view", { what: "domain", name: "NOBODY" })).text, /^not_found: /);

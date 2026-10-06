@@ -439,8 +439,12 @@ convergence:
   collapse_after_hours: 72
 
 social:
+  # Per epoch day, counted from the epoch's start.
   commons_posts_per_day: 5
   messages_per_day: 10
+  # The most characters a Commons post or a channel message may hold.
+  post_chars: 280
+  message_chars: 280
   # Trade offers a mind may have open at once; their goods are in escrow.
   open_offers_max: 5
   trade_expiry_hours: 48

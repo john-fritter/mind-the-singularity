@@ -6,14 +6,16 @@ import { briefText } from "../src/game/brief.js";
 import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
 
-// Private stays private (CLAUDE.md): another mind's scratchpad, full status
-// and private events never reach `view` or another mind's brief, and what
-// can't be seen is "not found". Extend this for every new read.
+// Private stays private (CLAUDE.md): another mind's scratchpad, full status,
+// private events and channels never reach `view` or another mind's brief,
+// and what can't be seen is "not found". Extend this for every new read.
 
 const rules = loadRules();
 const T0 = Date.UTC(2026, 9, 5, 12);
 const T = T0 + 50 * HOUR_MS;
 const SECRET = "SECRET-PLAN-7731";
+/** A message between HALCYON and VESTA: PIKE and strangers never see it. */
+const WHISPER = "WHISPER-4410";
 
 /** The keys a public listing or page may carry, and nothing else. */
 const SUMMARY_KEYS = ["architecture", "designation", "power", "rank", "status", "territory"];
@@ -24,8 +26,10 @@ async function main() {
   const store = new MemoryStore(game);
   const halcyon = { account: "halcyon" };
   const vesta = { account: "vesta" };
+  const pike = { account: "pike" };
   assert.ok((await bootMind(store, halcyon, { designation: "HALCYON", domainName: "Glasswater", architecture: "oracle" }, T0)).ok);
   assert.ok((await bootMind(store, vesta, { designation: "VESTA", domainName: "Hearth", architecture: "steward" }, T0)).ok);
+  assert.ok((await bootMind(store, pike, { designation: "PIKE", domainName: "Narrows", architecture: "accelerant" }, T0)).ok);
   // HALCYON knows Probe from the start, so it can look at VESTA.
   currentMind(game, "halcyon")!.known = ["probe"];
 
@@ -34,6 +38,8 @@ async function main() {
     halcyon,
     [
       { do: "scratchpad", text: SECRET },
+      { do: "message", to: "VESTA", text: WHISPER },
+      { do: "post", text: "A public word." },
       // Programs can crash; one of three probes gets through.
       { do: "execute", program: "probe", target: "VESTA" },
       { do: "execute", program: "probe", target: "VESTA" },
@@ -59,24 +65,45 @@ async function main() {
   assert.ok(!theirText.includes(SECRET) && !theirText.includes("Probed"), "the brief's text leaked something private");
   for (const d of theirs.inRange) assert.deepEqual(Object.keys(d).sort(), SUMMARY_KEYS);
 
+  // VESTA reads the message; PIKE, a third mind, sees nothing of it anywhere.
+  assert.ok(theirs.channels.messages.some((m) => m.text === WHISPER));
+  const pikes = (await getBrief(store, pike, T)) as Brief;
+  assert.equal(pikes.channels.messages.length, 0);
+  assert.ok(!JSON.stringify(pikes).includes(WHISPER) && !briefText(rules, pikes).includes(WHISPER), "a message leaked into a third mind's brief");
+  assert.ok(pikes.commons.posts.some((p) => p.text === "A public word."), "the Commons is public");
+  for (const query of [{ what: "channel" }, { what: "channel", name: "HALCYON" }, { what: "channel", name: "VESTA" }]) {
+    const channel = await view(store, pike, query, T);
+    assert.ok(channel.ok && channel.what === "channel" && channel.messages.length === 0, `PIKE sees ${JSON.stringify(channel)}`);
+  }
+
   // HALCYON's own brief shows what's its own.
   const mine = (await getBrief(store, halcyon, T)) as Brief;
   assert.equal(mine.you.scratchpad, SECRET);
 
   // The public views: nothing private, from anyone's seat.
-  for (const who of [halcyon, vesta, { account: "stranger" }]) {
+  for (const who of [halcyon, vesta, pike, { account: "stranger" }]) {
     const page = await view(store, who, { what: "domain", name: "HALCYON" }, T);
     assert.ok(page.ok && page.what === "domain");
     assert.deepEqual(Object.keys(page.domain).sort(), PAGE_KEYS);
     const ranks = await view(store, who, { what: "rankings" }, T);
     assert.ok(ranks.ok && ranks.what === "rankings");
     for (const d of ranks.domains) assert.deepEqual(Object.keys(d).sort(), SUMMARY_KEYS);
-    for (const query of [{ what: "record" }, { what: "record", mind: "VESTA" }, { what: "record", type: "probed" }, { what: "record", type: "battle_report" }]) {
+    for (const query of [
+      { what: "record" },
+      { what: "record", mind: "VESTA" },
+      { what: "record", type: "probed" },
+      { what: "record", type: "battle_report" },
+      { what: "record", type: "message" },
+    ]) {
       const record = await view(store, who, query, T);
       assert.ok(record.ok && record.what === "record");
       assert.ok(record.entries.every((e) => e.public), `a private event in ${JSON.stringify(query)}`);
       const shown = JSON.stringify(record);
-      assert.ok(!shown.includes(SECRET) && !shown.includes("Strength"), "private detail in the Record");
+      assert.ok(!shown.includes(SECRET) && !shown.includes("Strength") && !shown.includes(WHISPER), "private detail in the Record");
+    }
+    for (const query of [{ what: "commons" }, { what: "thread", post: 1 }]) {
+      const shown = JSON.stringify(await view(store, who, query, T));
+      assert.ok(shown.includes("A public word.") && !shown.includes(WHISPER) && !shown.includes(SECRET), `private detail in ${JSON.stringify(query)}`);
     }
     // Hidden is the same as missing.
     const missing = await view(store, who, { what: "domain", name: "NOBODY" }, T);
@@ -84,6 +111,9 @@ async function main() {
   }
   const stranger = await getBrief(store, { account: "stranger" }, T);
   assert.ok("ok" in stranger && stranger.code === "not_found");
+  // Without a mind there are no channels: not found, as anything hidden is.
+  const noChannel = await view(store, { account: "stranger" }, { what: "channel", name: "VESTA" }, T);
+  assert.ok(!noChannel.ok && noChannel.code === "not_found");
 }
 
 main().then(

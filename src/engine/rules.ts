@@ -309,6 +309,8 @@ const ConvergenceSchema = z
 const SocialSchema = z.strictObject({
   commons_posts_per_day: count,
   messages_per_day: count,
+  post_chars: positiveCount,
+  message_chars: positiveCount,
   open_offers_max: count,
   trade_expiry_hours: positive,
   protocol_max_members: z.number().int().min(2),

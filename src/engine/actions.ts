@@ -10,14 +10,15 @@ import { buildingName, programName, resolveBuilding, resolveProgram, resolveUnit
 import type { Order } from "./orders.js";
 import { deployCount, programCompute, programCrashChance, researchCost, scaledShare } from "./programs.js";
 import type { Rules } from "./rules.js";
+import { message, post } from "./social.js";
 
 export type { OrderContext, OrderResult } from "./context.js";
 
 // What each order does to the mind's own domain; orders aimed at other minds
-// are in conflict.ts. Every function here mutates the world it's given;
-// world.ts hands them a copy. An order that can't do anything fails without
-// spending a cycle. One that can do part of what was asked does that part
-// and says why it stopped.
+// are in conflict.ts, the Commons and channels in social.ts. Every function
+// here mutates the world it's given; world.ts hands them a copy. An order
+// that can't do anything fails without spending a cycle. One that can do
+// part of what was asked does that part and says why it stopped.
 
 /** Runs a repeatable one-cycle-cost action up to `cycles` cycles' worth. Returns the cycles spent. */
 function repeat(ctx: OrderContext, cost: number, cycles: number, step: () => void): number {
@@ -372,5 +373,9 @@ export function applyOrder(ctx: OrderContext, order: Order): OrderResult {
       return attack(ctx, order);
     case "set_countermeasure":
       return setCountermeasure(ctx, order);
+    case "post":
+      return post(ctx, order);
+    case "message":
+      return message(ctx, order);
   }
 }

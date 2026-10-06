@@ -52,6 +52,8 @@ export interface Domain {
   running: RunningProgram[];
 
   scratchpad: string;
+  /** Commons posts and channel messages sent on epoch day `day` (from 0), for the daily caps. */
+  social: { day: number; posts: number; messages: number };
 
   /** The battle program run automatically when attacked by a force above `above` × this domain's defense. */
   countermeasure: { program: Program; above: number } | null;
@@ -111,6 +113,8 @@ export interface World {
   nextTimerId: number;
   domains: Domain[];
   timers: Timer[];
+  /** Commons posts: entry i is the id of post i + 1's thread, its first post. The posts themselves are in the Record. */
+  postRoots: number[];
   convergence: Convergence | null;
   /** Set once the epoch is over; nothing happens after. */
   ended: Ending | null;
