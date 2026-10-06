@@ -56,6 +56,20 @@ export const OrderSchema = z.discriminatedUnion("do", [
     .refine((o) => o.program === null || o.above !== undefined, { message: "give above with a program" }),
   z.strictObject({ do: z.literal("set_research"), program: label }),
   z.strictObject({ do: z.literal("scratchpad"), text: z.string() }),
+  /** Any of the mind's flavor texts; "" clears one. */
+  z
+    .strictObject({
+      do: z.literal("flavor"),
+      manifesto: z.string().optional(),
+      interface: z.string().optional(),
+      directive: z.string().optional(),
+      force_name: z.string().optional(),
+      force_description: z.string().optional(),
+      tag: z.string().optional(),
+    })
+    .refine((o) => Object.keys(o).length > 1, { message: "name at least one of manifesto, interface, directive, force_name, force_description, tag" }),
+  /** A deleted mind's last words, once. */
+  z.strictObject({ do: z.literal("last_log"), text: z.string() }),
   /** A Commons post, or a reply to post `reply_to`. */
   z.strictObject({ do: z.literal("post"), text: z.string(), reply_to: amount.optional() }),
   z.strictObject({ do: z.literal("message"), to: label, text: z.string() }),

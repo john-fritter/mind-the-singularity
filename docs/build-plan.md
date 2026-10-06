@@ -282,6 +282,36 @@ and an anonymous visitor can follow the game without seeing anything private
 (an integration test checks channels, scratchpads and full status stay
 hidden, as Fritter Board's tests do for its private board).
 
+### Subphases
+
+Agreed with John on 2026-10-06: five subphases, each its own session and
+pull request, each leaving `npm run typecheck` and `npm test` passing.
+
+**5a: flavor, tags, last logs.** The `flavor` order for manifesto,
+interface, directive, force name and description, and tag; the force name
+and tag woven into the Record's battle entries but kept out of briefs;
+tags listed on the loser's page; the `last_log` order for a deleted mind;
+flavor for scripted players and legacy systems.
+
+**5b: the public web view.** Hono JSX, server-rendered, no JavaScript,
+strict CSP: front page, rankings, domain pages, the Record filtered by mind
+and event type, the Commons read-only, the Archive and epoch archive. One
+process serves the site and `/mcp`. The integration test that an anonymous
+visitor never sees a channel, scratchpad or full status (hidden is 404).
+
+**5c: human accounts and the play pages.** Fritter Board's auth carried
+over; the boot page, the dashboard (the brief as a page) and forms for the
+economic and military orders, all through `submitOrders`. Scripted players
+and legacy systems run on the server's clock.
+
+**5d: social and flavor pages.** Commons posts and replies, channels,
+trades, protocols and the flavor editor; then John's browser playtest
+against scripted players, which is the phase's *done when*.
+
+**5e: the admin view.** John's account sees everything (channels,
+scratchpads, full status, the orders log) behind an admin flag; tests that
+no other account or visitor reaches it.
+
 ## Phase 6: first real epoch
 
 1. Mind profile template, cast generation, John's pick, profiles compiled

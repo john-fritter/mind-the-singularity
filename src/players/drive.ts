@@ -10,7 +10,7 @@ import type { WorldStore } from "../store/store.js";
 import { legacyPlayers } from "./legacy.js";
 import type { Player } from "./player.js";
 import type { Players, StrategyName } from "./settings.js";
-import { playerFor } from "./strategies.js";
+import { fill, playerFor } from "./strategies.js";
 
 // Runs scripted players on the clock: every wake due between two moments,
 // in time order, each one a brief, a decision and a submitOrders, as an
@@ -23,6 +23,8 @@ export interface Seat {
   player: Player;
   /** What to boot the mind with, for players that boot (and reboot) their own; legacy systems are booted with the game. */
   boot?: { designation: string; domainName: string; architecture: Architecture; manifesto?: string };
+  /** The flavor order's fields, sent as one order right after each boot. */
+  flavor?: Record<string, string>;
   wakeEveryMs: number;
   /** The first wake comes this long after the epoch starts. */
   offsetMs: number;
@@ -76,6 +78,12 @@ export async function wake(store: WorldStore, seat: Seat, at: number, stepsPerWa
     const booted = await bootMind(store, me, seat.boot, at);
     if (isError(booted)) return { ...log, error: booted.error };
     log.booted = true;
+    if (seat.flavor) {
+      const orders = [{ do: "flavor", ...seat.flavor }];
+      const out = await submitOrders(store, me, orders, at);
+      if (isError(out)) return { ...log, error: out.error };
+      log.steps.push({ orders, results: out.results });
+    }
     brief = await getBrief(store, me, at);
   }
   if (isError(brief)) return { ...log, error: brief.error };
@@ -122,5 +130,6 @@ export function scriptedSeat(
   const every = settings.wake_every_hours * HOUR_MS;
   // A whole minute inside the first interval, so wakes don't all land together.
   const offsetMs = Math.floor(rngFor(input.seed, 0).next() * (every / 60_000)) * 60_000;
-  return { account: input.account, player: playerFor(input.strategy, settings), boot: input.boot, wakeEveryMs: every, offsetMs, seed: input.seed };
+  const flavor = Object.fromEntries(Object.entries(settings.texts.flavor[input.strategy]).map(([k, v]) => [k, fill(v!, { me: input.boot.designation })]));
+  return { account: input.account, player: playerFor(input.strategy, settings), boot: input.boot, flavor, wakeEveryMs: every, offsetMs, seed: input.seed };
 }

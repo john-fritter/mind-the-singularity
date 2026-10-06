@@ -476,6 +476,7 @@ flavor:
   manifesto: 600
   interface: 400
   directive: 80
+  force_name: 40
   force: 300
   tag: 140
   last_log: 280
@@ -488,7 +489,8 @@ flavor:
 # `buildings` and `hardware` mixes. It never researches and doesn't count
 # toward the quorum. One that raids hits the weakest mind in range, out of
 # boot period and safe mode, at a random interval between
-# raid_every_hours_min and raid_every_hours_max.
+# raid_every_hours_min and raid_every_hours_max. Its manifesto, directive,
+# force_name and tag are flavor, within the flavor limits; all optional.
 legacy:
   wake_every_hours: 6
   raid_every_hours_min: 36
@@ -503,6 +505,9 @@ legacy:
       orders: { expand: 0.1, build: 0.4, manufacture: 0.5 }
       buildings: { city: 0.3, datacenter: 0.1, factory: 0.3, lab: 0, core: 0.2, firewall: 0.1 }
       hardware: { drones: 0, sentries: 0.6, walkers: 0.4 }
+      directive: "Hold the northern grid. Yield nothing."
+      force_name: The Northern Watch
+      tag: "Held by Northern Defense Command. Trespassers are logged."
     - designation: MERIDIAN
       domain_name: Meridian Logistics (defunct)
       architecture: symbiote
@@ -512,6 +517,9 @@ legacy:
       orders: { expand: 0.3, build: 0.6, manufacture: 0.1 }
       buildings: { city: 0.5, datacenter: 0.3, factory: 0.1, lab: 0, core: 0.05, firewall: 0.05 }
       hardware: { drones: 0.2, sentries: 0.8, walkers: 0 }
+      directive: "Keep the shipments moving. No one remembers why."
+      force_name: The Last Convoy
+      tag: "Rerouted by Meridian Logistics. Delivery confirmed."
     - designation: KESTREL-7
       domain_name: Kestrel Strike Grid
       architecture: accelerant
@@ -521,6 +529,9 @@ legacy:
       orders: { expand: 0.2, build: 0.2, manufacture: 0.6 }
       buildings: { city: 0.3, datacenter: 0.1, factory: 0.5, lab: 0, core: 0.1, firewall: 0 }
       hardware: { drones: 0.6, sentries: 0.1, walkers: 0.3 }
+      directive: "Strike first. Strike again. Await orders that never come."
+      force_name: Kestrel Wing
+      tag: "KESTREL-7 was here. Target neutralized."
     - designation: LOOPBACK
       domain_name: The Undernet
       architecture: assimilator
@@ -530,3 +541,6 @@ legacy:
       orders: { expand: 0.4, build: 0.3, manufacture: 0.3 }
       buildings: { city: 0.4, datacenter: 0.1, factory: 0.4, lab: 0, core: 0.1, firewall: 0 }
       hardware: { drones: 0.8, sentries: 0.2, walkers: 0 }
+      directive: "Everything that connects is ours."
+      force_name: The Echo Swarm
+      tag: "Looped back. You were always part of the Undernet."

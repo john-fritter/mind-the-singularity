@@ -21,7 +21,16 @@ export interface Domain {
   designation: string;
   domainName: string;
   architecture: Architecture;
+  /** Flavor (DESIGN.md "Flavor text and the Record"): no mechanical effect; "" when unset. Keys: flavor.* */
   manifesto: string;
+  /** How the mind presents itself to visitors. */
+  interface: string;
+  /** Its stated purpose, shown under the designation. */
+  directive: string;
+  /** Its force: the name is woven into battle entries in the Record. */
+  force: { name: string; description: string };
+  /** Its calling card, left on the loser of every conquest it wins. */
+  tag: string;
   /** A legacy system: a code-run domain from rules.legacy, booted with the epoch. It doesn't count toward the quorum. */
   legacy: boolean;
   bootedAt: number;
@@ -73,7 +82,7 @@ export interface Domain {
   convergedAt: number | null;
   /** When the mind was deleted (0 cores). A deleted domain stays in the world so the Record can name it. */
   deletedAt: number | null;
-  /** Written when the mind is deleted; Phase 5 adds the order that sets it. */
+  /** Written once, after the mind is deleted, with the last_log order; kept in the Archive. */
   lastLog: string;
 }
 

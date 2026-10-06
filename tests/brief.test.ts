@@ -33,7 +33,8 @@ const shortName = (i: number) => `MIND-${i}`;
 let seq = 0;
 function event(data: EventData, mine: number[], publicEvent: boolean): ShownEvent {
   const e = { ...data, seq: ++seq, at: T0, public: publicEvent, domains: mine } as GameEvent;
-  return { ...e, text: describe(rules, e) };
+  // As read.ts shows events in a brief: without force names and tags.
+  return { ...e, text: describe(rules, e, { flavor: false }) };
 }
 
 /** A brief with every trim overfull of the longest lines the game writes, with names made by `longName` and amounts of `big`. */
@@ -60,6 +61,8 @@ function worstCase(longName: (i: number) => string, big = 987_654_321, text: (ch
         defender: me,
         attackerName: longName(100 + i),
         defenderName: longName(1),
+        force: prose(rules.flavor.force_name),
+        tag: prose(rules.flavor.tag),
         mode: "conquest",
         attackerWon: true,
         sectors: big,
@@ -151,6 +154,7 @@ function worstCase(longName: (i: number) => string, big = 987_654_321, text: (ch
       bootPeriodEndsAt: T0 + 54 * DAY_MS,
       deletedAt: null,
       rebootAt: null,
+      lastLogWritten: false,
     },
     since: { from: T0, yours, world, fights, left: 9_999 },
     // Full channels and Commons of the longest text the rules allow.

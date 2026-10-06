@@ -19,7 +19,8 @@ const WHISPER = "WHISPER-4410";
 
 /** The keys a public listing or page may carry, and nothing else. */
 const SUMMARY_KEYS = ["architecture", "designation", "power", "rank", "status", "territory"];
-const PAGE_KEYS = [...SUMMARY_KEYS, "bootedAt", "domainName", "manifesto", "protocol"].sort();
+// Flavor is public by design (DESIGN.md: "Flavor text and the Record"); the scratchpad is not.
+const PAGE_KEYS = [...SUMMARY_KEYS, "bootedAt", "domainName", "manifesto", "interface", "directive", "force", "tag", "tagsLeft", "lastLog", "protocol"].sort();
 
 async function main() {
   const game = newGame(rules, { epoch: 1, seed: 11, startedAt: T0 });

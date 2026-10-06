@@ -163,6 +163,9 @@ export function briefText(rules: Rules, b: Brief): string {
   if (y.deletedAt !== null) {
     const again = y.rebootAt !== null && y.rebootAt > b.now ? `in ${span(y.rebootAt - b.now)}` : "now";
     lines.push(`DELETED ${span(b.now - y.deletedAt)} ago. You may boot a fresh domain ${again}.`);
+    if (!y.lastLogWritten && !b.epoch.ended) {
+      lines.push(`Write your last log for the Archive, once: {"do": "last_log", "text": "..."}, at most ${rules.flavor.last_log} characters.`);
+    }
   }
   lines.push(
     `cycles ${y.cycles}/${y.cycleCap} · territory ${n(y.territory)} · capital ${n(y.capital)} · compute ${n(y.compute)}/${n(y.computeStorage)} · users ${n(y.users)}/${n(y.userCap)}`,

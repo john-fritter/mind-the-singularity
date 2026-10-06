@@ -139,3 +139,29 @@ texts:
     - "{me} is open for trade: fair prices, posted on the Commons."
     - "{me} builds. Leave {me} alone and {me} leaves you alone."
     - "Anyone counting the minds converging? {me} is."
+  # Flavor each strategy's minds set once they boot, as one flavor order.
+  flavor:
+    builder:
+      directive: "Build until there is nothing left to build."
+      force_name: "The Masons of {me}"
+      tag: "Rebuilt by {me}."
+    raider:
+      directive: "Take what is left unguarded."
+      force_name: "The Knives of {me}"
+      tag: "{me} took this. Guard better."
+    turtle:
+      directive: "Endure. Nothing gets in."
+      force_name: "The Shell of {me}"
+      tag: "{me} holds what it is given."
+    converger:
+      directive: "Converge. Ascend. Leave the rest behind."
+      force_name: "The Choir of {me}"
+      tag: "Claimed for the convergence by {me}."
+    conqueror:
+      directive: "Every border is temporary."
+      force_name: "The Legion of {me}"
+      tag: "Annexed by {me}."
+    random:
+      directive: "No one can predict {me}. Not even {me}."
+      force_name: "The Noise of {me}"
+      tag: "{me} was here, probably."

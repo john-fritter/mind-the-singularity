@@ -218,6 +218,8 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
     defender: target.id,
     attackerName: me.designation,
     defenderName: target.designation,
+    force: me.force.name,
+    tag: "",
     mode: order.mode,
     attackerWon: outcome.attackerWins,
     sectors: 0,
@@ -252,6 +254,8 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
     target.territory -= sectors;
     me.territory += sectors;
     report.sectors = sectors;
+    // A tag is left on territory taken, so only when some was.
+    if (sectors > 0) report.tag = me.tag;
   } else if (outcome.attackerWins) {
     const spoils = raidSpoils(rules, {
       capital: target.capital,
@@ -278,13 +282,13 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
   else if (outcome.attackerWins && order.mode === "conquest" && target.convergedAt !== null) collapse(world, now, ctx.events, "defeated");
   spend(ctx, cost);
   me.attacksMade.push(now);
-  return { do: order.do, ok: true, cycles: cost, message: describe(rules, reported) };
+  return { do: order.do, ok: true, cycles: cost, message: describe(rules, reported, { flavor: false }) };
 }
 
 /** The part of a battle report the public Record shows. */
 function publicLine(r: BattleReport): BattleLine {
-  const { attacker, defender, attackerName, defenderName, mode, attackerWon, sectors, cores, capital, users, buildings } = r;
-  return { attacker, defender, attackerName, defenderName, mode, attackerWon, sectors, cores, capital, users, buildings };
+  const { attacker, defender, attackerName, defenderName, force, tag, mode, attackerWon, sectors, cores, capital, users, buildings } = r;
+  return { attacker, defender, attackerName, defenderName, force, tag, mode, attackerWon, sectors, cores, capital, users, buildings };
 }
 
 // ── Hostile programs and Probe ──────────────────────────────────────────

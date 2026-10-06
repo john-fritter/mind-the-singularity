@@ -6,6 +6,7 @@ import { shutdownTimers } from "./convergence.js";
 import { syncCycles } from "./cycles.js";
 import { rebootAt } from "./deletion.js";
 import { legacyDomain, startingDomain } from "./domain.js";
+import { flavorText, writeLastLog } from "./flavor.js";
 import { parseOrder } from "./orders.js";
 import { emit, type GameEvent } from "./record.js";
 import { rngFor } from "./rng.js";
@@ -84,7 +85,7 @@ export function bootMind(rules: Rules, world: World, raw: BootInput, now: number
     ...parsed.data,
     designation: parsed.data.designation.trim(),
     domainName: parsed.data.domainName.trim(),
-    manifesto: parsed.data.manifesto.trim(),
+    manifesto: parsed.data.manifesto,
   };
   const f = rules.flavor;
   if (!DESIGNATION.test(input.designation)) {
@@ -95,8 +96,9 @@ export function bootMind(rules: Rules, world: World, raw: BootInput, now: number
     return { ok: false, error: "A domain name is needed, without control characters." };
   }
   if (input.domainName.length > f.domain_name) return { ok: false, error: `A domain name is at most ${f.domain_name} characters.` };
-  if (!PRINTABLE.test(input.manifesto.replace(/\n/g, ""))) return { ok: false, error: "The manifesto has control characters." };
-  if (input.manifesto.length > f.manifesto) return { ok: false, error: `A manifesto is at most ${f.manifesto} characters.` };
+  const manifesto = flavorText(input.manifesto, f.manifesto, "manifesto", true);
+  if (!manifesto.ok) return { ok: false, error: manifesto.error };
+  input.manifesto = manifesto.text;
 
   const next = structuredClone(world);
   const events: GameEvent[] = [];
@@ -164,7 +166,14 @@ export function applyOrders(rules: Rules, world: World, domainId: number, orders
   if (!domain) throw new Error(`no domain ${domainId}`);
   const refused = (raw: unknown, message: string): OrderResult => ({ do: kindOf(raw), ok: false, cycles: 0, message });
   if (domain.deletedAt !== null) {
-    return { world: next, results: orders.map((raw) => refused(raw, "This mind has been deleted.")), events };
+    // A deleted mind may only write its last log.
+    const results = orders.map((raw): OrderResult => {
+      const parsed = parseOrder(raw);
+      if (!parsed.ok || parsed.order.do !== "last_log") return refused(raw, "This mind has been deleted.");
+      if (next.ended) return refused(raw, "The epoch has ended.");
+      return writeLastLog(rules, next, domain, parsed.order, now, events);
+    });
+    return { world: next, results, events };
   }
   if (!next.ended) domain.lastActiveAt = now;
   syncCycles(rules, domain, now);

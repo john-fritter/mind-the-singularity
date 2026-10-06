@@ -9,7 +9,7 @@ import type { Players, Strategy, StrategyName } from "./settings.js";
 type Texts = Players["texts"];
 
 /** A text with {me}, {them} and {partners} filled in. */
-function fill(template: string, vars: Record<string, string>): string {
+export function fill(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (all, k: string) => vars[k] ?? all);
 }
 

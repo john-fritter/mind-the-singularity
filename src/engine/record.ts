@@ -31,6 +31,8 @@ export type EventData =
   | { type: "probed"; domain: number; target: number; targetName: string }
   | { type: "safe_mode"; domain: number; designation: string; until: number }
   | { type: "deleted"; domain: number; designation: string; domainName: string; by: number | null; byName: string | null }
+  /** A deleted mind's last log. */
+  | { type: "last_log"; domain: number; designation: string; domainName: string; text: string }
   | { type: "converged"; domain: number; designation: string; count: number; quorum: number }
   | { type: "collapsed"; reason: "timeout" | "defeated" | "deleted"; minds: number[]; designations: string[] }
   | { type: "singularity"; minds: number[]; designations: string[] }
@@ -76,6 +78,10 @@ export interface BattleLine {
   defender: number;
   attackerName: string;
   defenderName: string;
+  /** The attacker's force name at the time, or "". */
+  force: string;
+  /** The attacker's tag, left on the defender by a won conquest that took land; otherwise "". */
+  tag: string;
   mode: "conquest" | "raid";
   attackerWon: boolean;
   /** Sectors a won conquest took. */
@@ -138,6 +144,7 @@ const PUBLIC: Record<EventType, boolean> = {
   probed: false,
   safe_mode: true,
   deleted: true,
+  last_log: true,
   converged: true,
   collapsed: true,
   singularity: true,
@@ -208,8 +215,13 @@ const and = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1)
 /** "1 sector", "25 sectors". */
 const count = (k: number, one: string, many = `${one}s`) => `${n(k)} ${k === 1 ? one : many}`;
 
-/** An event as one line of text. Private events are written to the domain they're about. */
-export function describe(rules: Rules, event: GameEvent): string {
+/**
+ * An event as one line of text. Private events are written to the domain
+ * they're about. `flavor: false` leaves out force names and tags, for the
+ * brief, where every token counts and DESIGN.md keeps other minds' flavor out.
+ */
+export function describe(rules: Rules, event: GameEvent, opts: { flavor?: boolean } = {}): string {
+  const flavor = opts.flavor ?? true;
   switch (event.type) {
     case "booted":
       return `${event.designation} of ${event.domainName} came online: ${article(rules.architectures[event.architecture].name)} mind.`;
@@ -225,9 +237,9 @@ export function describe(rules: Rules, event: GameEvent): string {
       return `Upkeep went unpaid: ${lost.join(", ") || "nothing lost"}.`;
     }
     case "battle":
-      return battleLine(event);
+      return battleLine(event, flavor);
     case "battle_report":
-      return `${battleLine(event)} ${battleDetails(rules, event)}`;
+      return `${battleLine(event, flavor)} ${battleDetails(rules, event)}`;
     case "hostile": {
       const name = programName(rules, event.program);
       if (event.blocked) return `${event.targetName}'s firewalls blocked ${event.casterName}'s ${name}.`;
@@ -241,6 +253,8 @@ export function describe(rules: Rules, event: GameEvent): string {
       return event.byName
         ? `${event.designation} of ${event.domainName} was deleted by ${event.byName}.`
         : `${event.designation} of ${event.domainName} was deleted.`;
+    case "last_log":
+      return `The last log of ${event.designation}: "${event.text}"`;
     case "converged":
       return `${event.designation} ran the Singularity: convergence ${event.count}/${event.quorum}.`;
     case "collapsed": {
@@ -293,15 +307,18 @@ export function describe(rules: Rules, event: GameEvent): string {
   }
 }
 
-function battleLine(b: BattleLine): string {
+/** "The Pale Choir of HALCYON took 40 sectors from VESTA. HALCYON left its tag: "..."" (DESIGN.md's example), or plain designations. */
+function battleLine(b: BattleLine, flavor: boolean): string {
+  const attacker = flavor && b.force ? `${b.force} of ${b.attackerName}` : b.attackerName;
   if (!b.attackerWon) {
-    return b.mode === "conquest" ? `${b.defenderName} repelled ${b.attackerName}'s attack.` : `${b.defenderName} repelled ${b.attackerName}'s raid.`;
+    return b.mode === "conquest" ? `${b.defenderName} repelled ${attacker}'s attack.` : `${b.defenderName} repelled ${attacker}'s raid.`;
   }
   if (b.mode === "conquest") {
     const cores = b.cores > 0 ? ` and destroyed ${count(b.cores, "core")}` : "";
-    return `${b.attackerName} took ${count(b.sectors, "sector")} from ${b.defenderName}${cores}.`;
+    const tag = flavor && b.tag ? ` ${b.attackerName} left its tag: "${b.tag}"` : "";
+    return `${attacker} took ${count(b.sectors, "sector")} from ${b.defenderName}${cores}.${tag}`;
   }
-  return `${b.attackerName} raided ${b.defenderName}: ${n(b.capital)} capital and ${count(b.users, "user")} taken, ${count(b.buildings, "building")} wrecked.`;
+  return `${attacker} raided ${b.defenderName}: ${n(b.capital)} capital and ${count(b.users, "user")} taken, ${count(b.buildings, "building")} wrecked.`;
 }
 
 function programUse(rules: Rules, use: ProgramUse, whose: string): string {

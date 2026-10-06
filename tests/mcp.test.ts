@@ -200,7 +200,9 @@ async function memoryGame() {
   // An account with no mind has no channels to find.
   assert.match((await call(stranger, "view", { what: "channel", name: "VESTA" })).text, /^not_found: /);
   const page = JSON.parse(theirs[1]!.text).domain;
-  assert.deepEqual(Object.keys(page).sort(), ["architecture", "bootedAt", "designation", "domainName", "manifesto", "power", "protocol", "rank", "status", "territory"]);
+  assert.deepEqual(Object.keys(page).sort(), [
+    "architecture", "bootedAt", "designation", "directive", "domainName", "force", "interface", "lastLog", "manifesto", "power", "protocol", "rank", "status", "tag", "tagsLeft", "territory",
+  ]);
   assert.match((await call(vesta, "view", { what: "domain", name: "NOBODY" })).text, /^not_found: /);
   assert.match((await call(vesta, "view", { what: "domain" })).text, /^invalid: /);
 

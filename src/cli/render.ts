@@ -25,11 +25,19 @@ export function renderOrders(results: OrderResult[], status: ShortStatus): strin
 }
 
 export function renderPage(rules: Rules, d: PublicPage, startedAt: number): string {
+  const tags = d.tagsLeft.tags.map((t) => `  ${when(t.at, startedAt)}  ${t.by}: "${t.text}"`);
+  if (d.tagsLeft.more) tags.push("  (older tags in the Record)");
   return [
     `${d.designation} of ${d.domainName} (${rules.architectures[d.architecture].name})`,
+    d.directive,
     `${d.rank === null ? "unranked" : `rank ${d.rank}`} · power ${n(d.power)} · territory ${n(d.territory)} · ${d.status}`,
     `booted ${when(d.bootedAt, startedAt)}${d.protocol.length > 0 ? ` · protocol with ${d.protocol.join(", ")}` : ""}`,
     d.manifesto ? `\n${d.manifesto}` : "",
+    d.interface ? `\nInterface: ${d.interface}` : "",
+    d.force.name || d.force.description ? `\nForce: ${[d.force.name, d.force.description].filter(Boolean).join(". ")}` : "",
+    d.tag ? `Tag: "${d.tag}"` : "",
+    tags.length > 0 ? `\nTags left here:\n${tags.join("\n")}` : "",
+    d.lastLog ? `\nLast log: "${d.lastLog}"` : "",
   ]
     .filter(Boolean)
     .join("\n");
