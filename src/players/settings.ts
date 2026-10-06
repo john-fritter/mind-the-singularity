@@ -56,6 +56,25 @@ const StrategySchema = z
     leftover: z.enum(["monetize", "spin_up"]),
     buildings: shares(BUILDINGS),
     hardware: shares(HARDWARE),
+    /** How it trades and signs protocols (phase 4d). */
+    social: z.strictObject({
+      /** What it trades for, paying in the other; null never trades. */
+      buys: z.enum(["capital", "compute"]).nullable(),
+      /** Share of its spare stock of the other good it puts up in an offer, one open offer at a time. */
+      offer_share: share,
+      /** An offer smaller than this many cycles' worth isn't made. */
+      offer_min_cycles: z.number().positive(),
+      /** It asks this much more, in cycles' worth, than it gives. */
+      offer_margin: z.number().min(0),
+      /** It accepts an offer of what it buys worth at least (1 - this) of what it pays, in cycles. */
+      accept_tolerance: share,
+      /** Proposes a protocol to the strongest mind in range while in none. */
+      propose: z.boolean(),
+      /** Accepts a protocol proposal while in none. */
+      accept: z.boolean(),
+      /** Revokes its protocol when a partner converges and it isn't joining the convergence. */
+      revoke_on_converged: z.boolean(),
+    }),
   })
   .refine((s) => s.expand + s.manufacture <= 1, { message: "expand and manufacture can't take more than every cycle" });
 export type Strategy = z.infer<typeof StrategySchema>;
@@ -72,6 +91,15 @@ export const PlayersSchema = z.strictObject({
   random: z.strictObject({
     /** The most actions the random player tries in one wake. */
     actions_per_wake: z.number().int().positive(),
+  }),
+  /**
+   * What scripted players write on the Commons and in channels. {me},
+   * {them} and {partners} are filled in with designations.
+   */
+  texts: z.strictObject({
+    proposal: z.string().min(1),
+    revoke: z.string().min(1),
+    post: z.array(z.string().min(1)).min(1),
   }),
 });
 export type Players = z.infer<typeof PlayersSchema>;

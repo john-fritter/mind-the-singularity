@@ -57,13 +57,18 @@ function main() {
     assert.match(ok("thread", "1"), /HALCYON: Nothing personal\./);
     assert.match(ok("channel", "--as", "pike"), /HALCYON to PIKE: Truce\?/);
     assert.match(ok("brief", "--as", "pike"), /^CHANNELS\n- HALCYON \(just now\): Truce\?$/m);
-    assert.match(ok("orders", '[{"do":"trade_offer","give":{"capital":100},"want":{"compute":30}}]'), /Offer #1: 100 capital for 30 compute/);
-    assert.match(ok("offers", "--as", "pike"), /^#1 .* HALCYON gives 100 capital for 30 compute, expires /m);
-    assert.match(ok("commons"), /^#1 .* HALCYON gives 100 capital for 30 compute/m);
-    assert.match(ok("orders", "--as", "pike", '[{"do":"trade_accept","offer":1}]'), /Trade #1: you paid 30 compute to HALCYON/);
-    assert.match(ok("orders", '[{"do":"protocol_propose","to":"PIKE"}]'), /Proposal #1: a protocol of HALCYON, PIKE/);
-    assert.match(ok("protocols", "--as", "pike"), /^No protocols\.\n\nProposals you're in:\n#1  HALCYON to PIKE: HALCYON, PIKE, awaiting PIKE, expires /m);
-    assert.match(ok("orders", "--as", "pike", '[{"do":"protocol_accept","proposal":1}]'), /Protocol signed: you're in a protocol with HALCYON\./);
+    // The scripted builder trades and proposes protocols too, so numbers are read back, not assumed.
+    const offered = ok("orders", '[{"do":"trade_offer","give":{"capital":100},"want":{"compute":30}}]').match(/Offer #(\d+): 100 capital for 30 compute/);
+    assert.ok(offered, "the offer was made");
+    const offer = offered[1]!;
+    assert.match(ok("offers", "--as", "pike"), new RegExp(`^#${offer} .* HALCYON gives 100 capital for 30 compute, expires `, "m"));
+    assert.match(ok("commons"), new RegExp(`^#${offer} .* HALCYON gives 100 capital for 30 compute`, "m"));
+    assert.match(ok("orders", "--as", "pike", `[{"do":"trade_accept","offer":${offer}}]`), new RegExp(`Trade #${offer}: you paid 30 compute to HALCYON`));
+    const proposed = ok("orders", '[{"do":"protocol_propose","to":"PIKE"}]').match(/Proposal #(\d+): a protocol of HALCYON, PIKE/);
+    assert.ok(proposed, "the proposal was made");
+    const proposal = proposed[1]!;
+    assert.match(ok("protocols", "--as", "pike"), new RegExp(`^No protocols\\.\n\nProposals you're in:\n(.*\n)*#${proposal}  HALCYON to PIKE: HALCYON, PIKE, awaiting PIKE, expires `, "m"));
+    assert.match(ok("orders", "--as", "pike", `[{"do":"protocol_accept","proposal":${proposal}}]`), /Protocol signed: you're in a protocol with HALCYON\./);
     assert.match(ok("protocols"), /^HALCYON, PIKE$/m);
     assert.match(ok("brief"), /^protocol: PIKE$/m);
     const json = JSON.parse(ok("brief", "--as", "pike", "--json"));

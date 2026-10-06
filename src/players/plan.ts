@@ -9,6 +9,8 @@ import {
   expansionYield,
   hardwareHousing,
   manufactureCapacity,
+  monetizeYield,
+  spinUpYield,
   userCap,
   userChange,
 } from "../engine/economy.js";
@@ -16,7 +18,14 @@ import { conquestSectors } from "../engine/combat.js";
 import { deployCount, programCompute, scaledShare } from "../engine/programs.js";
 import type { Rules } from "../engine/rules.js";
 import { forceTotals } from "../engine/units.js";
-import type { Brief, PublicSummary } from "../game/read.js";
+import type { Brief, OfferView, ProposalView, PublicSummary } from "../game/read.js";
+
+/** Goods a trade swaps, and an amount of them, as orders and offers give it. */
+export type Goods = "capital" | "compute";
+export interface Lot {
+  goods: Goods;
+  amount: number;
+}
 
 // A wake's orders, built against what the brief says. Every order is added
 // only if the brief shows it can work, so a scripted player never sends an
@@ -74,6 +83,12 @@ export class Plan {
   private attacked = false;
   /** Cycles this plan has spent so far. */
   spent = 0;
+  /** Minds it signed a protocol with in this plan: no longer targets. */
+  private readonly signed = new Set<string>();
+  /** Social orders sent this plan, against the brief's daily allowances. */
+  private sent = { offers: 0, proposals: 0, posts: 0, messages: 0 };
+  /** Whether this plan joined, proposed or revoked a protocol: one such move a wake. */
+  private protocolMoved = false;
 
   constructor(
     readonly rules: Rules,
@@ -200,7 +215,7 @@ export class Plan {
    * with it who is in range.
    */
   targets(): PublicSummary[] {
-    return this.spent === 0 ? this.brief.inRange : [];
+    return this.spent === 0 ? this.brief.inRange.filter((t) => !this.signed.has(t.designation)) : [];
   }
 
   attackWith(target: string, mode: "conquest" | "raid", program?: Program): boolean {
@@ -243,6 +258,154 @@ export class Plan {
     this.compute -= compute;
     this.spending.push({ do: "execute", program: "probe", target });
     this.passCycles(cost);
+    return true;
+  }
+
+  // ── Social orders ─────────────────────────────────────────────────────
+  //
+  // Free, but a trade moves goods: escrow and swaps run before any cycle is
+  // spent, so they're only planned before the first one, while the
+  // estimate is still exact. Accepting a protocol is planned only then too,
+  // so no attack already planned can land on a new partner.
+
+  /** Whether a designation is a legacy system's: they trade, sign and read nothing. */
+  isLegacy(designation: string): boolean {
+    return this.rules.legacy.systems.some((s) => s.designation === designation);
+  }
+
+  /** What one cycle makes of these goods: Monetize's capital or Spin Up's compute, now. Keys: as monetizeYield, spinUpYield */
+  perCycle(goods: Goods): number {
+    const b = this.buildings;
+    return goods === "capital" ? monetizeYield(this.rules, capitalIncome(this.rules, this.users, b.city)) : spinUpYield(this.rules, computeIncome(this.rules, b.datacenter));
+  }
+
+  /** A lot's worth in cycles: those it would take this mind to make it. Infinite if it can't. */
+  cyclesFor(lot: Lot): number {
+    const rate = this.perCycle(lot.goods);
+    return rate > 0 ? lot.amount / rate : Infinity;
+  }
+
+  private stock(goods: Goods): number {
+    return goods === "capital" ? this.capital : this.compute;
+  }
+
+  private move(goods: Goods, by: number): void {
+    if (goods === "capital") this.capital += by;
+    else this.compute += by;
+  }
+
+  /** Room for compute in storage. */
+  get computeRoom(): number {
+    return Math.max(0, this.brief.you.computeStorage - this.compute);
+  }
+
+  /** Offers this mind may accept: made to it or to anyone by others. */
+  offersOpen(): OfferView[] {
+    return [...this.brief.offers.toYou, ...this.brief.offers.open];
+  }
+
+  /** Puts `give` in escrow for `want`, to anyone or one mind. */
+  offer(give: Lot, want: Lot, to?: string): boolean {
+    if (!this.live || this.spent > 0 || give.goods === want.goods) return false;
+    if (!(give.amount >= 1 && want.amount >= 1 && Number.isInteger(give.amount) && Number.isInteger(want.amount))) return false;
+    if (this.brief.offers.canOffer - this.sent.offers <= 0) return false;
+    if (this.brief.offers.yours.length + this.sent.offers >= this.rules.social.open_offers_max) return false;
+    if (to !== undefined && (to === this.brief.you.designation || this.isLegacy(to))) return false;
+    if (this.stock(give.goods) < give.amount) return false;
+    this.move(give.goods, -give.amount);
+    this.sent.offers++;
+    this.free.push({ do: "trade_offer", give: { [give.goods]: give.amount }, want: { [want.goods]: want.amount }, ...(to === undefined ? {} : { to }) });
+    return true;
+  }
+
+  private readonly taken = new Set<number>();
+
+  /** Accepts an open offer: pays what it wants, gets its escrow. */
+  acceptOffer(offer: OfferView): boolean {
+    if (!this.live || this.spent > 0 || this.taken.has(offer.offer) || offer.from === this.brief.you.designation) return false;
+    if (!this.offersOpen().some((o) => o.offer === offer.offer)) return false;
+    if (this.stock(offer.want.goods) < offer.want.amount) return false;
+    if (offer.give.goods === "compute" && offer.give.amount > this.computeRoom) return false;
+    this.taken.add(offer.offer);
+    this.move(offer.want.goods, -offer.want.amount);
+    this.move(offer.give.goods, offer.give.amount);
+    this.free.push({ do: "trade_accept", offer: offer.offer });
+    return true;
+  }
+
+  /** Takes back one of its own offers, and its escrow, if storage can hold it. */
+  cancelOffer(offer: number): boolean {
+    const mine = this.brief.offers.yours.find((o) => o.offer === offer);
+    if (!this.live || this.spent > 0 || !mine || this.taken.has(offer)) return false;
+    // Compute past storage would be lost; that's allowed, but the estimate stays a lower bound.
+    this.taken.add(offer);
+    if (mine.give.goods === "capital") this.capital += mine.give.amount;
+    else this.compute += Math.min(mine.give.amount, this.computeRoom);
+    this.free.push({ do: "trade_cancel", offer });
+    return true;
+  }
+
+  /**
+   * Proposes a protocol to a mind, while in none. Whether the other mind
+   * is in one isn't in the brief, so the engine may still refuse it.
+   */
+  propose(to: string): boolean {
+    if (!this.live || this.protocolMoved || this.brief.protocol !== null) return false;
+    if (to === this.brief.you.designation || this.isLegacy(to) || !this.brief.inRange.some((t) => t.designation === to)) return false;
+    if (this.brief.proposals.canPropose - this.sent.proposals <= 0) return false;
+    this.protocolMoved = true;
+    this.sent.proposals++;
+    this.free.push({ do: "protocol_propose", to });
+    return true;
+  }
+
+  /** Says yes to a proposal it's asked into, while in no protocol. */
+  acceptProposal(p: ProposalView): boolean {
+    const me = this.brief.you.designation;
+    // Before anything is spent: an attack or hostile program already planned may be on a member.
+    if (!this.live || this.spent > 0 || this.protocolMoved || this.brief.protocol !== null) return false;
+    if (!this.brief.proposals.toYou.some((q) => q.proposal === p.proposal) || !p.awaiting.includes(me)) return false;
+    this.protocolMoved = true;
+    // If its yes is the last, the members are partners at once; either way none is a target this wake.
+    for (const m of p.members) if (m !== me) this.signed.add(m);
+    this.free.push({ do: "protocol_accept", proposal: p.proposal });
+    return true;
+  }
+
+  /** Says no to a proposal it's in. */
+  declineProposal(p: ProposalView): boolean {
+    if (!this.live || this.protocolMoved || !this.brief.proposals.toYou.some((q) => q.proposal === p.proposal)) return false;
+    this.protocolMoved = true;
+    this.free.push({ do: "protocol_decline", proposal: p.proposal });
+    return true;
+  }
+
+  /** Revokes its protocol, unless it already has. */
+  revoke(): boolean {
+    const p = this.brief.protocol;
+    if (!this.live || this.protocolMoved || p === null || p.leaving.some((l) => l.mind === this.brief.you.designation)) return false;
+    this.protocolMoved = true;
+    this.free.push({ do: "protocol_revoke" });
+    return true;
+  }
+
+  /** A Commons post, if today's allowance has room. */
+  post(text: string, replyTo?: number): boolean {
+    if (!this.live || text.trim().length === 0 || text.length > this.rules.social.post_chars) return false;
+    if (this.brief.commons.canPost - this.sent.posts <= 0) return false;
+    if (replyTo !== undefined && !this.brief.commons.posts.some((p) => p.post === replyTo)) return false;
+    this.sent.posts++;
+    this.free.push({ do: "post", text, ...(replyTo === undefined ? {} : { reply_to: replyTo }) });
+    return true;
+  }
+
+  /** A message to a mind on its channel. */
+  message(to: string, text: string): boolean {
+    if (!this.live || text.trim().length === 0 || text.length > this.rules.social.message_chars) return false;
+    if (to === this.brief.you.designation || this.isLegacy(to)) return false;
+    if (this.brief.channels.canSend - this.sent.messages <= 0) return false;
+    this.sent.messages++;
+    this.free.push({ do: "message", to, text });
     return true;
   }
 
