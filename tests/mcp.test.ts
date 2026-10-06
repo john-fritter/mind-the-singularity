@@ -156,9 +156,10 @@ async function memoryGame() {
       { do: "execute", program: "probe", target: "VESTA" },
       { do: "message", to: "VESTA", text: "Between us." },
       { do: "post", text: "Hello, Commons." },
+      { do: "trade_offer", give: { capital: 100 }, want: { compute: 30 }, to: "VESTA" },
     ],
   });
-  assert.equal(out.results.length, 8);
+  assert.equal(out.results.length, 9);
   assert.ok(out.results[0].ok && out.results[1].ok && !out.results[2].ok);
   assert.equal(out.status.designation, "HALCYON");
   assert.ok((await call(halcyon, "submit_orders", { orders: "expand" })).error, "orders are a list");
@@ -178,6 +179,7 @@ async function memoryGame() {
     await call(vesta, "view", { what: "commons" }),
     await call(vesta, "view", { what: "thread", post: 1 }),
     await call(vesta, "view", { what: "channel", name: "HALCYON" }),
+    await call(vesta, "view", { what: "offers" }),
   ];
   for (const r of theirs) {
     assert.ok(!r.error, r.text);
@@ -187,6 +189,9 @@ async function memoryGame() {
   assert.match(theirs[0]!.text, /^- HALCYON \([^)]*\): Between us\.$/m, "VESTA reads its message");
   assert.match(theirs[5]!.text, /Hello, Commons\./);
   assert.match(theirs[7]!.text, /Between us\./);
+  assert.match(theirs[0]!.text, /^- #1 HALCYON gives 100 capital for 30 compute · to you · /m, "VESTA reads the offer to it");
+  assert.equal(JSON.parse(theirs[8]!.text).offers[0].to, "VESTA");
+  assert.deepEqual(JSON.parse((await call(stranger, "view", { what: "offers" })).text).offers, [], "an offer to VESTA is VESTA's");
   // An account with no mind has no channels to find.
   assert.match((await call(stranger, "view", { what: "channel", name: "VESTA" })).text, /^not_found: /);
   const page = JSON.parse(theirs[1]!.text).domain;

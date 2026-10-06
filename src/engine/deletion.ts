@@ -6,7 +6,8 @@ import type { Domain, World } from "./state.js";
 
 // Deletion: at 0 cores the mind is gone. The domain stays in the world,
 // marked deleted, so the Record and the Archive can still name it; it can't
-// act or be targeted, and its timers go with it.
+// act or be targeted, and its timers go with it, as do its open trade
+// offers and what they held in escrow.
 
 /** Deletes a mind. Mutates the world and the domain. */
 export function deleteMind(world: World, d: Domain, now: number, events: GameEvent[], by: Domain | null): void {
@@ -15,7 +16,11 @@ export function deleteMind(world: World, d: Domain, now: number, events: GameEve
   d.countermeasure = null;
   d.researchTarget = null;
   d.safeModeUntil = null;
-  world.timers = world.timers.filter((t) => !(t.kind === "program_ends" && t.domain === d.id));
+  const offers = new Set(world.offers.filter((o) => o.from === d.id).map((o) => o.id));
+  world.offers = world.offers.filter((o) => !offers.has(o.id));
+  world.timers = world.timers.filter(
+    (t) => !(t.kind === "program_ends" && t.domain === d.id) && !(t.kind === "offer_expires" && offers.has(t.offer)),
+  );
   emit(world, events, now, {
     type: "deleted",
     domain: d.id,

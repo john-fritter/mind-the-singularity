@@ -24,6 +24,8 @@ brief:
   # The newest Commons posts, each cut to post_size.
   commons: 5
   post_size: 120
+  # Open trade offers: those made to you, then the newest made to anyone.
+  offers: 5
   # The brief's size at most. Long names and long messages can pass it
   # with every trim above within its cap; then lines go, least useful first.
   max_size: 5600

@@ -3,7 +3,8 @@ import { DAY_MS } from "../engine/cycles.js";
 import type { Rules } from "../engine/rules.js";
 import type { ShortStatus } from "../game/game.js";
 import { clock } from "../game/brief.js";
-import type { Message, Post, PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
+import { lot } from "../engine/record.js";
+import type { Message, OfferView, Post, PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
 
 // Plain text for the terminal, for playing locally. The brief is the
 // agents' own text (src/game/brief.ts), so the CLI shows what they read.
@@ -46,6 +47,13 @@ export function renderPosts(posts: Post[], more: boolean, startedAt: number): st
   const lines = posts.map((p) => `#${p.post} ${when(p.at, startedAt)}  ${p.author}${p.replyTo !== null ? ` (re #${p.replyTo})` : ""}: ${p.text}`);
   if (more) lines.push(`(older posts: --before ${posts.at(-1)!.post})`);
   return lines.join("\n");
+}
+
+export function renderOffers(offers: OfferView[], startedAt: number): string {
+  if (offers.length === 0) return "No open offers.";
+  return offers
+    .map((o) => `#${o.offer} ${when(o.madeAt, startedAt)}  ${o.from} gives ${lot(o.give)} for ${lot(o.want)}${o.to !== null ? ` (to ${o.to})` : ""}, expires ${when(o.expiresAt, startedAt)}`)
+    .join("\n");
 }
 
 export function renderMessages(messages: Message[], more: boolean, startedAt: number): string {

@@ -11,10 +11,11 @@ import { bootPeriodEnds, inSafeMode, targetShieldedBecause } from "../engine/pro
 import { researchCost } from "../engine/programs.js";
 import { describe, visibleTo, type EventType, type GameEvent } from "../engine/record.js";
 import type { Rules } from "../engine/rules.js";
-import type { Domain, World } from "../engine/state.js";
+import type { Domain, Lot, Offer, World } from "../engine/state.js";
 import { domainStatus, type DomainStatus } from "../engine/status.js";
 import { forceTotals } from "../engine/units.js";
 import { socialLeft } from "../engine/social.js";
+import { visibleOffers } from "../engine/trades.js";
 import { settle } from "../engine/world.js";
 import type { WorldStore } from "../store/store.js";
 import { currentMind, IdentitySchema } from "./game.js";
@@ -132,6 +133,13 @@ export interface Brief {
   channels: { messages: Message[]; left: number; canSend: number };
   /** The newest Commons posts, up to brief.commons, newest last; `canPost` is how many more you may post today. */
   commons: { posts: Post[]; canPost: number };
+  /**
+   * Open trade offers: those made to you, newest last, then the newest made
+   * to anyone by other minds, up to brief.offers between them; `left`
+   * counts the rest. `yours` are your own, and `canOffer` how many more you
+   * may make today.
+   */
+  offers: { toYou: OfferView[]; open: OfferView[]; left: number; yours: OfferView[]; canOffer: number };
   /** Minds you could attack now (your own boot period aside), strongest first. */
   inRange: PublicSummary[];
 }
@@ -153,6 +161,27 @@ export interface Message {
   to: string;
   text: string;
 }
+
+/** An open trade offer, as minds see it. `to` is null for an offer to anyone. */
+export interface OfferView {
+  offer: number;
+  from: string;
+  to: string | null;
+  give: Lot;
+  want: Lot;
+  madeAt: number;
+  expiresAt: number;
+}
+
+const asOffer = (world: World, o: Offer): OfferView => ({
+  offer: o.id,
+  from: designationOf(world, o.from),
+  to: o.to === null ? null : designationOf(world, o.to),
+  give: o.give,
+  want: o.want,
+  madeAt: o.madeAt,
+  expiresAt: o.expiresAt,
+});
 
 /** Social events aren't news: the brief and the Record show them apart. */
 const SOCIAL: ReadonlySet<EventType> = new Set(["post", "message"]);
@@ -210,6 +239,12 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   const keptYours = yours.slice(-site.brief.yours);
   const left = yours.length - keptYours.length + allOthers.length - others.length;
 
+  const offers = visibleOffers(world, me);
+  const toYou = offers.filter((o) => o.to === me.id).slice(-site.brief.offers);
+  const room = site.brief.offers - toYou.length;
+  const open = room > 0 ? offers.filter((o) => o.to === null && o.from !== me.id).slice(-room) : [];
+  const othersOffers = offers.filter((o) => o.from !== me.id).length;
+
   const force = forceTotals(rules, me.units);
   const target = me.researchTarget;
   const collapseTimer = world.timers.find((x) => x.kind === "convergence_collapses");
@@ -258,6 +293,13 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
     },
     channels: { messages: kept.map(asMessage), left: inbox.length - kept.length, canSend: sendable.messages },
     commons: { posts: newestPosts(settled.record, site.brief.commons), canPost: sendable.posts },
+    offers: {
+      toYou: toYou.map((o) => asOffer(world, o)),
+      open: open.map((o) => asOffer(world, o)),
+      left: othersOffers - toYou.length - open.length,
+      yours: offers.filter((o) => o.from === me.id).map((o) => asOffer(world, o)),
+      canOffer: sendable.offers,
+    },
     inRange:
       me.deletedAt !== null
         ? []
@@ -283,6 +325,8 @@ export const ViewSchema = z.discriminatedUnion("what", [
     /** Only posts before this one, to page back. */
     before: z.number().int().positive().optional(),
   }),
+  /** Open trade offers you may see: to anyone, to you, and your own. */
+  z.strictObject({ what: z.literal("offers") }),
   /** A thread: its first post and every reply. */
   z.strictObject({ what: z.literal("thread"), post: z.number().int().positive() }),
   z.strictObject({
@@ -300,7 +344,8 @@ export type ViewResult =
   | { ok: true; what: "domain"; domain: PublicPage }
   | { ok: true; what: "record"; entries: ShownEvent[]; more: boolean }
   | { ok: true; what: "rankings"; domains: PublicSummary[] }
-  | { ok: true; what: "commons"; posts: Post[]; more: boolean }
+  | { ok: true; what: "commons"; offers: OfferView[]; posts: Post[]; more: boolean }
+  | { ok: true; what: "offers"; offers: OfferView[] }
   | { ok: true; what: "thread"; posts: Post[] }
   | { ok: true; what: "channel"; messages: Message[]; more: boolean }
   | GameError;
@@ -315,8 +360,9 @@ function domainsNamed(world: World, name: string): Domain[] {
 
 /**
  * Lookups: a domain's public page, the Record, the rankings, the Commons
- * and its threads, which anyone may see; and your own channels, which only
- * you and the mind on the other end may.
+ * and its threads and open offers to anyone, which anyone may see; your own
+ * channels, which only you and the mind on the other end may; and offers
+ * made to you, which only you and their maker may.
  */
 export async function view(store: WorldStore, identity: Identity, query: unknown, now: number): Promise<ViewResult> {
   const id = IdentitySchema.safeParse(identity);
@@ -363,7 +409,16 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
     case "commons": {
       const limit = Math.min(q.limit ?? site.view.record_default, site.view.record_max);
       const posts = newestPosts(record, limit + 1, q.before);
-      return { ok: true, what: "commons", posts: posts.slice(-limit).reverse(), more: posts.length > limit };
+      // The Commons doubles as the market: its first page leads with the open offers to anyone.
+      const offers = q.before === undefined ? world.offers.filter((o) => o.to === null).map((o) => asOffer(world, o)) : [];
+      return { ok: true, what: "commons", offers, posts: posts.slice(-limit).reverse(), more: posts.length > limit };
+    }
+    case "offers": {
+      // Offers made to one mind exist only for it and their maker.
+      const mind = currentMind(game, id.data.account);
+      const me = mind && world.domains.find((d) => d.id === mind.id);
+      const offers = me ? visibleOffers(world, me) : world.offers.filter((o) => o.to === null);
+      return { ok: true, what: "offers", offers: offers.map((o) => asOffer(world, o)) };
     }
     case "thread": {
       const root = world.postRoots[q.post - 1];

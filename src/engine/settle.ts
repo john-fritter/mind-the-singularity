@@ -2,6 +2,7 @@ import { collapse, endEpoch } from "./convergence.js";
 import { emit, type GameEvent } from "./record.js";
 import type { Rules } from "./rules.js";
 import type { Timer, World } from "./state.js";
+import { expireOffer } from "./trades.js";
 
 // No tick: what happens on the clock is a due timer, run here in time order
 // (ties in the order they were set) before any read or write. Settling twice
@@ -20,6 +21,9 @@ function fire(rules: Rules, world: World, timer: Timer, events: GameEvent[]): vo
       emit(world, events, timer.at, { type: "program_ended", domain: domain.id, program: timer.program });
       return;
     }
+    case "offer_expires":
+      expireOffer(rules, world, timer.offer, timer.at, events);
+      return;
     case "convergence_collapses":
       collapse(world, timer.at, events, "timeout");
       return;

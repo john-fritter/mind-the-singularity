@@ -12,8 +12,9 @@ import { applyOrders, bootMind, createWorld, settle } from "../src/engine/world.
 // One domain per architecture, given random orders every few hours for a
 // month, attacking and running programs on each other: nothing goes
 // negative or fractional, buildings fit their territory, compute fits its
-// storage, hardware fits its housing, posts and messages keep to their
-// daily caps, and a deleted mind does nothing. The engine never changes the
+// storage, hardware fits its housing, posts, messages and offers keep to
+// their caps, every open offer has its expiry, and a deleted mind does
+// nothing. The engine never changes the
 // world it's given, and the same seed and orders give the same world and
 // events.
 
@@ -29,7 +30,7 @@ const upTo = (rng: Rng, n: number) => 1 + Math.floor(rng.next() * n);
 function randomOrders(rng: Rng, architecture: Architecture, others: string[]): unknown[] {
   const programs = programsOf(architecture).map((p) => p.id);
   return Array.from({ length: upTo(rng, 6) }, () => {
-    switch (upTo(rng, 16)) {
+    switch (upTo(rng, 17)) {
       case 1:
         return { do: "expand", cycles: upTo(rng, 12) };
       case 2:
@@ -59,6 +60,14 @@ function randomOrders(rng: Rng, architecture: Architecture, others: string[]): u
         return { do: "post", text: "word ".repeat(upTo(rng, 60)), ...(rng.next() < 0.5 ? { reply_to: upTo(rng, 40) } : {}) };
       case 15:
         return { do: "message", to: pick(rng, others), text: "word ".repeat(upTo(rng, 60)) };
+      case 16: {
+        const roll = rng.next();
+        if (roll < 0.4) return { do: "trade_accept", offer: upTo(rng, 60) };
+        if (roll < 0.5) return { do: "trade_cancel", offer: upTo(rng, 60) };
+        const [give, want] = pick(rng, [["capital", "compute"], ["compute", "capital"], ["capital", "capital"]] as const);
+        const to = rng.next() < 0.5 ? { to: pick(rng, others) } : {};
+        return { do: "trade_offer", give: { [give]: upTo(rng, 3000) }, want: { [want]: upTo(rng, 3000) }, ...to };
+      }
       default:
         return pick(rng, [{ do: "attack" }, { do: "expand", cycles: 0 }, null, "build", { do: "build", building: "moat", count: 1 }]);
     }
@@ -66,7 +75,16 @@ function randomOrders(rng: Rng, architecture: Architecture, others: string[]): u
 }
 
 function checkInvariants(world: World, now: number) {
+  for (const o of world.offers) {
+    const maker = world.domains.find((d) => d.id === o.from)!;
+    assert.ok(maker.deletedAt === null, "a deleted mind's offer is open");
+    assert.ok(Number.isInteger(o.give.amount) && o.give.amount > 0 && o.give.goods !== o.want.goods, `offer #${o.id}`);
+    assert.ok(world.timers.some((t) => t.kind === "offer_expires" && t.offer === o.id && t.at === o.expiresAt), `offer #${o.id} has no expiry`);
+  }
+  assert.equal(world.timers.filter((t) => t.kind === "offer_expires").length, world.offers.length, "an expiry timer outlived its offer");
   for (const d of world.domains) {
+    assert.ok(world.offers.filter((o) => o.from === d.id).length <= rules.social.open_offers_max, `${d.designation} has too many offers open`);
+    assert.ok(d.social.offers <= rules.social.trade_offers_per_day, `${d.designation} made too many offers today`);
     assert.ok(d.deletedAt === null || d.buildings.core === 0, `${d.designation} deleted with cores`);
     assert.ok(d.deletedAt !== null || d.buildings.core > 0, `${d.designation} has no cores but wasn't deleted`);
     const amounts = {
@@ -140,9 +158,9 @@ function play(seed: number): { world: World; events: GameEvent[] } {
 
 function main() {
   const first = play(42);
-  // Things happened: programs were learned and run, minds fought.
+  // Things happened: programs were learned and run, minds fought and traded.
   const types = new Set(first.events.map((e) => e.type));
-  for (const t of ["booted", "learned", "program_ended", "battle", "hostile", "probed"]) assert.ok(types.has(t as GameEvent["type"]), `no ${t} events`);
+  for (const t of ["booted", "learned", "program_ended", "battle", "hostile", "probed", "trade", "offer_expired", "offers_withdrawn"]) assert.ok(types.has(t as GameEvent["type"]), `no ${t} events`);
   assert.ok(first.world.domains.every((d) => d.known.length > 0), "every mind learned something");
 
   // Same seed, same orders: the same world and events, exactly.

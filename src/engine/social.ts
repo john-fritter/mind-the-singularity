@@ -19,18 +19,19 @@ export function epochDay(world: World, now: number): number {
 }
 
 /** What a mind has sent today, with yesterday's counts cleared. Mutates the domain. */
-function sentToday(world: World, domain: Domain, now: number): Domain["social"] {
+export function sentToday(world: World, domain: Domain, now: number): Domain["social"] {
   const day = epochDay(world, now);
-  if (domain.social.day !== day) domain.social = { day, posts: 0, messages: 0 };
+  if (domain.social.day !== day) domain.social = { day, posts: 0, messages: 0, offers: 0 };
   return domain.social;
 }
 
-/** Posts and messages a mind may still send today. Keys: social.commons_posts_per_day, social.messages_per_day */
-export function socialLeft(rules: Rules, world: World, domain: Domain, now: number): { posts: number; messages: number } {
-  const today = domain.social.day === epochDay(world, now) ? domain.social : { posts: 0, messages: 0 };
+/** Posts, messages and trade offers a mind may still make today. Keys: social.commons_posts_per_day, social.messages_per_day, social.trade_offers_per_day */
+export function socialLeft(rules: Rules, world: World, domain: Domain, now: number): { posts: number; messages: number; offers: number } {
+  const today = domain.social.day === epochDay(world, now) ? domain.social : { posts: 0, messages: 0, offers: 0 };
   return {
     posts: Math.max(0, rules.social.commons_posts_per_day - today.posts),
     messages: Math.max(0, rules.social.messages_per_day - today.messages),
+    offers: Math.max(0, rules.social.trade_offers_per_day - today.offers),
   };
 }
 
