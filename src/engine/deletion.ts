@@ -1,5 +1,6 @@
 import { collapse } from "./convergence.js";
 import { HOUR_MS } from "./cycles.js";
+import { leaveOnDeletion } from "./protocols.js";
 import { emit, type GameEvent } from "./record.js";
 import type { Rules } from "./rules.js";
 import type { Domain, World } from "./state.js";
@@ -7,7 +8,8 @@ import type { Domain, World } from "./state.js";
 // Deletion: at 0 cores the mind is gone. The domain stays in the world,
 // marked deleted, so the Record and the Archive can still name it; it can't
 // act or be targeted, and its timers go with it, as do its open trade
-// offers and what they held in escrow.
+// offers and what they held in escrow. It leaves its protocol at once, and
+// its protocol proposals close.
 
 /** Deletes a mind. Mutates the world and the domain. */
 export function deleteMind(world: World, d: Domain, now: number, events: GameEvent[], by: Domain | null): void {
@@ -21,6 +23,7 @@ export function deleteMind(world: World, d: Domain, now: number, events: GameEve
   world.timers = world.timers.filter(
     (t) => !(t.kind === "program_ends" && t.domain === d.id) && !(t.kind === "offer_expires" && offers.has(t.offer)),
   );
+  leaveOnDeletion(world, d, now, events);
   emit(world, events, now, {
     type: "deleted",
     domain: d.id,

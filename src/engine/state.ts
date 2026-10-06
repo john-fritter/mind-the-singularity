@@ -52,8 +52,8 @@ export interface Domain {
   running: RunningProgram[];
 
   scratchpad: string;
-  /** Commons posts, channel messages and trade offers made on epoch day `day` (from 0), for the daily caps. */
-  social: { day: number; posts: number; messages: number; offers: number };
+  /** Commons posts, channel messages, trade offers and protocol proposals made on epoch day `day` (from 0), for the daily caps. */
+  social: { day: number; posts: number; messages: number; offers: number; proposals: number };
 
   /** The battle program run automatically when attacked by a force above `above` × this domain's defense. */
   countermeasure: { program: Program; above: number } | null;
@@ -97,10 +97,37 @@ export interface Offer {
   expiresAt: number;
 }
 
+/** A non-aggression protocol: its members can't attack each other or run hostile programs on each other. */
+export interface Protocol {
+  id: number;
+  /** Domain ids, in the order they joined. */
+  members: number[];
+  /** Members who revoked, and when each leaves. Until then the protocol still holds them. */
+  leaving: { domain: number; at: number }[];
+}
+
+/** A proposed protocol, or a mind joining one, waiting on every yes but its proposer's. */
+export interface Proposal {
+  id: number;
+  from: number;
+  /** The mind it was proposed to. */
+  to: number;
+  /** The protocol it would make, proposer first. */
+  members: number[];
+  /** The protocol `members` would grow, if one of the two was in one. */
+  protocol: number | null;
+  /** Members who haven't said yes yet. */
+  awaiting: number[];
+  madeAt: number;
+  expiresAt: number;
+}
+
 /** Something due at a moment, run by settle() in time order. */
 export type Timer = { id: number; at: number } & (
   | { kind: "program_ends"; domain: number; program: Program }
   | { kind: "offer_expires"; offer: number }
+  | { kind: "proposal_expires"; proposal: number }
+  | { kind: "protocol_revoked"; protocol: number; domain: number }
   | { kind: "convergence_collapses" }
   | { kind: "shutdown_warning" }
   | { kind: "shutdown" }
@@ -140,6 +167,13 @@ export interface World {
   offers: Offer[];
   /** The last offer number used; they count from 1 for the epoch. */
   lastOfferId: number;
+  /** Protocols in force, oldest first. A mind is in one at most. */
+  protocols: Protocol[];
+  lastProtocolId: number;
+  /** Open protocol proposals, oldest first; a mind has one open at most. */
+  proposals: Proposal[];
+  /** The last proposal number used; they count from 1 for the epoch. */
+  lastProposalId: number;
   convergence: Convergence | null;
   /** Set once the epoch is over; nothing happens after. */
   ended: Ending | null;

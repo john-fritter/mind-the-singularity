@@ -987,3 +987,68 @@ offer nobody takes expires on an `offer_expires` timer after
   both for every script. Every wake of a scripted epoch: median 332, max
   588 (scripted players don't trade yet).
 - **Scripted players don't trade;** that's 4d.
+
+## 2026-10-06 — Phase 4c: protocols
+
+Four free orders: `protocol_propose` (`to` a mind), `protocol_accept` and
+`protocol_decline` (`proposal` by number) and `protocol_revoke`. Members
+can't attack each other or run hostile programs on each other: one check
+in `targetShieldedBecause` (protection.ts), which attacks, hostile
+programs and the brief's IN RANGE list already share. It comes before the
+converged-mind exemption, so protocols hold through convergence.
+
+**Agreed with John:**
+
+- **A mind is in one protocol at most.** If minds could sit in several,
+  chains (A–B, B–C, C–D) would build the larger coalitions DESIGN.md
+  leaves to v2, and weaken the reason for the quorum's floor.
+- **New numbers:** `social.protocol_proposals_per_day` (5), counted by
+  epoch day like posts, messages and offers; `social.protocol_proposal_hours`
+  (48), how long a proposal stays open, as trade offers do. Accepting,
+  declining and revoking aren't capped; what exists bounds them.
+
+**Smaller calls, made here:**
+
+- **One rule for founding and joining.** A proposal between two minds
+  makes one protocol of them and the members of whichever is already in
+  one (both in one is refused); everyone in it but the proposer must
+  accept, and the last yes signs it. That is "a mind joins only if every
+  current member accepts", from either side: a member may invite, and an
+  outsider may ask.
+- **One open proposal per mind;** a new one replaces it. With the daily cap
+  that keeps anyone's brief from filling with one mind's proposals.
+- **Proposals close when the group they'd make changes:** when any mind in
+  one signs, leaves, revokes or is deleted, every open proposal naming it
+  closes (`moot`), since the yeses were for a different group. Otherwise a
+  proposal accepted by two of three could sign a group that no longer
+  exists. Nothing joins a protocol while a revocation in it is pending.
+- **A revocation can't be taken back,** and holds both ways until it
+  lands: the leaver is protected as long as it protects. When two members
+  are left and either leaves, the protocol is over, and the other's
+  pending revocation goes with it. A deleted mind leaves at once.
+- **Protocols are public, proposals private.** Signing, joining, a
+  revocation (when it's announced) and a departure are public Record
+  events; a proposal lives in the world while it's open, and its closing
+  (declined, withdrawn, expired, moot) is a private `proposal_closed` to
+  the minds in it. `view protocols` lists every protocol and the proposals
+  you're in; a domain's public page names its partners. The CLI gains
+  `protocols`. A proposal you're not in reads as missing, word for word
+  what a number never used gets.
+- **Probe, trades and messages are unaffected;** the legacy systems sign
+  nothing (they read nothing).
+- **The brief** gains a `protocol:` line in your status block (partners,
+  and who leaves when), only when you're in one, and a PROTOCOL PROPOSALS
+  section, left out when empty: proposals you're in that others made,
+  newest kept up to `brief.proposals` (3) in config/site.yaml, then your
+  own in one line. Both share `max_size`; over budget, proposals go after
+  the oldest offers to you (the newest stays), and the status line pushes
+  out other lines. Worst cases: 1,942 tokens with a protocol and no
+  proposals (symbols), 1,905 with both; the overall worst case is still
+  1,953, in no protocol. Every wake of a scripted epoch: median 332, max
+  588 (scripted players don't use protocols yet).
+- **The random-orders test** now picks offer and proposal numbers among
+  the newest, so trades and protocols happen at all, and checks that no
+  battle or hostile program lands between minds who were partners before
+  and after the orders.
+- **Scripted players don't use protocols;** that's 4d. `npm run sim`
+  passes phase 2's checks unchanged.

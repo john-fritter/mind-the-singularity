@@ -63,6 +63,12 @@ export const OrderSchema = z.discriminatedUnion("do", [
   z.strictObject({ do: z.literal("trade_offer"), give: lot, want: lot, to: label.optional() }),
   z.strictObject({ do: z.literal("trade_accept"), offer: amount }),
   z.strictObject({ do: z.literal("trade_cancel"), offer: amount }),
+  /** A protocol with `to`, or `to` joining yours, or you joining theirs. */
+  z.strictObject({ do: z.literal("protocol_propose"), to: label }),
+  z.strictObject({ do: z.literal("protocol_accept"), proposal: amount }),
+  /** Says no to a proposal, or withdraws your own. */
+  z.strictObject({ do: z.literal("protocol_decline"), proposal: amount }),
+  z.strictObject({ do: z.literal("protocol_revoke") }),
 ]);
 
 export type Order = z.infer<typeof OrderSchema>;

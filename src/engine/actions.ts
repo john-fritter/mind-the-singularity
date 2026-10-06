@@ -11,6 +11,7 @@ import type { Order } from "./orders.js";
 import { deployCount, programCompute, programCrashChance, researchCost, scaledShare } from "./programs.js";
 import type { Rules } from "./rules.js";
 import { message, post } from "./social.js";
+import { acceptProposal, declineProposal, proposeProtocol, revokeProtocol } from "./protocols.js";
 import { acceptTrade, cancelTrade, offerTrade } from "./trades.js";
 
 export type { OrderContext, OrderResult } from "./context.js";
@@ -385,5 +386,13 @@ export function applyOrder(ctx: OrderContext, order: Order): OrderResult {
       return acceptTrade(ctx, order);
     case "trade_cancel":
       return cancelTrade(ctx, order);
+    case "protocol_propose":
+      return proposeProtocol(ctx, order);
+    case "protocol_accept":
+      return acceptProposal(ctx, order);
+    case "protocol_decline":
+      return declineProposal(ctx, order);
+    case "protocol_revoke":
+      return revokeProtocol(ctx, order);
   }
 }

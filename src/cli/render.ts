@@ -4,7 +4,7 @@ import type { Rules } from "../engine/rules.js";
 import type { ShortStatus } from "../game/game.js";
 import { clock } from "../game/brief.js";
 import { lot } from "../engine/record.js";
-import type { Message, OfferView, Post, PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
+import type { Message, OfferView, Post, ProposalView, ProtocolView, PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
 
 // Plain text for the terminal, for playing locally. The brief is the
 // agents' own text (src/game/brief.ts), so the CLI shows what they read.
@@ -28,7 +28,7 @@ export function renderPage(rules: Rules, d: PublicPage, startedAt: number): stri
   return [
     `${d.designation} of ${d.domainName} (${rules.architectures[d.architecture].name})`,
     `${d.rank === null ? "unranked" : `rank ${d.rank}`} · power ${n(d.power)} · territory ${n(d.territory)} · ${d.status}`,
-    `booted ${when(d.bootedAt, startedAt)}`,
+    `booted ${when(d.bootedAt, startedAt)}${d.protocol.length > 0 ? ` · protocol with ${d.protocol.join(", ")}` : ""}`,
     d.manifesto ? `\n${d.manifesto}` : "",
   ]
     .filter(Boolean)
@@ -54,6 +54,19 @@ export function renderOffers(offers: OfferView[], startedAt: number): string {
   return offers
     .map((o) => `#${o.offer} ${when(o.madeAt, startedAt)}  ${o.from} gives ${lot(o.give)} for ${lot(o.want)}${o.to !== null ? ` (to ${o.to})` : ""}, expires ${when(o.expiresAt, startedAt)}`)
     .join("\n");
+}
+
+export function renderProtocols(protocols: ProtocolView[], proposals: ProposalView[], startedAt: number): string {
+  const lines = protocols.map((p) => {
+    const leaving = p.leaving.map((l) => `; ${l.mind} leaves ${when(l.at, startedAt)}`).join("");
+    return `${p.members.join(", ")}${leaving}`;
+  });
+  if (lines.length === 0) lines.push("No protocols.");
+  if (proposals.length > 0) lines.push("", "Proposals you're in:");
+  for (const p of proposals) {
+    lines.push(`#${p.proposal}  ${p.from} to ${p.to}: ${p.members.join(", ")}, awaiting ${p.awaiting.join(", ")}, expires ${when(p.expiresAt, startedAt)}`);
+  }
+  return lines.join("\n");
 }
 
 export function renderMessages(messages: Message[], more: boolean, startedAt: number): string {

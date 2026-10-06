@@ -161,7 +161,7 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
   const { rules, world, domain: me, now, rng } = ctx;
   const target = findTarget(ctx, order.target);
   if (typeof target === "string") return fail(order, target);
-  const shield = shieldedBecause(rules, me, target, now);
+  const shield = shieldedBecause(rules, world, me, target, now);
   if (shield) return fail(order, shield);
   me.attacksMade = me.attacksMade.filter((t) => t > now - DAY_MS);
   const cost = attackCycles(rules, me.attacksMade.length);
@@ -359,7 +359,7 @@ export function executeAgainst(ctx: OrderContext, order: Extract<Order, { do: "e
   if (typeof target === "string") return fail(order, target);
   const hostile = PROGRAM_INFO.get(program)!.kind === "hostile";
   if (hostile) {
-    const shield = shieldedBecause(rules, me, target, now);
+    const shield = shieldedBecause(rules, world, me, target, now);
     if (shield) return fail(order, shield);
     if (hostileCapReached(rules, target, now)) return fail(order, `${target.designation} has taken all the hostile programs it can today.`);
   }

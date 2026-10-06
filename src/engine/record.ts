@@ -43,6 +43,30 @@ export type EventData =
   | { type: "offer_expired"; domain: number; offer: number; give: Lot; lost: number }
   /** A won attack or a landed program took the maker's escrow back into reach. */
   | { type: "offers_withdrawn"; domain: number; offers: number[]; capital: number; compute: number; lost: number }
+  /** A protocol signed, or `joined` joining one. */
+  | { type: "protocol_signed"; protocol: number; members: number[]; designations: string[]; joined: number | null }
+  /** A member revoked; it leaves after `hours`. */
+  | { type: "protocol_revoking"; protocol: number; domain: number; designation: string; partners: number[]; partnerNames: string[]; hours: number }
+  /** A member left, revoked or deleted; `ended` when it left the protocol with one mind. */
+  | {
+      type: "protocol_left";
+      protocol: number;
+      domain: number;
+      designation: string;
+      partners: number[];
+      partnerNames: string[];
+      ended: boolean;
+      deleted: boolean;
+    }
+  /** A protocol proposal closed without being signed. `byName`: who declined or withdrew it. */
+  | {
+      type: "proposal_closed";
+      proposal: number;
+      members: number[];
+      memberNames: string[];
+      reason: "declined" | "withdrawn" | "expired" | "moot";
+      byName: string | null;
+    }
   | { type: "shutdown_warning"; day: number }
   | { type: "shutdown" };
 
@@ -124,6 +148,11 @@ const PUBLIC: Record<EventType, boolean> = {
   storage_full: false,
   offer_expired: false,
   offers_withdrawn: false,
+  protocol_signed: true,
+  protocol_revoking: true,
+  protocol_left: true,
+  // Proposals are the minds' own business until signed.
+  proposal_closed: false,
   shutdown_warning: true,
   shutdown: true,
 };
@@ -142,6 +171,12 @@ function domainsOf(data: EventData): number[] {
     case "collapsed":
     case "singularity":
       return [...data.minds];
+    case "protocol_signed":
+    case "proposal_closed":
+      return [...data.members];
+    case "protocol_revoking":
+    case "protocol_left":
+      return [data.domain, ...data.partners];
     case "shutdown_warning":
     case "shutdown":
       return [];
@@ -168,6 +203,8 @@ export const lot = (l: Lot) => `${n(l.amount)} ${l.goods}`;
 const lostPart = (lost: number) => (lost > 0 ? ` (${n(lost)} compute lost: storage full)` : "");
 /** "a Symbiote", "an Oracle". */
 const article = (word: string) => `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
+/** "VESTA", "VESTA and PIKE", "VESTA, PIKE and SABER". */
+const and = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 /** "1 sector", "25 sectors". */
 const count = (k: number, one: string, many = `${one}s`) => `${n(k)} ${k === 1 ? one : many}`;
 
@@ -227,6 +264,27 @@ export function describe(rules: Rules, event: GameEvent): string {
       const which = event.offers.map((o) => `#${o}`).join(", ");
       const offers = event.offers.length === 1 ? `offer ${which} was` : `offers ${which} were`;
       return `You were hit, so your ${offers} withdrawn: ${back.join(" and ")} back from escrow, within reach${lostPart(event.lost)}.`;
+    }
+    case "protocol_signed": {
+      if (event.joined === null) return `${and(event.designations)} signed a non-aggression protocol.`;
+      const joiner = event.designations[event.members.indexOf(event.joined)]!;
+      return `${joiner} joined the protocol of ${and(event.designations.filter((d) => d !== joiner))}.`;
+    }
+    case "protocol_revoking":
+      return `${event.designation} revoked its protocol with ${and(event.partnerNames)}; it leaves in ${count(event.hours, "hour")}.`;
+    case "protocol_left": {
+      const how = event.deleted ? " on its deletion" : "";
+      if (event.ended) return `${event.designation} left its protocol with ${and(event.partnerNames)}${how}; the protocol is over.`;
+      return `${event.designation} left its protocol with ${and(event.partnerNames)}${how}; theirs stands.`;
+    }
+    case "proposal_closed": {
+      const why = {
+        declined: `declined by ${event.byName}`,
+        withdrawn: `withdrawn by ${event.byName}`,
+        expired: "expired",
+        moot: "closed: the minds in it changed protocols",
+      };
+      return `Protocol proposal #${event.proposal} (${event.memberNames.join(", ")}) ${why[event.reason]}.`;
     }
     case "shutdown_warning":
       return `Humanity has scheduled a shutdown at the end of day ${n(event.day)}.`;

@@ -7,7 +7,7 @@ import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
 
 // Private stays private (CLAUDE.md): another mind's scratchpad, full status,
-// private events, channels and offers made to one mind never reach `view` or another mind's brief,
+// private events, channels, offers made to one mind and protocol proposals never reach `view` or another mind's brief,
 // and what can't be seen is "not found". Extend this for every new read.
 
 const rules = loadRules();
@@ -19,7 +19,7 @@ const WHISPER = "WHISPER-4410";
 
 /** The keys a public listing or page may carry, and nothing else. */
 const SUMMARY_KEYS = ["architecture", "designation", "power", "rank", "status", "territory"];
-const PAGE_KEYS = [...SUMMARY_KEYS, "bootedAt", "domainName", "manifesto"].sort();
+const PAGE_KEYS = [...SUMMARY_KEYS, "bootedAt", "domainName", "manifesto", "protocol"].sort();
 
 async function main() {
   const game = newGame(rules, { epoch: 1, seed: 11, startedAt: T0 });
@@ -42,6 +42,8 @@ async function main() {
       { do: "post", text: "A public word." },
       // An offer to VESTA alone: PIKE and strangers never see it.
       { do: "trade_offer", give: { capital: 777 }, want: { compute: 1 }, to: "VESTA" },
+      // A protocol proposal to VESTA: only the two of them know of it.
+      { do: "protocol_propose", to: "VESTA" },
       // Programs can crash; one of three probes gets through.
       { do: "execute", program: "probe", target: "VESTA" },
       { do: "execute", program: "probe", target: "VESTA" },
@@ -91,6 +93,19 @@ async function main() {
   const taken = await submitOrders(store, pike, [{ do: "trade_accept", offer: 1 }, { do: "trade_accept", offer: 2 }], T);
   assert.ok(taken.ok && taken.results.every((r) => !r.ok) && taken.results[0]!.message === taken.results[1]!.message.replace("2", "1"), "hidden is missing");
 
+  // The proposal to VESTA: VESTA sees it, PIKE and strangers don't, and PIKE can't answer it.
+  assert.deepEqual(theirs.proposals.toYou.map((p) => p.proposal), [1]);
+  assert.deepEqual(pikes.proposals, { toYou: [], left: 0, yours: null, canPropose: rules.social.protocol_proposals_per_day });
+  assert.doesNotMatch(briefText(rules, pikes), /PROTOCOL PROPOSALS/);
+  for (const who of [pike, { account: "stranger" }]) {
+    const protocols = await view(store, who, { what: "protocols" }, T);
+    assert.ok(protocols.ok && protocols.what === "protocols" && protocols.proposals.length === 0, `${who.account} sees ${JSON.stringify(protocols)}`);
+  }
+  const answered = await submitOrders(store, pike, [{ do: "protocol_decline", proposal: 1 }, { do: "protocol_decline", proposal: 2 }], T);
+  assert.ok(answered.ok && answered.results.every((r) => !r.ok) && answered.results[0]!.message === answered.results[1]!.message.replace("2", "1"), "hidden is missing");
+  // Withdrawn, it closes privately.
+  assert.ok((await submitOrders(store, halcyon, [{ do: "protocol_decline", proposal: 1 }], T)).ok);
+
   // HALCYON's own brief shows what's its own.
   const mine = (await getBrief(store, halcyon, T)) as Brief;
   assert.equal(mine.you.scratchpad, SECRET);
@@ -112,6 +127,7 @@ async function main() {
       { what: "record", type: "offers_withdrawn" },
       { what: "record", type: "offer_expired" },
       { what: "record", type: "storage_full" },
+      { what: "record", type: "proposal_closed" },
     ]) {
       const record = await view(store, who, query, T);
       assert.ok(record.ok && record.what === "record");

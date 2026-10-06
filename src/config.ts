@@ -41,6 +41,7 @@ export const SiteSchema = z.strictObject({
     commons: count,
     post_size: count,
     offers: count,
+    proposals: count,
     max_size: count,
     scanned: count,
   }),

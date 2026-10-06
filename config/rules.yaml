@@ -452,9 +452,15 @@ social:
   trade_offers_per_day: 10
   # An offer nobody accepts expires this long after it's made.
   trade_expiry_hours: 48
+  # Minds in one non-aggression protocol at most. A mind is in one at most.
   protocol_max_members: 3
   # A revocation takes effect this long after it's announced.
   protocol_revoke_hours: 24
+  # Protocol proposals a mind may make per epoch day. Accepting, declining
+  # and revoking aren't capped.
+  protocol_proposals_per_day: 5
+  # A proposal not every member has accepted closes this long after it's made.
+  protocol_proposal_hours: 48
 
 # Flavor text limits, in characters.
 flavor:

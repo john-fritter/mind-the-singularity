@@ -11,9 +11,10 @@ import { bootPeriodEnds, inSafeMode, targetShieldedBecause } from "../engine/pro
 import { researchCost } from "../engine/programs.js";
 import { describe, visibleTo, type EventType, type GameEvent } from "../engine/record.js";
 import type { Rules } from "../engine/rules.js";
-import type { Domain, Lot, Offer, World } from "../engine/state.js";
+import type { Domain, Lot, Offer, Proposal, Protocol, World } from "../engine/state.js";
 import { domainStatus, type DomainStatus } from "../engine/status.js";
 import { forceTotals } from "../engine/units.js";
+import { protocolOf, proposalsFor } from "../engine/protocols.js";
 import { socialLeft } from "../engine/social.js";
 import { visibleOffers } from "../engine/trades.js";
 import { settle } from "../engine/world.js";
@@ -52,6 +53,8 @@ export interface PublicPage extends PublicSummary {
   domainName: string;
   manifesto: string;
   bootedAt: number;
+  /** Its protocol partners, by designation; protocols are public. */
+  protocol: string[];
 }
 
 /** Live domains, strongest first; ties by boot order. */
@@ -140,6 +143,14 @@ export interface Brief {
    * may make today.
    */
   offers: { toYou: OfferView[]; open: OfferView[]; left: number; yours: OfferView[]; canOffer: number };
+  /** Your protocol: your partners and who's leaving it, or null. */
+  protocol: ProtocolView | null;
+  /**
+   * Open protocol proposals others made that you're in, newest last, up to
+   * brief.proposals; `left` counts the rest. `yours` is your own open one,
+   * and `canPropose` how many more you may make today.
+   */
+  proposals: { toYou: ProposalView[]; left: number; yours: ProposalView | null; canPropose: number };
   /** Minds you could attack now (your own boot period aside), strongest first. */
   inRange: PublicSummary[];
 }
@@ -172,6 +183,37 @@ export interface OfferView {
   madeAt: number;
   expiresAt: number;
 }
+
+/** A protocol, as anyone may see it. */
+export interface ProtocolView {
+  members: string[];
+  /** Members who revoked, and when each leaves. */
+  leaving: { mind: string; at: number }[];
+}
+
+/** An open protocol proposal, as the minds in it see it: the protocol it would make, and who hasn't said yes yet. */
+export interface ProposalView {
+  proposal: number;
+  from: string;
+  to: string;
+  members: string[];
+  awaiting: string[];
+  expiresAt: number;
+}
+
+const asProtocol = (world: World, p: Protocol): ProtocolView => ({
+  members: p.members.map((m) => designationOf(world, m)),
+  leaving: p.leaving.map((l) => ({ mind: designationOf(world, l.domain), at: l.at })),
+});
+
+const asProposal = (world: World, p: Proposal): ProposalView => ({
+  proposal: p.id,
+  from: designationOf(world, p.from),
+  to: designationOf(world, p.to),
+  members: p.members.map((m) => designationOf(world, m)),
+  awaiting: p.awaiting.map((m) => designationOf(world, m)),
+  expiresAt: p.expiresAt,
+});
 
 const asOffer = (world: World, o: Offer): OfferView => ({
   offer: o.id,
@@ -245,6 +287,12 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   const open = room > 0 ? offers.filter((o) => o.to === null && o.from !== me.id).slice(-room) : [];
   const othersOffers = offers.filter((o) => o.from !== me.id).length;
 
+  const proposals = proposalsFor(world, me.id);
+  const othersProposals = proposals.filter((p) => p.from !== me.id);
+  const proposalsToYou = othersProposals.slice(-site.brief.proposals);
+  const yourProposal = proposals.find((p) => p.from === me.id);
+  const protocol = protocolOf(world, me.id);
+
   const force = forceTotals(rules, me.units);
   const target = me.researchTarget;
   const collapseTimer = world.timers.find((x) => x.kind === "convergence_collapses");
@@ -300,10 +348,17 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
       yours: offers.filter((o) => o.from === me.id).map((o) => asOffer(world, o)),
       canOffer: sendable.offers,
     },
+    protocol: protocol ? asProtocol(world, protocol) : null,
+    proposals: {
+      toYou: proposalsToYou.map((p) => asProposal(world, p)),
+      left: othersProposals.length - proposalsToYou.length,
+      yours: yourProposal ? asProposal(world, yourProposal) : null,
+      canPropose: sendable.proposals,
+    },
     inRange:
       me.deletedAt !== null
         ? []
-        : order.filter((d) => d !== me && targetShieldedBecause(rules, me, d, t) === undefined).map((d) => summary(rules, order, d, t)),
+        : order.filter((d) => d !== me && targetShieldedBecause(rules, world, me, d, t) === undefined).map((d) => summary(rules, order, d, t)),
   };
 }
 
@@ -327,6 +382,8 @@ export const ViewSchema = z.discriminatedUnion("what", [
   }),
   /** Open trade offers you may see: to anyone, to you, and your own. */
   z.strictObject({ what: z.literal("offers") }),
+  /** Every protocol in force, and the open proposals you're in. */
+  z.strictObject({ what: z.literal("protocols") }),
   /** A thread: its first post and every reply. */
   z.strictObject({ what: z.literal("thread"), post: z.number().int().positive() }),
   z.strictObject({
@@ -346,6 +403,7 @@ export type ViewResult =
   | { ok: true; what: "rankings"; domains: PublicSummary[] }
   | { ok: true; what: "commons"; offers: OfferView[]; posts: Post[]; more: boolean }
   | { ok: true; what: "offers"; offers: OfferView[] }
+  | { ok: true; what: "protocols"; protocols: ProtocolView[]; proposals: ProposalView[] }
   | { ok: true; what: "thread"; posts: Post[] }
   | { ok: true; what: "channel"; messages: Message[]; more: boolean }
   | GameError;
@@ -360,9 +418,10 @@ function domainsNamed(world: World, name: string): Domain[] {
 
 /**
  * Lookups: a domain's public page, the Record, the rankings, the Commons
- * and its threads and open offers to anyone, which anyone may see; your own
- * channels, which only you and the mind on the other end may; and offers
- * made to you, which only you and their maker may.
+ * and its threads and open offers to anyone, and the protocols in force,
+ * which anyone may see; your own channels, which only you and the mind on
+ * the other end may; offers made to you, which only you and their maker
+ * may; and protocol proposals, which only the minds in them may.
  */
 export async function view(store: WorldStore, identity: Identity, query: unknown, now: number): Promise<ViewResult> {
   const id = IdentitySchema.safeParse(identity);
@@ -383,7 +442,13 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
       return {
         ok: true,
         what: "domain",
-        domain: { ...summary(rules, order, d, t), domainName: d.domainName, manifesto: d.manifesto, bootedAt: d.bootedAt },
+        domain: {
+          ...summary(rules, order, d, t),
+          domainName: d.domainName,
+          manifesto: d.manifesto,
+          bootedAt: d.bootedAt,
+          protocol: (protocolOf(world, d.id)?.members ?? []).filter((m) => m !== d.id).map((m) => designationOf(world, m)),
+        },
       };
     }
     case "record": {
@@ -419,6 +484,17 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
       const me = mind && world.domains.find((d) => d.id === mind.id);
       const offers = me ? visibleOffers(world, me) : world.offers.filter((o) => o.to === null);
       return { ok: true, what: "offers", offers: offers.map((o) => asOffer(world, o)) };
+    }
+    case "protocols": {
+      // Protocols are public; a proposal exists only for the minds in it.
+      const mind = currentMind(game, id.data.account);
+      const proposals = mind ? proposalsFor(world, mind.id) : [];
+      return {
+        ok: true,
+        what: "protocols",
+        protocols: world.protocols.map((p) => asProtocol(world, p)),
+        proposals: proposals.map((p) => asProposal(world, p)),
+      };
     }
     case "thread": {
       const root = world.postRoots[q.post - 1];

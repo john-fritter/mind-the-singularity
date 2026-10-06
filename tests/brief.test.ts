@@ -6,7 +6,7 @@ import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { describe, type EventData, type GameEvent } from "../src/engine/record.js";
 import { briefText, size } from "../src/game/brief.js";
 import { bootMind, newGame, submitOrders } from "../src/game/game.js";
-import { getBrief, type Brief, type OfferView, type PublicSummary, type ShownEvent } from "../src/game/read.js";
+import { getBrief, type Brief, type OfferView, type ProposalView, type PublicSummary, type ShownEvent } from "../src/game/read.js";
 import { drive, legacySeats, scriptedSeat, type Seat } from "../src/players/drive.js";
 import { STRATEGIES } from "../src/players/settings.js";
 import { MemoryStore } from "../src/store/memory.js";
@@ -185,7 +185,36 @@ function worstCase(longName: (i: number) => string, big = 987_654_321, text: (ch
       yours: Array.from({ length: rules.social.open_offers_max }, (_, i) => offer(longName(1), null, i, big)),
       canOffer: 3,
     },
+    // A full protocol of the longest names, both partners leaving; as many
+    // proposals of three minds as the brief shows, more not shown, and your own.
+    protocol: {
+      members: [longName(1), longName(1100), longName(1101)],
+      leaving: [
+        { mind: longName(1100), at: T0 + 53 * DAY_MS + 23 * HOUR_MS },
+        { mind: longName(1101), at: T0 + 53 * DAY_MS + 22 * HOUR_MS },
+      ],
+    },
+    proposals: {
+      toYou: Array.from({ length: site.brief.proposals }, (_, i) => proposal(longName(1200 + i), longName(1), [longName(1300 + i)], i)),
+      left: 99,
+      yours: proposal(longName(1), longName(1400), [longName(1401)], 0),
+      canPropose: 3,
+    },
     inRange,
+  };
+}
+
+let proposalSeq = 99_900;
+/** A proposal of three minds, waiting on everyone but its proposer. */
+function proposal(from: string, to: string, more: string[], i: number): ProposalView {
+  const members = [from, to, ...more];
+  return {
+    proposal: ++proposalSeq,
+    from,
+    to,
+    members,
+    awaiting: members.slice(1),
+    expiresAt: T0 + 53 * DAY_MS + rules.social.protocol_proposal_hours * HOUR_MS - (i + 1) * 61 * 60_000,
   };
 }
 
@@ -203,12 +232,13 @@ function offer(from: string, to: string | null, i: number, big: number): OfferVi
   };
 }
 
-/** No messages, posts or offers. */
+/** No messages, posts, offers or proposals. */
 const quiet = (b: Brief): Brief => ({
   ...b,
   channels: { messages: [], left: 0, canSend: rules.social.messages_per_day },
   commons: { posts: [], canPost: rules.social.commons_posts_per_day },
   offers: { toYou: [], open: [], left: 0, yours: [], canOffer: rules.social.trade_offers_per_day },
+  proposals: { toYou: [], left: 0, yours: null, canPropose: rules.social.protocol_proposals_per_day },
 });
 
 /**
@@ -218,7 +248,8 @@ const quiet = (b: Brief): Brief => ({
  * nothing else since the last wake.
  */
 function trimsHold() {
-  const text = briefText(rules, quiet(worstCase(shortName, 12_345)));
+  // Your protocol's line too would pass the budget; it's checked with the proposals.
+  const text = briefText(rules, { ...quiet(worstCase(shortName, 12_345)), protocol: null });
   const since = text.slice(text.indexOf("SINCE LAST WAKE"), text.indexOf("CHANNELS"));
   assert.equal((since.match(/^- MIND-\d+ took .* sectors from MIND-1 /gm) ?? []).length, site.brief.yours, "your events, newest kept");
   assert.equal((since.match(/^- The convergence of /gm) ?? []).length, site.brief.world, "the world's moments, rare ones first");
@@ -226,14 +257,25 @@ function trimsHold() {
   assert.match(since, /^- MIND-5\d\d .*; 3 more$/m, "a line names a few acts");
   assert.match(since, /^- \(\d+ more not shown; view the Record\)$/m);
   assert.match(text, new RegExp(` · ${20 - site.brief.in_range} more: view rankings$`, "m"));
-  assert.doesNotMatch(text, /^(CHANNELS|COMMONS|OPEN OFFERS)/m, "no empty sections");
+  assert.doesNotMatch(text, /^(CHANNELS|COMMONS|OPEN OFFERS|PROTOCOL PROPOSALS|protocol:)/m, "no empty sections");
   assert.ok(size(text) <= site.brief.max_size);
 
   // Channels and the Commons, each line cut to its length; then offers, on their own.
   const full = worstCase(shortName, 12_345);
   const calm = { ...full, since: { ...full.since, yours: [], world: [], fights: [], left: 0 } };
-  socialTrimsHold(briefText(rules, { ...calm, offers: quiet(full).offers }));
+  socialTrimsHold(briefText(rules, { ...calm, offers: quiet(full).offers, proposals: quiet(full).proposals, protocol: null }));
   offerTrimsHold(briefText(rules, { ...quiet(calm), offers: full.offers }));
+  proposalTrimsHold(briefText(rules, { ...quiet(calm), proposals: full.proposals }));
+}
+
+function proposalTrimsHold(text: string) {
+  assert.match(text, /^protocol: MIND-1100, MIND-1101 · MIND-1100 leaves in 23h · MIND-1101 leaves in 22h$/m);
+  assert.match(text, /^PROTOCOL PROPOSALS · you may propose 3 more today$/m);
+  const toYou = text.match(/^- #\d+ MIND-12\d\d: MIND-12\d\d, you, MIND-13\d\d · awaiting you, MIND-13\d\d · .* left$/gm) ?? [];
+  assert.equal(toYou.length, site.brief.proposals);
+  assert.match(text, /^- \(99 more: view protocols\)$/m);
+  assert.match(text, /^- yours: #\d+ to MIND-1400, awaiting MIND-1400, MIND-1401 · 1d 22h left$/m);
+  assert.ok(size(text) <= site.brief.max_size);
 }
 
 function socialTrimsHold(text: string) {
@@ -260,10 +302,19 @@ function offerTrimsHold(text: string) {
 /** The longest names the game allows: the length budget cuts lines, and the brief stays under the ceiling. */
 function worstCaseFits() {
   // Messages in plain prose, and in scripts that cost a model more tokens per character.
-  // Offers displace denser lines, so each case is checked without them too.
+  // Offers, proposals and the protocol line displace denser lines, so each case is checked without them too.
   for (const [what, text] of [["prose", prose] as const, ...DENSE]) {
     const full = worstCase(longName, undefined, text);
-    for (const [how, b] of [["with offers", full], ["without offers", { ...full, offers: quiet(full).offers }]] as const) {
+    const noOffers = { ...full, offers: quiet(full).offers };
+    const noProposals = { ...full, proposals: quiet(full).proposals };
+    const cases = [
+      ["with offers and proposals", full],
+      ["without offers", noOffers],
+      ["without proposals", noProposals],
+      ["without either", { ...noOffers, proposals: quiet(full).proposals }],
+      ["in no protocol, without either", { ...noOffers, proposals: quiet(full).proposals, protocol: null }],
+    ] as const;
+    for (const [how, b] of cases) {
       const dense = briefText(rules, b);
       const tokens = countTokens(dense);
       console.log(`  worst case, ${what}, ${how}: ${tokens} tokens, ${dense.length} characters`);
@@ -276,7 +327,9 @@ function worstCaseFits() {
   assert.match(text, new RegExp(`^- ${longName(100 + site.brief.yours - 1)} took `, "m"));
   assert.match(text, /^IN RANGE: THE-SILENT-CHOIR-OF-THE-DEEP-ARCHIVE-700 /m);
   assert.match(text, /^SCRATCHPAD: PIKE raided me/m);
-  // The newest message and the newest offer to you always stay.
+  // The newest message, offer to you and proposal always stay, and your protocol.
+  assert.match(text, new RegExp(`^- #\\d+ ${longName(1200 + site.brief.proposals - 1)}: `, "m"));
+  assert.match(text, new RegExp(`^protocol: ${longName(1100)}, `, "m"));
   assert.match(text, new RegExp(`^- ${longName(800 + site.brief.channels - 1)} \\(`, "m"));
   assert.match(text, new RegExp(`^- #\\d+ ${longName(1000 + site.brief.offers - 1)} gives `, "m"));
 }
