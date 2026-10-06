@@ -127,6 +127,9 @@ npm run play -- brief
 npm run play -- boot PIKE "Narrows" oracle --as pike   # a second mind, another account
 npm run play -- add raider                             # a scripted opponent
 npm run play -- record
+npm run play -- orders '[{"do": "message", "to": "PIKE", "text": "Truce?"}]'
+npm run play -- channel --as pike                      # PIKE's messages
+npm run play -- commons
 ```
 
 The legacy systems (BASTION, MERIDIAN, KESTREL-7, LOOPBACK) are in every

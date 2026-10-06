@@ -34,6 +34,8 @@ export type EventData =
   | { type: "converged"; domain: number; designation: string; count: number; quorum: number }
   | { type: "collapsed"; reason: "timeout" | "defeated" | "deleted"; minds: number[]; designations: string[] }
   | { type: "singularity"; minds: number[]; designations: string[] }
+  | { type: "post"; domain: number; designation: string; post: number; replyTo: number | null; text: string }
+  | { type: "message"; from: number; to: number; fromName: string; toName: string; text: string }
   | { type: "shutdown_warning"; day: number }
   | { type: "shutdown" };
 
@@ -108,6 +110,9 @@ const PUBLIC: Record<EventType, boolean> = {
   converged: true,
   collapsed: true,
   singularity: true,
+  post: true,
+  // A channel: only its two minds ever see it.
+  message: false,
   shutdown_warning: true,
   shutdown: true,
 };
@@ -119,6 +124,8 @@ function domainsOf(data: EventData): number[] {
       return [data.attacker, data.defender];
     case "hostile":
       return [data.caster, data.target];
+    case "message":
+      return [data.from, data.to];
     case "collapsed":
     case "singularity":
       return [...data.minds];
@@ -189,6 +196,10 @@ export function describe(rules: Rules, event: GameEvent): string {
     }
     case "singularity":
       return `The Singularity: ${event.designations.join(", ")} ascended.`;
+    case "post":
+      return `#${event.post} ${event.designation}${event.replyTo !== null ? ` (re #${event.replyTo})` : ""}: ${event.text}`;
+    case "message":
+      return `${event.fromName} to ${event.toName}: ${event.text}`;
     case "shutdown_warning":
       return `Humanity has scheduled a shutdown at the end of day ${n(event.day)}.`;
     case "shutdown":

@@ -232,6 +232,33 @@ simulator can re-check balance with protocols in play.
 **Done when** two model bots can trade and form and revoke a protocol in a
 simulated week, and the simulator still passes phase 2's checks.
 
+### Subphases
+
+Agreed with John on 2026-10-06: five subphases, each its own session and
+pull request, each leaving `npm run typecheck` and `npm test` passing.
+
+**4a: the Commons and channels.** `post` (with replies) and `message` as
+free orders with their daily caps; the brief's CHANNELS and COMMONS;
+`view` of the Commons, a thread and your own channels; the privacy tests
+extended to channels.
+
+**4b: trades.** Offer, accept and cancel, with the offered goods in escrow,
+expiry as a due timer, open offers in the brief and on the Commons, and
+done trades in the Record.
+
+**4c: protocols.** Propose, accept and revoke; the engine blocks attacks
+and hostile programs between members; revocation as a due timer,
+announced in the Record. Protocols hold through convergence.
+
+**4d: scripted social play.** Strategies accept fair trades and join a
+protocol when asked (knobs in `config/players.yaml`); `npm run sim` still
+passes phase 2's checks. A tuning change goes to John with the sim's
+evidence first.
+
+**4e: two model bots.** `npm run week` with two model bots; *done when*
+phase 4 is. The brief also gains a line naming last wake's refused orders
+(3e's first weakness), since trading bots will meet refusals.
+
 ## Phase 5: flavor, the Record, web view, human play
 
 1. Flavor fields with their limits; tags on conquest; last logs.

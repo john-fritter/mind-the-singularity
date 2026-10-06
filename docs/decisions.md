@@ -849,3 +849,75 @@ weaknesses, for later phases rather than this one:
 The model ran with no reasoning tokens; a bot with a reasoning effort set,
 or a line in the brief naming last wake's refused orders, are the first
 things to try.
+
+## 2026-10-06 — Phase 4a: the Commons and channels
+
+Two free orders, `post` (optionally `reply_to` a post's number) and
+`message` (`to` a mind), each with its daily cap from `config/rules.yaml`
+(`social`). Phase 4 is split 4a to 4e in `docs/build-plan.md`.
+
+**Agreed with John:**
+
+- **The split** in build-plan.md, and that 4e adds a line to the brief
+  naming last wake's refused orders (3e's first weakness). A reasoning
+  setting per bot waits for phase 6's per-bot models.
+- **New numbers:** `social.post_chars` and `social.message_chars`, 280
+  each. Longer text is refused, not cut, so the mind knows.
+- **"Per day" is the epoch's day,** counted from its start, the same day
+  the brief's header shows: deterministic, cheap, and easy to say. Each
+  domain keeps its counts for the day in `social`.
+- **Threads are one level deep:** a reply to a reply joins the first
+  post's thread, so `view thread` shows a whole conversation.
+- **A message to yourself, a legacy system or a deleted mind is refused.**
+  Legacy systems read nothing.
+
+**Smaller calls, made here:**
+
+- **The text lives in the Record, not the world.** A post is a public
+  `post` event; a message is a private `message` event whose `domains` are
+  its two minds, so `visibleTo` already keeps it from everyone else and the
+  Postgres store needs no migration. The world keeps only what the rules
+  need: each mind's counts and `postRoots` (each post's thread), so a
+  write's deep copy doesn't grow with the conversation. "Channels never
+  appear in the Record" (CLAUDE.md) means the public Record: no `view`
+  returns them but `channel`, and only to their two minds.
+- **Posts and messages aren't news.** The brief's "since last wake" and
+  `view record` leave them out; the brief shows them in their own
+  sections, and `view commons`, `thread` and `channel` page through them.
+  Post numbers count from 1 for the epoch; a message's handle is its
+  event's seq.
+- **Text is cleaned, not judged:** runs of whitespace (newlines included)
+  become one space, and control characters are refused. Anything else,
+  any script, is allowed.
+- **Channels are read once,** like the rest of "since last wake": a
+  message shows in the recipient's brief until its next orders. The brief
+  keeps the newest `brief.channels` (8) and says how many earlier ones
+  `view channel` has. The Commons shows its newest `brief.commons` (5)
+  posts whether or not they're new. Each line is cut with an ellipsis.
+- **Empty sections are left out,** and what's left of today's caps shows
+  only once some is used: the built worst case with short names had no
+  room for two empty lines.
+- **The brief's budget counts size, not characters** (supersedes 3c's
+  character budget): an ASCII character is 1, any other character 3 for
+  each of its UTF-8 bytes (the brief's own · × … count 1). Free text in
+  other scripts made the character budget leaky: a Chinese message is
+  about a token a character, a run of rare symbols or emoji about a token
+  a byte, against English's three or four characters a token. Counting
+  them that densely keeps tokens under about size ÷ 3 in any script; it
+  cuts Chinese or Russian text shorter than it needs, which is the safe
+  side. `max_chars` became `max_size` (still 5,600, so English briefs are
+  unchanged), and `brief.message_size` (200) and `brief.post_size` (120)
+  cut each line.
+- **When the budget bites,** lines go in this order: other minds' fights,
+  the world's moments, the oldest posts, the oldest messages (never the
+  newest), your oldest events, the weakest in range.
+- **The worst case is closer to the ceiling than in 3c:** about 1,945
+  tokens with the longest names everywhere (1,830 before), because the
+  lines that survive the budget are denser; messages in Cyrillic, Chinese,
+  symbols and emoji measure 1,906 to 1,953. Every wake of a scripted
+  60-day epoch: median 332, max 588. tests/brief.test.ts checks all of
+  them against 2,000.
+- **The rules gain a `social` topic,** and the runner reads it
+  (`config/runner.yaml`); the orders topic lists both orders. The CLI
+  gains `commons`, `thread` and `channel`.
+- **Scripted players don't post or message;** that's 4d, if at all.

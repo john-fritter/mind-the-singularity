@@ -6,7 +6,7 @@ import { z } from "zod";
 //
 // Buildings, units and programs are named by id or display name; the engine
 // resolves them (names.ts). Lengths that come from the rules (the
-// scratchpad's) are checked by the engine, since this schema is static.
+// scratchpad's, a post's) are checked by the engine, since this schema is static.
 
 const label = z.string().min(1).max(80);
 const amount = z.number().int().positive();
@@ -51,6 +51,9 @@ export const OrderSchema = z.discriminatedUnion("do", [
     .refine((o) => o.program === null || o.above !== undefined, { message: "give above with a program" }),
   z.strictObject({ do: z.literal("set_research"), program: label }),
   z.strictObject({ do: z.literal("scratchpad"), text: z.string() }),
+  /** A Commons post, or a reply to post `reply_to`. */
+  z.strictObject({ do: z.literal("post"), text: z.string(), reply_to: amount.optional() }),
+  z.strictObject({ do: z.literal("message"), to: label, text: z.string() }),
 ]);
 
 export type Order = z.infer<typeof OrderSchema>;

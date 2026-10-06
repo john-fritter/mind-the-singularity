@@ -23,7 +23,7 @@ lookups_per_wake: 3
 # prompt and a persona, the static prompt is about 6,000 tokens: the top of
 # DESIGN.md's 4,000-6,000, and the same on every wake, so a provider's
 # prompt cache can take it. Dropping a topic here is the first lever.
-rules_topics: [overview, orders, economy, units, programs, architectures, combat, protection, convergence]
+rules_topics: [overview, orders, economy, units, programs, architectures, combat, protection, social, convergence]
 # Each wake's result is appended here as one line of JSON (gitignored).
 log_path: logs/runner.jsonl
 

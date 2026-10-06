@@ -27,7 +27,7 @@ import { drive, legacySeats, scriptedSeat, type Seat } from "../players/drive.js
 import { STRATEGIES, type StrategyName } from "../players/settings.js";
 import { MemoryStore } from "../store/memory.js";
 import { readSave, writeSave, type SaveFile, type SavedPlayer } from "../store/save.js";
-import { renderOrders, renderPage, renderRankings, renderRecord, when } from "./render.js";
+import { renderMessages, renderOrders, renderPage, renderPosts, renderRankings, renderRecord, when } from "./render.js";
 
 const HELP = `Play Mind: the Singularity locally.
 
@@ -43,6 +43,9 @@ Commands
   view NAME                    a domain's public page
   record                       the public Record (--mind NAME, --type TYPE, --limit N, --before SEQ)
   rankings                     every live mind by power
+  commons                      the Commons, newest first (--limit N, --before POST)
+  thread POST                  a Commons thread in full
+  channel [NAME]               your messages, or those with one mind (--limit N, --before SEQ)
   add STRATEGY [DESIGNATION]   add a scripted opponent (--arch ARCHITECTURE); strategies:
                                ${[...STRATEGIES, "random"].join(", ")}
   players                      the scripted players in this game
@@ -214,6 +217,27 @@ async function main() {
       const result = await view(store, me, { what: "rankings" }, now);
       if (!result.ok) fail(result);
       else if (result.what === "rankings") out(result, renderRankings(game.rules, result.domains));
+      break;
+    }
+    case "commons":
+    case "channel": {
+      const query = {
+        what: command,
+        ...(command === "channel" && args.length > 0 ? { name: args.join(" ") } : {}),
+        ...(o.limit !== undefined ? { limit: int(o.limit, "--limit") } : {}),
+        ...(o.before !== undefined ? { before: int(o.before, "--before") } : {}),
+      };
+      const result = await view(store, me, query, now);
+      if (!result.ok) fail(result);
+      else if (result.what === "commons") out(result, renderPosts(result.posts, result.more, startedAt));
+      else if (result.what === "channel") out(result, renderMessages(result.messages, result.more, startedAt));
+      break;
+    }
+    case "thread": {
+      if (!args[0]) throw new CliError("Usage: thread POST");
+      const result = await view(store, me, { what: "thread", post: int(args[0], "POST") }, now);
+      if (!result.ok) fail(result);
+      else if (result.what === "thread") out(result, renderPosts(result.posts, false, startedAt));
       break;
     }
     case "add": {

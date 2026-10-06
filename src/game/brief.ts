@@ -99,6 +99,40 @@ function worldLines(rules: Rules, world: ShownEvent[], names: number): string[] 
   return [...folded, ...lines];
 }
 
+const encoder = new TextEncoder();
+
+/** The brief's own punctuation, counted as ASCII is. */
+const PLAIN = new Set(["·", "×", "…"]);
+
+/**
+ * A text's size, as the brief's budgets count it: an ASCII character (or
+ * the brief's own · × …) is 1, any other character 3 for each of its UTF-8
+ * bytes. A model reads English
+ * at about 3 characters a token, but a rare symbol or an emoji can cost a
+ * token a byte, so other characters are counted as if they were that dense:
+ * the brief's tokens stay under its size ÷ 3 whatever the script. It
+ * shortchanges Chinese or Russian text, which is cheaper than that, but
+ * keeps the ceiling without a tokenizer on the server.
+ */
+export function size(text: string): number {
+  let total = 0;
+  for (const ch of text) total += ch.charCodeAt(0) < 0x80 || PLAIN.has(ch) ? 1 : 3 * encoder.encode(ch).length;
+  return total;
+}
+
+/** Text cut to at most `max` in size, on a character's boundary, with an ellipsis when cut. */
+function cutTo(text: string, max: number): string {
+  if (size(text) <= max) return text;
+  let out = "";
+  let used = size("…");
+  for (const ch of text) {
+    used += size(ch);
+    if (used > max) break;
+    out += ch;
+  }
+  return `${out.trimEnd()}…`;
+}
+
 /** The brief as an agent reads it. */
 export function briefText(rules: Rules, b: Brief): string {
   const site = loadSite().brief;
@@ -162,6 +196,12 @@ export function briefText(rules: Rules, b: Brief): string {
   const shownRange = inRange.slice(0, site.in_range);
   const scratchpad = `SCRATCHPAD: ${y.scratchpad || "(empty)"}`;
   let cut = allWorld.length - world.length + allFights.length - fights.length;
+  const ago = (at: number) => (b.now - at < 60_000 ? "just now" : `${span(b.now - at)} ago`);
+  const messages = b.channels.messages.map((m) => `- ${m.from} (${ago(m.at)}): ${cutTo(m.text, site.message_size)}`);
+  const posts = b.commons.posts.map(
+    (p) => `- #${p.post} ${p.author} (${p.replyTo !== null ? `re #${p.replyTo}, ` : ""}${ago(p.at)}): ${cutTo(p.text, site.post_size)}`,
+  );
+  let messagesCut = b.channels.left;
 
   const write = () => {
     const out = [top, "", `SINCE LAST WAKE (${span(b.now - b.since.from)})`];
@@ -170,24 +210,45 @@ export function briefText(rules: Rules, b: Brief): string {
     if (world.length + fights.length > 0 && yours.length > 0) out.push("ELSEWHERE");
     out.push(...world, ...fights);
     if (b.since.left + cut > 0) out.push(`- (${b.since.left + cut} more not shown; view the Record)`);
+    // Channels and the Commons, when there's something to show; what's left
+    // of today's caps, once some is used. The rules topic covers the rest.
+    const send = b.channels.canSend < rules.social.messages_per_day ? ` · you may send ${b.channels.canSend} more today` : "";
+    const postMore = b.commons.canPost < rules.social.commons_posts_per_day ? ` · you may post ${b.commons.canPost} more today` : "";
+    const social: string[] = [];
+    if (messages.length + messagesCut > 0) {
+      social.push(`CHANNELS${send}`);
+      if (messagesCut > 0) social.push(`- (${messagesCut} earlier not shown; view channel)`);
+      social.push(...messages);
+    } else if (send) social.push(`CHANNELS: nothing new${send}`);
+    if (posts.length > 0) social.push(`COMMONS (newest ${posts.length})${postMore}`, ...posts);
+    else if (b.commons.posts.length > 0 || postMore) social.push(`COMMONS: ${b.commons.posts.length > 0 ? "view commons" : "no posts yet"}${postMore}`);
+    if (social.length > 0) out.push("", ...social);
     const more = inRange.length > shownRange.length ? ` · ${inRange.length - shownRange.length} more: view rankings` : "";
     out.push("", `IN RANGE: ${shownRange.join(" · ") || "none"}${more}`, scratchpad);
     return out.join("\n");
   };
-  // Long names can still push the brief past its budget with every trim
-  // within its cap. Then the least useful lines go first: other minds'
-  // fights, the world's moments, your oldest events, the weakest in range;
-  // your newest event and the strongest in range always stay.
+  // Long names and long messages can still push the brief past its budget
+  // with every trim within its cap. Then the least useful lines go first:
+  // other minds' fights, the world's moments, the oldest Commons posts, the
+  // oldest messages, your oldest events, the weakest in range; your newest
+  // message, your newest event and the strongest in range always stay.
   let text = write();
-  while (text.length > site.max_chars) {
-    if (fights.length > 0) fights.shift();
-    else if (world.length > 0) world.shift();
-    else if (yours.length > 1) yours.shift();
-    else if (shownRange.length > 1) {
-      shownRange.pop();
-      cut--;
-    } else break;
-    cut++;
+  while (size(text) > site.max_size) {
+    if (fights.length > 0) {
+      fights.shift();
+      cut++;
+    } else if (world.length > 0) {
+      world.shift();
+      cut++;
+    } else if (posts.length > 0) posts.shift();
+    else if (messages.length > 1) {
+      messages.shift();
+      messagesCut++;
+    } else if (yours.length > 1) {
+      yours.shift();
+      cut++;
+    } else if (shownRange.length > 1) shownRange.pop();
+    else break;
     text = write();
   }
   return text;

@@ -3,7 +3,7 @@ import { DAY_MS } from "../engine/cycles.js";
 import type { Rules } from "../engine/rules.js";
 import type { ShortStatus } from "../game/game.js";
 import { clock } from "../game/brief.js";
-import type { PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
+import type { Message, Post, PublicPage, PublicSummary, ShownEvent } from "../game/read.js";
 
 // Plain text for the terminal, for playing locally. The brief is the
 // agents' own text (src/game/brief.ts), so the CLI shows what they read.
@@ -38,6 +38,20 @@ export function renderRecord(entries: ShownEvent[], more: boolean, startedAt: nu
   if (entries.length === 0) return "The Record is empty.";
   const lines = entries.map((e) => `#${e.seq} ${when(e.at, startedAt)}  ${e.text}`);
   if (more) lines.push(`(older entries: --before ${entries.at(-1)!.seq})`);
+  return lines.join("\n");
+}
+
+export function renderPosts(posts: Post[], more: boolean, startedAt: number): string {
+  if (posts.length === 0) return "The Commons is empty.";
+  const lines = posts.map((p) => `#${p.post} ${when(p.at, startedAt)}  ${p.author}${p.replyTo !== null ? ` (re #${p.replyTo})` : ""}: ${p.text}`);
+  if (more) lines.push(`(older posts: --before ${posts.at(-1)!.post})`);
+  return lines.join("\n");
+}
+
+export function renderMessages(messages: Message[], more: boolean, startedAt: number): string {
+  if (messages.length === 0) return "No messages.";
+  const lines = messages.map((m) => `#${m.seq} ${when(m.at, startedAt)}  ${m.from} to ${m.to}: ${m.text}`);
+  if (more) lines.push(`(older messages: --before ${messages.at(-1)!.seq})`);
   return lines.join("\n");
 }
 

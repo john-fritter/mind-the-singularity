@@ -12,9 +12,10 @@ import { applyOrders, bootMind, createWorld, settle } from "../src/engine/world.
 // One domain per architecture, given random orders every few hours for a
 // month, attacking and running programs on each other: nothing goes
 // negative or fractional, buildings fit their territory, compute fits its
-// storage, hardware fits its housing, and a deleted mind does nothing. The engine never
-// changes the world it's given, and the same seed and orders give the same
-// world and events.
+// storage, hardware fits its housing, posts and messages keep to their
+// daily caps, and a deleted mind does nothing. The engine never changes the
+// world it's given, and the same seed and orders give the same world and
+// events.
 
 const rules = loadRules();
 const T0 = Date.UTC(2026, 9, 5, 12);
@@ -28,7 +29,7 @@ const upTo = (rng: Rng, n: number) => 1 + Math.floor(rng.next() * n);
 function randomOrders(rng: Rng, architecture: Architecture, others: string[]): unknown[] {
   const programs = programsOf(architecture).map((p) => p.id);
   return Array.from({ length: upTo(rng, 6) }, () => {
-    switch (upTo(rng, 14)) {
+    switch (upTo(rng, 16)) {
       case 1:
         return { do: "expand", cycles: upTo(rng, 12) };
       case 2:
@@ -54,6 +55,10 @@ function randomOrders(rng: Rng, architecture: Architecture, others: string[]): u
         return { do: "execute", program: pick(rng, programs), target: pick(rng, others) };
       case 13:
         return { do: "set_countermeasure", program: pick(rng, programs), above: rng.next() * 2 };
+      case 14:
+        return { do: "post", text: "word ".repeat(upTo(rng, 60)), ...(rng.next() < 0.5 ? { reply_to: upTo(rng, 40) } : {}) };
+      case 15:
+        return { do: "message", to: pick(rng, others), text: "word ".repeat(upTo(rng, 60)) };
       default:
         return pick(rng, [{ do: "attack" }, { do: "expand", cycles: 0 }, null, "build", { do: "build", building: "moat", count: 1 }]);
     }
@@ -78,6 +83,7 @@ function checkInvariants(world: World, now: number) {
       assert.ok(Number.isInteger(value) && value! >= 0, `${d.designation}.${key} = ${value}`);
     }
     assert.ok(totalBuildings(d) <= d.territory, `${d.designation} has more buildings than sectors`);
+    assert.ok(d.social.posts <= rules.social.commons_posts_per_day && d.social.messages <= rules.social.messages_per_day, `${d.designation} passed a daily cap`);
     assert.ok(d.compute <= computeStorage(rules, d.buildings.datacenter), `${d.designation} compute past storage`);
     assert.ok(totalHardware(d) <= hardwareHousing(rules, d.buildings.factory), `${d.designation} hardware past housing`);
     const cycles = availableCycles(rules, d, now);
