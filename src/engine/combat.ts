@@ -101,9 +101,25 @@ export function unitsLost(rules: Rules, units: number, lossShare: number, ranged
   return Math.floor(units * lossShare * (ranged ? rules.combat.ranged_loss_factor : 1));
 }
 
-/** Sectors a won conquest takes. Keys: combat.conquest_territory_share */
-export function conquestSectors(rules: Rules, defenderTerritory: number): number {
-  return Math.floor(defenderTerritory * rules.combat.conquest_territory_share);
+/**
+ * How much of a full conquest a won one takes: 1 against a mind at least as
+ * powerful as the attacker, less the weaker it is, so a much larger mind
+ * can't farm small ones (docs/decisions.md, conquest tuning). Powers are
+ * from before the battle. Keys: combat.conquest_size_exponent
+ */
+export function conquestScale(rules: Rules, defenderPower: number, attackerPower: number): number {
+  if (attackerPower <= 0) return 1;
+  return Math.min(1, defenderPower / attackerPower) ** rules.combat.conquest_size_exponent;
+}
+
+/** Sectors a won conquest takes. Keys: combat.conquest_territory_share, as conquestScale */
+export function conquestSectors(rules: Rules, defenderTerritory: number, scale: number): number {
+  return Math.floor(defenderTerritory * rules.combat.conquest_territory_share * scale);
+}
+
+/** Cores a lopsided conquest destroys, before capping at what's there. Keys: combat.lopsided_cores, as conquestScale */
+export function lopsidedCores(rules: Rules, scale: number): number {
+  return Math.round(rules.combat.lopsided_cores * scale);
 }
 
 export interface RaidSpoils {

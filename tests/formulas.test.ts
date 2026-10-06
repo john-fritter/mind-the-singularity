@@ -11,7 +11,9 @@ import {
 } from "../src/engine/architectures.js";
 import {
   battleOutcome,
+  conquestScale,
   conquestSectors,
+  lopsidedCores,
   coreBonus,
   opposingBonus,
   raidSpoils,
@@ -198,7 +200,16 @@ function combat() {
 
   assert.equal(unitsLost(rules, 100, 0.2, false), 20);
   assert.equal(unitsLost(rules, 100, 0.2, true), 10);
-  assert.equal(conquestSectors(rules, 812), 81);
+  // A full conquest against an equal or stronger mind; against a weaker one,
+  // (ratio)^2 of it, and a lopsided win's core only from 1/√2 of the power up.
+  assert.equal(conquestScale(rules, 1000, 1000), 1);
+  assert.equal(conquestScale(rules, 3000, 1000), 1);
+  assert.equal(conquestScale(rules, 500, 1000), 0.25);
+  assert.equal(conquestSectors(rules, 812, 1), 81);
+  assert.equal(conquestSectors(rules, 812, conquestScale(rules, 500, 1000)), 20);
+  assert.equal(lopsidedCores(rules, 1), 1);
+  assert.equal(lopsidedCores(rules, conquestScale(rules, 710, 1000)), 1);
+  assert.equal(lopsidedCores(rules, conquestScale(rules, 700, 1000)), 0);
   assert.deepEqual(raidSpoils(rules, { capital: 41200, users: 22400, buildingsExceptCores: 512 }), {
     capital: 4120,
     users: 1120,

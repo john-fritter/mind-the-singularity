@@ -258,6 +258,14 @@ evidence first.
 **4e: two model bots.** `npm run week` with two model bots; *done when*
 phase 4 is. The brief also gains a line naming last wake's refused orders
 (3e's first weakness), since trading bots will meet refusals.
+Merged as PR #17: the bots traded and signed a protocol but never revoked
+one in two weeks; John counted Phase 4 done and moved the revocation check
+to the conquest tuning pass.
+
+**The conquest tuning pass** (John's call, between Phases 4 and 5). A much
+larger mind takes less in a conquest, so the raider and conqueror can trade
+and sign protocols again with phase 2's checks still passing; one model-bot
+week re-checks that a bot revokes a protocol.
 
 ## Phase 5: flavor, the Record, web view, human play
 

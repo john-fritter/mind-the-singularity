@@ -381,13 +381,20 @@ combat:
   loser_loss_base: 0.15
   loser_loss_max: 0.35
   ranged_loss_factor: 0.5
-  # A conquest won at r >= lopsided_ratio also destroys lopsided_cores cores.
+  # A conquest won at r >= lopsided_ratio also destroys lopsided_cores cores,
+  # times the size factor below, rounded.
   lopsided_ratio: 1.5
   lopsided_cores: 1
   # A won conquest takes this share of the defender's territory. The land
   # arrives open: the buildings on it are destroyed in proportion, cores
   # excepted.
   conquest_territory_share: 0.1
+  # Against a weaker defender both are multiplied by
+  #   (defender power / attacker power) ^ conquest_size_exponent
+  # (powers from before the battle), so a much larger mind can't farm small
+  # ones: at half its power it takes a quarter as much land and no core
+  # (docs/decisions.md, conquest tuning).
+  conquest_size_exponent: 2
   # A won raid steals these shares of the defender's capital and users and
   # wrecks this share of its buildings, cores excepted.
   raid_capital_share: 0.1

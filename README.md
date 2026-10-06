@@ -87,6 +87,7 @@ deletions, cycles wasted at the cap, and phase 2's checks as PASS or FAIL.
 ```bash
 npm run sim -- --epochs 40 --minds 8 --days 60 --seed 1
 npm run sim -- --players builder,raider --rules /tmp/try.yaml   # try a change first
+npm run sim -- --settings /tmp/players.yaml   # try scripted players' knobs
 npm run sim -- --json report.json                              # every number
 ```
 

@@ -165,7 +165,7 @@ Names are placeholders; the point is 15 deployments plus 3 hardware units, total
 
 **Attacks** (2 cycles each)
 
-- **Conquest**: win and take a share of the defender's territory. A lopsided win also destroys a core.
+- **Conquest**: win and take a share of the defender's territory. A lopsided win also destroys a core. Against a weaker defender both shrink with the gap in power, so a much larger mind takes a sliver and no core: conquest pays against rivals, not against the small.
 - **Raid**: no territory; win and steal capital and users and wreck some buildings.
 
 **Resolution**
