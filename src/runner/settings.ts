@@ -41,6 +41,24 @@ const BotSchema = z.strictObject({
 });
 export type BotSettings = z.infer<typeof BotSchema>;
 
+/** The simulated week (npm run week): one bot against scripted players on a fake clock. */
+const WeekSchema = z.strictObject({
+  /** The bot that plays, from `bots`. */
+  bot: z.string().min(1),
+  days: count,
+  /** The bot wakes once in each slot of 24h / wakes_per_day, at a seeded minute inside it. */
+  wakes_per_day: count,
+  /** Scripted opponents' strategies (config/players.yaml), one mind each. */
+  opponents: z.array(z.string().min(1)),
+  /** Seeds the epoch, the opponents and the bot's wake times. */
+  seed: z.number().int(),
+  /** DESIGN.md's ceiling on a brief, in tokens (gpt-tokenizer); the week fails past it. */
+  brief_ceiling_tokens: count,
+  /** Where the save, the wake log and the report go, under the repo (gitignored). */
+  out_dir: z.string().min(1),
+});
+export type WeekSettings = z.infer<typeof WeekSchema>;
+
 export const RunnerSchema = z
   .strictObject({
     /** The game's MCP server; MCP_URL in runner.env overrides it. */
@@ -59,8 +77,11 @@ export const RunnerSchema = z
     /** Each wake's result is appended here as a line of JSON, under the repo. */
     log_path: z.string().min(1),
     bots: z.array(BotSchema),
+    /** The simulated week's knobs; only npm run week needs them. */
+    week: WeekSchema.optional(),
   })
-  .refine((r) => new Set(r.bots.map((b) => b.name)).size === r.bots.length, { message: "bot names must be unique" });
+  .refine((r) => new Set(r.bots.map((b) => b.name)).size === r.bots.length, { message: "bot names must be unique" })
+  .refine((r) => !r.week || r.bots.some((b) => b.name === r.week!.bot), { message: "week.bot must name one of the bots" });
 export type RunnerSettings = z.infer<typeof RunnerSchema>;
 
 /** Parses and validates runner YAML. Throws one error listing every problem. */

@@ -219,7 +219,8 @@ orders, one retry with the error, the optional lookup round; adapted from
 Fritter Board's single-shot mode.
 
 **3e: the simulated week.** One model bot for seven simulated days against
-scripted players on a fake clock. *Done when* phase 3 is.
+scripted players on a fake clock. *Done when* phase 3 is. (Done
+2026-10-06: `npm run week`; the week's result is in decisions.md.)
 
 ## Phase 4: social
 

@@ -19,9 +19,10 @@ engine, the game layer with its one write path, a local CLI, scripted
 players (random, builder, raider, turtle, converger, conqueror) and the
 legacy systems, all playing through the same orders as anyone, and the
 simulator, whose balance checks pass. Phase 3 (the database, the MCP
-server, the brief and one model bot) is under way: the Postgres store,
-accounts and API keys, the MCP server, the brief as text and the
-runner core (one wake of one model bot) are in.
+server, the brief and one model bot) is done: the Postgres store,
+accounts and API keys, the MCP server, the brief as text, the runner
+core, and a simulated week in which one model bot plays seven days against
+scripted players (`npm run week`).
 
 ## How it works
 
@@ -49,6 +50,7 @@ src/cli/            play from the command line
 src/mcp/            the MCP server
 src/web/            the web view and human play
 src/runner/         the bot runner (an MCP client)
+src/week/           the simulated week: the runner against scripted players on a fake clock
 ```
 
 ## Development
@@ -68,6 +70,7 @@ npm run epoch -- new # start an epoch in the database (show: where it stands)
 npm run mcp          # the MCP server for agents, on 127.0.0.1:3111/mcp
 npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
 npm run runner -- prompt <bot>  # what that bot would read, without calling a model
+npm run week         # one model bot plays a simulated week against scripted players (report in logs/week/)
 ```
 
 The database commands read `DATABASE_URL` from `.env` (see `.env.example`).

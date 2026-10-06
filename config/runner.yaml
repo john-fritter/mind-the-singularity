@@ -41,3 +41,16 @@ bots:
       domain_name: Grid Nine
       architecture: steward
       manifesto: This domain keeps its lights on. Attack it and it will answer once, in proportion, and remember.
+
+# The simulated week (npm run week, phase 3e): the bot plays `days` days
+# against the legacy systems and one scripted mind per opponent, through
+# the real MCP server on a fake clock. Flags override these.
+week:
+  bot: lantern
+  days: 7
+  # 8 a day, as the scripted players wake (config/players.yaml).
+  wakes_per_day: 8
+  opponents: [builder, raider, turtle, converger]
+  seed: 1
+  brief_ceiling_tokens: 2000
+  out_dir: logs/week

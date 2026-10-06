@@ -30,9 +30,18 @@ export function systemPrompt(instructions: string, role: string, topics: string[
   return [`## The game\n\n${instructions.trim()}`, role, rules, `## Who you are\n\n${persona.trim()}`].filter(Boolean).join("\n\n");
 }
 
+const WAKE_HEAD = "You are awake. Your brief:\n\n";
+const WAKE_TAIL = "\n\nAnswer with your JSON object.";
+
 /** The wake's message: the brief, and what to do with it. */
 export function wakeMessage(brief: string): string {
-  return `You are awake. Your brief:\n\n${brief.trim()}\n\nAnswer with your JSON object.`;
+  return `${WAKE_HEAD}${brief.trim()}${WAKE_TAIL}`;
+}
+
+/** The brief inside a wake's message, as the model read it; null if it isn't one. */
+export function briefInMessage(message: string): string | null {
+  if (!message.startsWith(WAKE_HEAD) || !message.endsWith(WAKE_TAIL)) return null;
+  return message.slice(WAKE_HEAD.length, message.length - WAKE_TAIL.length);
 }
 
 /** The lookup round's answers. */
