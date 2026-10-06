@@ -11,6 +11,7 @@ import { bootPeriodEnds, inSafeMode, targetShieldedBecause } from "../engine/pro
 import { researchCost } from "../engine/programs.js";
 import { describe, visibleTo, type EventType, type GameEvent } from "../engine/record.js";
 import type { Rules } from "../engine/rules.js";
+import type { OrderResult } from "../engine/context.js";
 import type { Domain, Lot, Offer, Proposal, Protocol, World } from "../engine/state.js";
 import { domainStatus, type DomainStatus } from "../engine/status.js";
 import { forceTotals } from "../engine/units.js";
@@ -153,6 +154,31 @@ export interface Brief {
   proposals: { toYou: ProposalView[]; left: number; yours: ProposalView | null; canPropose: number };
   /** Minds you could attack now (your own boot period aside), strongest first. */
   inRange: PublicSummary[];
+  /**
+   * The orders the game refused in your last orders, identical ones folded
+   * with how many times, up to site.yaml's brief.refused; `left` counts the
+   * other distinct refusals.
+   */
+  refused: { orders: Refusal[]; left: number };
+}
+
+/** A refused order: its `do` and the game's reason, `times` over. */
+export interface Refusal {
+  do: string;
+  message: string;
+  times: number;
+}
+
+/** The refused results of one set of orders, identical ones folded, in first-seen order. */
+export function refusals(results: readonly OrderResult[]): Refusal[] {
+  const out: Refusal[] = [];
+  for (const r of results) {
+    if (r.ok) continue;
+    const same = out.find((x) => x.do === r.do && x.message === r.message);
+    if (same) same.times++;
+    else out.push({ do: r.do, message: r.message, times: 1 });
+  }
+  return out;
 }
 
 /** A Commons post. `replyTo` is its thread's first post, for a reply. */
@@ -293,6 +319,8 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
   const yourProposal = proposals.find((p) => p.from === me.id);
   const protocol = protocolOf(world, me.id);
 
+  const refused = lastOrders?.kind === "orders" ? refusals(lastOrders.results) : [];
+
   const force = forceTotals(rules, me.units);
   const target = me.researchTarget;
   const collapseTimer = world.timers.find((x) => x.kind === "convergence_collapses");
@@ -359,6 +387,7 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
       me.deletedAt !== null
         ? []
         : order.filter((d) => d !== me && targetShieldedBecause(rules, world, me, d, t) === undefined).map((d) => summary(rules, order, d, t)),
+    refused: { orders: refused.slice(0, site.brief.refused), left: Math.max(0, refused.length - site.brief.refused) },
   };
 }
 

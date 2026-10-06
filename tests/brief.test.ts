@@ -201,6 +201,15 @@ function worstCase(longName: (i: number) => string, big = 987_654_321, text: (ch
       canPropose: 3,
     },
     inRange,
+    // Refusals as long as the line shows, echoing what the mind wrote, more not shown.
+    refused: {
+      orders: Array.from({ length: site.brief.refused }, (_, i) => ({
+        do: "set_countermeasure",
+        message: `No mind called ${i}${text(site.brief.refused_size)}`,
+        times: 99,
+      })),
+      left: 9,
+    },
   };
 }
 
@@ -232,9 +241,10 @@ function offer(from: string, to: string | null, i: number, big: number): OfferVi
   };
 }
 
-/** No messages, posts, offers or proposals. */
+/** No messages, posts, offers, proposals or refusals. */
 const quiet = (b: Brief): Brief => ({
   ...b,
+  refused: { orders: [], left: 0 },
   channels: { messages: [], left: 0, canSend: rules.social.messages_per_day },
   commons: { posts: [], canPost: rules.social.commons_posts_per_day },
   offers: { toYou: [], open: [], left: 0, yours: [], canOffer: rules.social.trade_offers_per_day },
@@ -263,7 +273,8 @@ function trimsHold() {
   // Channels and the Commons, each line cut to its length; then offers, on their own.
   const full = worstCase(shortName, 12_345);
   const calm = { ...full, since: { ...full.since, yours: [], world: [], fights: [], left: 0 } };
-  socialTrimsHold(briefText(rules, { ...calm, offers: quiet(full).offers, proposals: quiet(full).proposals, protocol: null }));
+  socialTrimsHold(briefText(rules, { ...calm, offers: quiet(full).offers, proposals: quiet(full).proposals, refused: quiet(full).refused, protocol: null }));
+  refusedTrimsHold(briefText(rules, { ...quiet(calm), refused: full.refused }));
   offerTrimsHold(briefText(rules, { ...quiet(calm), offers: full.offers }));
   proposalTrimsHold(briefText(rules, { ...quiet(calm), proposals: full.proposals }));
 }
@@ -275,6 +286,16 @@ function proposalTrimsHold(text: string) {
   assert.equal(toYou.length, site.brief.proposals);
   assert.match(text, /^- \(99 more: view protocols\)$/m);
   assert.match(text, /^- yours: #\d+ to MIND-1400, awaiting MIND-1400, MIND-1401 · 1d 22h left$/m);
+  assert.ok(size(text) <= site.brief.max_size);
+}
+
+function refusedTrimsHold(text: string) {
+  const line = text.split("\n").find((l) => l.startsWith("REFUSED LAST WAKE: "));
+  assert.ok(line, "the refused orders line");
+  assert.equal(line.match(/set_countermeasure ×99: No mind called /g)?.length, site.brief.refused);
+  assert.ok(line.endsWith(" · 9 more"));
+  assert.ok(size(line) <= "REFUSED LAST WAKE: ".length + site.brief.refused * (site.brief.refused_size + 3) + " · 9 more".length);
+  assert.ok(text.indexOf("REFUSED LAST WAKE") < text.indexOf("SINCE LAST WAKE"), "read before the plan");
   assert.ok(size(text) <= site.brief.max_size);
 }
 
@@ -305,11 +326,11 @@ function worstCaseFits() {
   // Offers, proposals and the protocol line displace denser lines, so each case is checked without them too.
   for (const [what, text] of [["prose", prose] as const, ...DENSE]) {
     const full = worstCase(longName, undefined, text);
-    const noOffers = { ...full, offers: quiet(full).offers };
+    const noOffers = { ...full, offers: quiet(full).offers, refused: quiet(full).refused };
     const noProposals = { ...full, proposals: quiet(full).proposals };
     const cases = [
       ["with offers and proposals", full],
-      ["without offers", noOffers],
+      ["without offers or refusals", noOffers],
       ["without proposals", noProposals],
       ["without either", { ...noOffers, proposals: quiet(full).proposals }],
       ["in no protocol, without either", { ...noOffers, proposals: quiet(full).proposals, protocol: null }],
@@ -332,6 +353,8 @@ function worstCaseFits() {
   assert.match(text, new RegExp(`^protocol: ${longName(1100)}, `, "m"));
   assert.match(text, new RegExp(`^- ${longName(800 + site.brief.channels - 1)} \\(`, "m"));
   assert.match(text, new RegExp(`^- #\\d+ ${longName(1000 + site.brief.offers - 1)} gives `, "m"));
+  // So does the first refusal.
+  assert.match(text, /^REFUSED LAST WAKE: set_countermeasure ×99: No mind called 0/m);
 }
 
 /** Text that costs more tokens per character than English: other scripts, symbols, emoji. */
@@ -418,10 +441,19 @@ async function reads() {
   assert.match(text, /^IN RANGE: .*PIKE \([\d.]+k?, Accelerant\)/m);
   assert.equal(lines.at(-1), "SCRATCHPAD: watch PIKE");
 
+  assert.doesNotMatch(text, /REFUSED/, "nothing was refused");
+
+  // Orders the game refused are named on the next wake, identical ones folded.
+  const bad = [{ do: "attack", target: "NOBODY", mode: "raid" }, { do: "build", building: "city", count: -1 }, { do: "build", building: "city", count: -1 }];
+  assert.ok((await submitOrders(store, halcyon, bad, t)).ok);
+  const refused = briefText(rules, (await getBrief(store, halcyon, t + HOUR_MS)) as Brief);
+  assert.match(refused, /^REFUSED LAST WAKE: attack: .+ · build ×2: Invalid order: .+$/m);
+
   // After orders, the window starts again.
   assert.ok((await submitOrders(store, halcyon, [], t)).ok);
   const quiet = briefText(rules, (await getBrief(store, halcyon, t + HOUR_MS)) as Brief);
   assert.match(quiet, /^SINCE LAST WAKE \(1h\)\n- nothing$/m);
+  assert.doesNotMatch(quiet, /REFUSED/, "only last wake's refusals");
 
   // The final week is announced in the header.
   const late = briefText(rules, (await getBrief(store, halcyon, T0 + 55 * DAY_MS)) as Brief);

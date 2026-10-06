@@ -1116,3 +1116,88 @@ earliest deletion day 8.1, no foreseeable failed order (main before this:
   946 (332 and 588 before); `tests/brief.test.ts` checks every wake.
 - **cli.test.ts** reads offer and proposal numbers back instead of
   assuming #1, since the scripted builder now makes its own.
+
+## 2026-10-06 — Phase 4e: two model bots
+
+`npm run week` now plays a list of bots, and the brief names last wake's
+refused orders. Two weeks were run with LANTERN and a new persona, TALLY,
+against the legacy systems and five scripted minds. No numbers in
+`config/rules.yaml` changed; `npm run sim` passes phase 2's four checks
+with the same numbers as 4d.
+
+**Agreed with John:**
+
+- **`REFUSED LAST WAKE:`** follows the status block when the mind's last
+  orders had refusals: identical ones folded with ×N, at most
+  `brief.refused` (3), each cut to `brief.refused_size` (100), in
+  site.yaml. It reads the last `orders` entry in the log, which "since
+  last wake" already uses, so nothing new is stored. When the length
+  budget bites it drops to one refusal after the world's moments; the
+  first stays. The built worst case is now 1,981 tokens (was 1,953),
+  because a refusal can echo what the mind wrote (`No mind called …`) and
+  so is tested in dense scripts too. Lowering `max_size` to win the margin
+  back broke the caps-hold test, so it stays; **the next brief addition
+  has to make room first.**
+- **Two bots, same model:** LANTERN (Steward) and TALLY (Assimilator), a
+  broker persona that trades, and signs and revokes protocols as they pay
+  (personas/tally.md), both deepseek/deepseek-v4-pro. The opponents gain
+  the conqueror, for the conquest tuning pass.
+- **Done, read as:** between them the bots make or accept a trade, join a
+  protocol and revoke one, with each other or a scripted mind, without
+  scripting them into it.
+- **After the first week had no revocation**, John chose to tweak Tally's
+  persona (propose protocols yourself; revoke when a deal stops paying or
+  a better partner waits) and say in the role prompt that `view` and
+  `rules` are lookups, never orders, and re-run.
+
+**Smaller calls, made here:**
+
+- **`week.bot` became `week.bots`** (`--bots a,b`). Each bot has its own
+  in-process key and seeded wake times; the first bot's times are 3e's.
+  The bots' wakes run in time order (the first-listed first on a tie),
+  `--resume` counts wakes across both, and `WeekDeps.model` is a function
+  of the bot, so bots may use different models or keys.
+- **The report** is per bot (orders, briefs, refusals), plus how many
+  refusals were sent again unchanged on the next wake, the Phase 4 check
+  (trade, sign, revoke: yes/no, and how many between the bots), the bots'
+  trades and protocol events, their messages to each other and Commons
+  posts, and every battle in the week by attacker and defender.
+
+**The weeks' result** (seed 1, 112 wakes each, 120 and 119 model calls,
+about 0.94M tokens in each, ~90% cached; every wake done, every brief
+under 720 tokens, both games replay):
+
+| | Week 1 | Week 2 (tweaked) |
+| --- | --- | --- |
+| Trades by a bot (between the bots) | 15 (3) | 5 (1) |
+| Protocols a bot signed (between the bots) | 1 (0) | 1 (0) |
+| Protocols a bot revoked | 0 | 0 |
+| Orders accepted: Lantern / Tally | 87% / 87% | 92% / 84% |
+| Refusals repeated next wake: Lantern / Tally | 9/37, 6/40 | 3/20, 20/46 |
+| Final rank: Lantern / Tally (of 11) | 3 / 4 | 3 / 5 |
+
+- **Trading works and the bots haggle.** Tally sold compute to the
+  builder, converger and turtle, messaged Lantern with terms for days,
+  and they traded at its quoted 0.8 rate. Lantern took the converger's
+  capital-for-compute offers once it had surplus. Week 2 had fewer trades
+  because Tally cancelled and relisted at prices nobody took.
+- **Nobody revoked.** Lantern signed the converger's proposal on day 3 and
+  had no reason to leave: nobody attacked either bot, and no convergence
+  started within the week. Tally never proposed, in either week, even
+  with the persona telling it to; its scratchpad shows it reading
+  everyone else as paired ("CONVERGER-4/LANTERN looks closed") though the
+  builder had no protocol. In a week where nobody threatens a mind, a
+  protocol buys nothing, so the model doesn't reach for one. The engine,
+  tests and simulator cover revocation (sim: 4 a median epoch).
+- **The refusal line helps the Steward, not every confusion.** Lantern's
+  26 "no factory housing" refusals from 3e fell to 12 and then 0, and its
+  repeats to 3 of 20. Tally ran `execute Assimilation` 20 times while it
+  had never learned it: its notes treat executing a program as
+  researching it, which the line names but doesn't explain. Its `view`
+  orders (15 in week 1) stopped after the role-prompt line.
+- **Conquest, for the tuning pass:** in both weeks the conqueror took 277
+  sectors, all from legacy systems (MERIDIAN, LOOPBACK, KESTREL-7), lost
+  all 8 conquests against BASTION, never attacked the model bots or the
+  strong scripted minds, and finished 6th of 11; the raider farmed
+  KESTREL-7 (13 raids). Against minds that build defense, the conqueror
+  is weak in its first week: the sim's dominance comes later in an epoch.

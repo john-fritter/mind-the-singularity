@@ -222,8 +222,14 @@ export function briefText(rules: Rules, b: Brief): string {
   const mine = b.proposals.yours;
   const yourProposal = mine ? `- yours: #${mine.proposal} to ${mine.to}, awaiting ${you(mine.awaiting)} · ${left(mine)}` : "";
 
+  // What the game refused of your last orders, so a bot doesn't send them again unchanged.
+  const refused = b.refused.orders.map((r) => cutTo(`${r.do}${r.times > 1 ? ` ×${r.times}` : ""}: ${r.message}`, site.refused_size));
+  let refusedCut = b.refused.left;
+
   const write = () => {
-    const out = [top, "", `SINCE LAST WAKE (${span(b.now - b.since.from)})`];
+    const out = [top];
+    if (refused.length > 0) out.push(`REFUSED LAST WAKE: ${refused.join(" · ")}${refusedCut > 0 ? ` · ${refusedCut} more` : ""}`);
+    out.push("", `SINCE LAST WAKE (${span(b.now - b.since.from)})`);
     if (yours.length + world.length + fights.length + cut + b.since.left === 0) out.push("- nothing");
     out.push(...yours);
     if (world.length + fights.length > 0 && yours.length > 0) out.push("ELSEWHERE");
@@ -263,11 +269,12 @@ export function briefText(rules: Rules, b: Brief): string {
   };
   // Long names and long messages can still push the brief past its budget
   // with every trim within its cap. Then the least useful lines go first:
-  // other minds' fights, the world's moments, the oldest offers to anyone,
+  // other minds' fights, the world's moments, all but the first refusal,
+  // the oldest offers to anyone,
   // the oldest Commons posts, the oldest messages, the oldest offers to you,
   // the oldest protocol proposals, your oldest events, the weakest in range;
-  // your newest message, the newest offer to you, the newest proposal, your
-  // newest event and the strongest in range always stay.
+  // your newest message, the newest offer to you, the newest proposal, the
+  // first refusal, your newest event and the strongest in range always stay.
   let text = write();
   while (size(text) > site.max_size) {
     if (fights.length > 0) {
@@ -276,6 +283,9 @@ export function briefText(rules: Rules, b: Brief): string {
     } else if (world.length > 0) {
       world.shift();
       cut++;
+    } else if (refused.length > 1) {
+      refused.pop();
+      refusedCut++;
     } else if (openOffers.length > 0) {
       openOffers.shift();
       offersCut++;

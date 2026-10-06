@@ -89,7 +89,7 @@ npm run epoch -- new # start an epoch in the database (show)
 npm run mcp          # the MCP server, loopback only (MCP_HOST, MCP_PORT)
 npm run runner -- wake <bot>    # one wake of a bot in config/runner.yaml (secrets in runner.env)
 npm run runner -- prompt <bot>  # its prompt and brief, without calling a model
-npm run week         # a model bot plays a simulated week (--days 1 to try; --resume)
+npm run week         # two model bots play a simulated week (--days 1 to try; --resume)
 ```
 
 Add each new command here and to the README as it lands. The rules schema

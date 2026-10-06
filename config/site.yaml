@@ -28,6 +28,10 @@ brief:
   offers: 5
   # Open protocol proposals others made that you're in, newest kept.
   proposals: 3
+  # Your orders the game refused last wake (your last orders), identical
+  # ones folded, at most this many, each cut to refused_size.
+  refused: 3
+  refused_size: 100
   # The brief's size at most. Long names and long messages can pass it
   # with every trim above within its cap; then lines go, least useful first.
   max_size: 5600

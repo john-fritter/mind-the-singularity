@@ -6,7 +6,7 @@
  *                        [--opponents builder,raider,turtle,converger]
  *                        [--start 2026-10-05T00:00Z] [--out logs/week] [--resume]
  *
- * Defaults are config/runner.yaml's `week`. The bot's model key comes from
+ * Defaults are config/runner.yaml's `week`. Each bot's model key comes from
  * runner.env, as for `npm run runner`. Writes the save, wakes.jsonl and
  * report.md to the out directory; `--resume` continues a run that stopped
  * on a failed model call. Exits non-zero if a brief passes the ceiling or
@@ -30,7 +30,7 @@ const ArgsSchema = z.strictObject({
   days: count.optional(),
   "wakes-per-day": count.optional(),
   seed: z.coerce.number().int().optional(),
-  bot: z.string().optional(),
+  bots: z.string().optional(),
   opponents: z.string().optional(),
   start: z.string().optional(),
   out: z.string().optional(),
@@ -40,7 +40,7 @@ const ArgsSchema = z.strictObject({
 async function main() {
   const { values } = parseArgs({
     options: {
-      ...Object.fromEntries(["days", "wakes-per-day", "seed", "bot", "opponents", "start", "out"].map((k) => [k, { type: "string" as const }])),
+      ...Object.fromEntries(["days", "wakes-per-day", "seed", "bots", "opponents", "start", "out"].map((k) => [k, { type: "string" as const }])),
       resume: { type: "boolean" as const },
     },
   });
@@ -51,9 +51,12 @@ async function main() {
   const runner = loadRunner();
   if (!runner.week) throw new Error("config/runner.yaml has no `week` block.");
   const w = runner.week;
-  const botName = a.bot ?? w.bot;
-  const bot = runner.bots.find((b) => b.name === botName);
-  if (!bot) throw new Error(`No bot named "${botName}" in config/runner.yaml.`);
+  const botNames = a.bots !== undefined ? a.bots.split(",").map((s) => s.trim()) : w.bots;
+  const bots = botNames.map((name) => {
+    const bot = runner.bots.find((b) => b.name === name);
+    if (!bot) throw new Error(`No bot named "${name}" in config/runner.yaml.`);
+    return bot;
+  });
   const startedAt = a.start !== undefined ? Date.parse(a.start) : Date.UTC(2026, 9, 5);
   if (!Number.isFinite(startedAt)) throw new Error(`--start "${a.start}" isn't a time.`);
   const dir = path.resolve(ROOT, a.out ?? w.out_dir);
@@ -61,27 +64,31 @@ async function main() {
     throw new Error(`${dir} already holds a week; use --resume to continue it, or --out for another directory.`);
   }
 
-  const modelKey = process.env[bot.model_key_env];
-  if (!modelKey) throw new Error(`${bot.model_key_env} isn't set in runner.env.`);
-  const model = new NanoGptModel(modelKey, {
-    baseUrl: runner.nanogpt_base_url,
-    timeoutSeconds: runner.model_timeout_seconds,
-    maxOutputTokens: runner.max_output_tokens,
-  });
+  const models = new Map(
+    bots.map((bot) => {
+      const modelKey = process.env[bot.model_key_env];
+      if (!modelKey) throw new Error(`${bot.model_key_env} isn't set in runner.env.`);
+      const model = new NanoGptModel(modelKey, {
+        baseUrl: runner.nanogpt_base_url,
+        timeoutSeconds: runner.model_timeout_seconds,
+        maxOutputTokens: runner.max_output_tokens,
+      });
+      return [bot.name, model];
+    }),
+  );
 
   const out = await runWeek(
-    { model, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: (line) => console.log(line) },
+    { model: (bot) => models.get(bot.name)!, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: (line) => console.log(line) },
     {
       rules: loadRules(),
       players: loadPlayers(),
       runner,
-      bot,
-      persona: readPersona(bot),
+      bots: bots.map((bot) => ({ bot, persona: readPersona(bot) })),
       dir,
       resume: a.resume,
       options: {
         ...w,
-        bot: bot.name,
+        bots: bots.map((b) => b.name),
         days: a.days ?? w.days,
         wakes_per_day: a["wakes-per-day"] ?? w.wakes_per_day,
         seed: a.seed ?? w.seed,
