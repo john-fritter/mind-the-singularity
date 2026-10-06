@@ -1261,3 +1261,21 @@ protocols signed and 6 revocations an epoch. All four checks pass.
 - **Phase 4's deferred condition.** When 4e merged, John chose to count
   it done without a model bot revoking a protocol and to re-check that in
   this pass (4e's entry ends before that choice was recorded).
+
+**The model-bot week** (`npm run week`, seed 1, LANTERN and TALLY against
+the legacy systems and the five scripted minds; 112 wakes, 115 model
+calls, every brief under 750 tokens, the game replays; report in
+`/mnt/project-files/conquest-tuning/week-report.md`):
+
+- **Still no revocation.** The bots traded 25 times and signed 2
+  protocols (LANTERN with the builder; TALLY, proposing for the first
+  time, with the conqueror), and nobody revoked. As in 4e, nothing in a
+  week threatened either bot, so no pact stopped paying. Revocation
+  stays covered by the engine tests and the simulator (a median 6 an
+  epoch).
+- **The raider and conqueror trade with the bots now:** TALLY bought
+  their compute for capital 10 times.
+- **The conqueror won all 15 conquests** (all on legacy systems, BASTION
+  once, 199 sectors) and finished 6th of 11, as in 4e: a week is too
+  early for conquest to dominate, and the sim's dominance comes later in
+  an epoch.
