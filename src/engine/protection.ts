@@ -1,15 +1,16 @@
 import { DAY_MS, HOUR_MS } from "./cycles.js";
 import { domainPower } from "./domain.js";
 import { inRange } from "./power.js";
+import { protocolShieldBecause } from "./protocols.js";
 import { emit, type GameEvent } from "./record.js";
 import type { Rules } from "./rules.js";
 import type { Domain, World } from "./state.js";
 
 // The protection rules (DESIGN.md, Defense, protection, and deletion): the
-// boot period, range and retaliation, safe mode and the hostile-program cap.
-// Attacks and hostile programs pass the same check; Probe passes none.
-// Converged minds lose range and safe-mode protection while their
-// convergence lasts.
+// boot period, range and retaliation, safe mode and the hostile-program cap,
+// and protocols (protocols.ts). Attacks and hostile programs pass the same
+// check; Probe passes none. Converged minds lose range and safe-mode
+// protection while their convergence lasts; protocols still hold.
 
 const hours = (ms: number) => Math.max(1, Math.ceil(ms / HOUR_MS));
 
@@ -30,21 +31,23 @@ export function attackedBy(rules: Rules, victim: Domain, aggressor: Domain, now:
 
 /**
  * Why `actor` may not attack `target` or run a hostile program on it, or
- * undefined if it may. Keys: protection.*, as bootPeriodEnds, attackedBy, inRange
+ * undefined if it may. Keys: protection.*, as bootPeriodEnds, attackedBy, inRange, protocolShieldBecause
  */
-export function shieldedBecause(rules: Rules, actor: Domain, target: Domain, now: number): string | undefined {
+export function shieldedBecause(rules: Rules, world: World, actor: Domain, target: Domain, now: number): string | undefined {
   const ownBoot = bootPeriodEnds(rules, actor);
   if (now < ownBoot) return `You're in your boot period for another ${hours(ownBoot - now)}h.`;
-  return targetShieldedBecause(rules, actor, target, now);
+  return targetShieldedBecause(rules, world, actor, target, now);
 }
 
 /**
  * Why `target` is shielded from `actor`, leaving out the actor's own boot
  * period: what the brief's "in range" list needs. Keys: as shieldedBecause
  */
-export function targetShieldedBecause(rules: Rules, actor: Domain, target: Domain, now: number): string | undefined {
+export function targetShieldedBecause(rules: Rules, world: World, actor: Domain, target: Domain, now: number): string | undefined {
   const theirBoot = bootPeriodEnds(rules, target);
   if (now < theirBoot) return `${target.designation} is in its boot period for another ${hours(theirBoot - now)}h.`;
+  const protocol = protocolShieldBecause(rules, world, actor, target, now);
+  if (protocol) return protocol;
   if (target.convergedAt !== null) return undefined;
   if (inSafeMode(target, now)) return `${target.designation} is in safe mode for another ${hours(target.safeModeUntil! - now)}h.`;
   const mine = domainPower(rules, actor);

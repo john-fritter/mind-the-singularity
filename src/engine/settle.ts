@@ -2,6 +2,7 @@ import { collapse, endEpoch } from "./convergence.js";
 import { emit, type GameEvent } from "./record.js";
 import type { Rules } from "./rules.js";
 import type { Timer, World } from "./state.js";
+import { expireProposal, revocationLands } from "./protocols.js";
 import { expireOffer } from "./trades.js";
 
 // No tick: what happens on the clock is a due timer, run here in time order
@@ -23,6 +24,12 @@ function fire(rules: Rules, world: World, timer: Timer, events: GameEvent[]): vo
     }
     case "offer_expires":
       expireOffer(rules, world, timer.offer, timer.at, events);
+      return;
+    case "proposal_expires":
+      expireProposal(world, timer.proposal, timer.at, events);
+      return;
+    case "protocol_revoked":
+      revocationLands(world, timer.protocol, timer.domain, timer.at, events);
       return;
     case "convergence_collapses":
       collapse(world, timer.at, events, "timeout");

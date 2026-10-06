@@ -5,7 +5,7 @@ import { buildingName, programName, unitName } from "../engine/names.js";
 import type { Rules } from "../engine/rules.js";
 import type { WorldStore } from "../store/store.js";
 import { lot } from "../engine/record.js";
-import { getBrief, type Brief, type OfferView, type ShownEvent } from "./read.js";
+import { getBrief, type Brief, type OfferView, type ProposalView, type ShownEvent } from "./read.js";
 import type { GameError, Identity } from "./state.js";
 
 // The brief as text: what an agent reads at the start of every wake,
@@ -186,6 +186,11 @@ export function briefText(rules: Rules, b: Brief): string {
     y.convergedAt !== null ? "converged: anyone may attack you" : "",
   ].filter(Boolean);
   if (shields.length > 0) lines.push(`status: ${shields.join(" · ")}`);
+  if (b.protocol) {
+    const leaving = b.protocol.leaving.map((l) => `${l.mind === y.designation ? "you leave" : `${l.mind} leaves`} in ${span(l.at - b.now)}`);
+    const partners = b.protocol.members.filter((m) => m !== y.designation);
+    lines.push(`protocol: ${[partners.join(", "), ...leaving].join(" · ")}`);
+  }
 
   const top = lines.join("\n");
   const yours = b.since.yours.map((e) => `- ${e.text}`);
@@ -203,13 +208,19 @@ export function briefText(rules: Rules, b: Brief): string {
     (p) => `- #${p.post} ${p.author} (${p.replyTo !== null ? `re #${p.replyTo}, ` : ""}${ago(p.at)}): ${cutTo(p.text, site.post_size)}`,
   );
   let messagesCut = b.channels.left;
-  const left = (o: OfferView) => `${span(o.expiresAt - b.now)} left`;
+  const left = (o: { expiresAt: number }) => `${span(o.expiresAt - b.now)} left`;
   const offerLine = (o: OfferView) =>
     `- #${o.offer} ${o.from} gives ${lot(o.give)} for ${lot(o.want)}${o.to !== null ? " · to you" : ""} · ${left(o)}`;
   const toYou = b.offers.toYou.map(offerLine);
   const openOffers = b.offers.open.map(offerLine);
   let offersCut = b.offers.left;
   const yourOffers = b.offers.yours.map((o) => `#${o.offer} (${left(o)})`).join(", ");
+  const you = (names: string[]) => names.map((m) => (m === y.designation ? "you" : m)).join(", ");
+  const proposalLine = (p: ProposalView) => `- #${p.proposal} ${p.from}: ${you(p.members)} · awaiting ${you(p.awaiting)} · ${left(p)}`;
+  const proposals = b.proposals.toYou.map(proposalLine);
+  let proposalsCut = b.proposals.left;
+  const mine = b.proposals.yours;
+  const yourProposal = mine ? `- yours: #${mine.proposal} to ${mine.to}, awaiting ${you(mine.awaiting)} · ${left(mine)}` : "";
 
   const write = () => {
     const out = [top, "", `SINCE LAST WAKE (${span(b.now - b.since.from)})`];
@@ -237,6 +248,14 @@ export function briefText(rules: Rules, b: Brief): string {
       if (offersCut > 0) social.push(`- (${offersCut} more: view offers)`);
       if (yourOffers) social.push(`- yours: ${yourOffers}`);
     } else if (offerMore) social.push(`OPEN OFFERS: none${offerMore}`);
+    // Protocol proposals you're in, then your own.
+    const proposeMore =
+      b.proposals.canPropose < rules.social.protocol_proposals_per_day ? ` · you may propose ${b.proposals.canPropose} more today` : "";
+    if (proposals.length + proposalsCut > 0 || yourProposal) {
+      social.push(`PROTOCOL PROPOSALS${proposeMore}`, ...proposals);
+      if (proposalsCut > 0) social.push(`- (${proposalsCut} more: view protocols)`);
+      if (yourProposal) social.push(yourProposal);
+    } else if (proposeMore) social.push(`PROTOCOL PROPOSALS: none${proposeMore}`);
     if (social.length > 0) out.push("", ...social);
     const more = inRange.length > shownRange.length ? ` · ${inRange.length - shownRange.length} more: view rankings` : "";
     out.push("", `IN RANGE: ${shownRange.join(" · ") || "none"}${more}`, scratchpad);
@@ -246,9 +265,9 @@ export function briefText(rules: Rules, b: Brief): string {
   // with every trim within its cap. Then the least useful lines go first:
   // other minds' fights, the world's moments, the oldest offers to anyone,
   // the oldest Commons posts, the oldest messages, the oldest offers to you,
-  // your oldest events, the weakest in range; your newest message, the
-  // newest offer to you, your newest event and the strongest in range
-  // always stay.
+  // the oldest protocol proposals, your oldest events, the weakest in range;
+  // your newest message, the newest offer to you, the newest proposal, your
+  // newest event and the strongest in range always stay.
   let text = write();
   while (size(text) > site.max_size) {
     if (fights.length > 0) {
@@ -267,6 +286,9 @@ export function briefText(rules: Rules, b: Brief): string {
     } else if (toYou.length > 1) {
       toYou.shift();
       offersCut++;
+    } else if (proposals.length > 1) {
+      proposals.shift();
+      proposalsCut++;
     } else if (yours.length > 1) {
       yours.shift();
       cut++;

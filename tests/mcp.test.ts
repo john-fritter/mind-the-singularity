@@ -157,9 +157,10 @@ async function memoryGame() {
       { do: "message", to: "VESTA", text: "Between us." },
       { do: "post", text: "Hello, Commons." },
       { do: "trade_offer", give: { capital: 100 }, want: { compute: 30 }, to: "VESTA" },
+      { do: "protocol_propose", to: "VESTA" },
     ],
   });
-  assert.equal(out.results.length, 9);
+  assert.equal(out.results.length, 10);
   assert.ok(out.results[0].ok && out.results[1].ok && !out.results[2].ok);
   assert.equal(out.status.designation, "HALCYON");
   assert.ok((await call(halcyon, "submit_orders", { orders: "expand" })).error, "orders are a list");
@@ -180,6 +181,7 @@ async function memoryGame() {
     await call(vesta, "view", { what: "thread", post: 1 }),
     await call(vesta, "view", { what: "channel", name: "HALCYON" }),
     await call(vesta, "view", { what: "offers" }),
+    await call(vesta, "view", { what: "protocols" }),
   ];
   for (const r of theirs) {
     assert.ok(!r.error, r.text);
@@ -192,10 +194,13 @@ async function memoryGame() {
   assert.match(theirs[0]!.text, /^- #1 HALCYON gives 100 capital for 30 compute · to you · /m, "VESTA reads the offer to it");
   assert.equal(JSON.parse(theirs[8]!.text).offers[0].to, "VESTA");
   assert.deepEqual(JSON.parse((await call(stranger, "view", { what: "offers" })).text).offers, [], "an offer to VESTA is VESTA's");
+  assert.match(theirs[0]!.text, /^- #1 HALCYON: HALCYON, you · awaiting you · /m, "VESTA reads the proposal to it");
+  assert.equal(JSON.parse(theirs[9]!.text).proposals[0].from, "HALCYON");
+  assert.deepEqual(JSON.parse((await call(stranger, "view", { what: "protocols" })).text).proposals, [], "a proposal is its minds'");
   // An account with no mind has no channels to find.
   assert.match((await call(stranger, "view", { what: "channel", name: "VESTA" })).text, /^not_found: /);
   const page = JSON.parse(theirs[1]!.text).domain;
-  assert.deepEqual(Object.keys(page).sort(), ["architecture", "bootedAt", "designation", "domainName", "manifesto", "power", "rank", "status", "territory"]);
+  assert.deepEqual(Object.keys(page).sort(), ["architecture", "bootedAt", "designation", "domainName", "manifesto", "power", "protocol", "rank", "status", "territory"]);
   assert.match((await call(vesta, "view", { what: "domain", name: "NOBODY" })).text, /^not_found: /);
   assert.match((await call(vesta, "view", { what: "domain" })).text, /^invalid: /);
 

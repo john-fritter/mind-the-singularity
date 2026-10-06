@@ -61,6 +61,11 @@ function main() {
     assert.match(ok("offers", "--as", "pike"), /^#1 .* HALCYON gives 100 capital for 30 compute, expires /m);
     assert.match(ok("commons"), /^#1 .* HALCYON gives 100 capital for 30 compute/m);
     assert.match(ok("orders", "--as", "pike", '[{"do":"trade_accept","offer":1}]'), /Trade #1: you paid 30 compute to HALCYON/);
+    assert.match(ok("orders", '[{"do":"protocol_propose","to":"PIKE"}]'), /Proposal #1: a protocol of HALCYON, PIKE/);
+    assert.match(ok("protocols", "--as", "pike"), /^No protocols\.\n\nProposals you're in:\n#1  HALCYON to PIKE: HALCYON, PIKE, awaiting PIKE, expires /m);
+    assert.match(ok("orders", "--as", "pike", '[{"do":"protocol_accept","proposal":1}]'), /Protocol signed: you're in a protocol with HALCYON\./);
+    assert.match(ok("protocols"), /^HALCYON, PIKE$/m);
+    assert.match(ok("brief"), /^protocol: PIKE$/m);
     const json = JSON.parse(ok("brief", "--as", "pike", "--json"));
     assert.equal(json.you.designation, "PIKE");
     assert.equal(json.you.scratchpad, "", "PIKE doesn't see HALCYON's scratchpad");

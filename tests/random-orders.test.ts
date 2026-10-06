@@ -13,8 +13,8 @@ import { applyOrders, bootMind, createWorld, settle } from "../src/engine/world.
 // month, attacking and running programs on each other: nothing goes
 // negative or fractional, buildings fit their territory, compute fits its
 // storage, hardware fits its housing, posts, messages and offers keep to
-// their caps, every open offer has its expiry, and a deleted mind does
-// nothing. The engine never changes the
+// their caps, every open offer has its expiry, protocols keep to their
+// size and never shelter an attack, and a deleted mind does nothing. The engine never changes the
 // world it's given, and the same seed and orders give the same world and
 // events.
 
@@ -27,10 +27,12 @@ const pick = <T>(rng: Rng, xs: readonly T[]): T => xs[Math.floor(rng.next() * xs
 const upTo = (rng: Rng, n: number) => 1 + Math.floor(rng.next() * n);
 
 /** A random batch of orders, some of them bad on purpose. */
-function randomOrders(rng: Rng, architecture: Architecture, others: string[]): unknown[] {
+/** Orders of every kind; offers and proposals are picked among the newest, which are likelier still open. */
+function randomOrders(rng: Rng, architecture: Architecture, others: string[], world: World): unknown[] {
+  const recent = (last: number) => Math.max(1, last + 1 - upTo(rng, 8));
   const programs = programsOf(architecture).map((p) => p.id);
   return Array.from({ length: upTo(rng, 6) }, () => {
-    switch (upTo(rng, 17)) {
+    switch (upTo(rng, 18)) {
       case 1:
         return { do: "expand", cycles: upTo(rng, 12) };
       case 2:
@@ -62,11 +64,18 @@ function randomOrders(rng: Rng, architecture: Architecture, others: string[]): u
         return { do: "message", to: pick(rng, others), text: "word ".repeat(upTo(rng, 60)) };
       case 16: {
         const roll = rng.next();
-        if (roll < 0.4) return { do: "trade_accept", offer: upTo(rng, 60) };
-        if (roll < 0.5) return { do: "trade_cancel", offer: upTo(rng, 60) };
+        if (roll < 0.4) return { do: "trade_accept", offer: recent(world.lastOfferId) };
+        if (roll < 0.5) return { do: "trade_cancel", offer: recent(world.lastOfferId) };
         const [give, want] = pick(rng, [["capital", "compute"], ["compute", "capital"], ["capital", "capital"]] as const);
         const to = rng.next() < 0.5 ? { to: pick(rng, others) } : {};
         return { do: "trade_offer", give: { [give]: upTo(rng, 3000) }, want: { [want]: upTo(rng, 3000) }, ...to };
+      }
+      case 17: {
+        const roll = rng.next();
+        if (roll < 0.4) return { do: "protocol_accept", proposal: recent(world.lastProposalId) };
+        if (roll < 0.5) return { do: "protocol_decline", proposal: recent(world.lastProposalId) };
+        if (roll < 0.55) return { do: "protocol_revoke" };
+        return { do: "protocol_propose", to: pick(rng, others) };
       }
       default:
         return pick(rng, [{ do: "attack" }, { do: "expand", cycles: 0 }, null, "build", { do: "build", building: "moat", count: 1 }]);
@@ -75,6 +84,23 @@ function randomOrders(rng: Rng, architecture: Architecture, others: string[]): u
 }
 
 function checkInvariants(world: World, now: number) {
+  const inProtocols = world.protocols.flatMap((p) => p.members);
+  assert.equal(new Set(inProtocols).size, inProtocols.length, "a mind in two protocols");
+  for (const p of world.protocols) {
+    assert.ok(p.members.length >= 2 && p.members.length <= rules.social.protocol_max_members, `protocol of ${p.members.length}`);
+    assert.ok(p.members.every((m) => world.domains.find((d) => d.id === m)!.deletedAt === null), "a deleted mind in a protocol");
+    for (const l of p.leaving) {
+      assert.ok(p.members.includes(l.domain) && l.at > now - HOUR_MS);
+      assert.ok(world.timers.some((t) => t.kind === "protocol_revoked" && t.protocol === p.id && t.domain === l.domain && t.at === l.at), "a revocation without its timer");
+    }
+  }
+  assert.equal(world.timers.filter((t) => t.kind === "protocol_revoked").length, world.protocols.reduce((n, p) => n + p.leaving.length, 0));
+  for (const p of world.proposals) {
+    assert.ok(p.members.length <= rules.social.protocol_max_members && p.awaiting.every((m) => p.members.includes(m) && m !== p.from));
+    assert.ok(world.timers.some((t) => t.kind === "proposal_expires" && t.proposal === p.id && t.at === p.expiresAt), `proposal #${p.id} has no expiry`);
+  }
+  assert.equal(world.timers.filter((t) => t.kind === "proposal_expires").length, world.proposals.length, "an expiry timer outlived its proposal");
+  assert.equal(new Set(world.proposals.map((p) => p.from)).size, world.proposals.length, "a mind with two proposals open");
   for (const o of world.offers) {
     const maker = world.domains.find((d) => d.id === o.from)!;
     assert.ok(maker.deletedAt === null, "a deleted mind's offer is open");
@@ -85,6 +111,7 @@ function checkInvariants(world: World, now: number) {
   for (const d of world.domains) {
     assert.ok(world.offers.filter((o) => o.from === d.id).length <= rules.social.open_offers_max, `${d.designation} has too many offers open`);
     assert.ok(d.social.offers <= rules.social.trade_offers_per_day, `${d.designation} made too many offers today`);
+    assert.ok(d.social.proposals <= rules.social.protocol_proposals_per_day, `${d.designation} made too many proposals today`);
     assert.ok(d.deletedAt === null || d.buildings.core === 0, `${d.designation} deleted with cores`);
     assert.ok(d.deletedAt !== null || d.buildings.core > 0, `${d.designation} has no cores but wasn't deleted`);
     const amounts = {
@@ -134,13 +161,21 @@ function play(seed: number): { world: World; events: GameEvent[] } {
     for (const d of world.domains) {
       const before = JSON.stringify(world);
       const others = world.domains.filter((o) => o.id !== d.id).map((o) => pick(rng, [o.designation, o.designation.toLowerCase()]));
-      const out = applyOrders(rules, world, d.id, randomOrders(rng, d.architecture, [...others, "NOBODY"]), now);
+      const out = applyOrders(rules, world, d.id, randomOrders(rng, d.architecture, [...others, "NOBODY"], world), now);
       if (d.deletedAt !== null) {
         assert.ok(out.results.every((r) => !r.ok && r.cycles === 0), "a deleted mind acted");
         assert.deepEqual(out.world.domains.find((x) => x.id === d.id), world.domains.find((x) => x.id === d.id));
       }
       assert.equal(JSON.stringify(world), before, "applyOrders changed its input");
       for (const r of out.results) assert.ok(r.message.length > 0 && r.cycles >= 0);
+      // Membership changes only by this mind's own orders once the world is
+      // settled, so partners before and after were partners throughout.
+      for (const e of out.events) {
+        const [a, b] = e.type === "battle" ? [e.attacker, e.defender] : e.type === "hostile" ? [e.caster, e.target] : [];
+        if (a === undefined || b === undefined) continue;
+        const together = (w: World) => w.protocols.some((p) => p.members.includes(a) && p.members.includes(b));
+        assert.ok(!(together(world) && together(out.world)), "a protocol partner was attacked");
+      }
       world = out.world;
       events.push(...out.events);
       checkInvariants(world, now);
@@ -158,9 +193,9 @@ function play(seed: number): { world: World; events: GameEvent[] } {
 
 function main() {
   const first = play(42);
-  // Things happened: programs were learned and run, minds fought and traded.
+  // Things happened: programs were learned and run, minds fought, traded and signed protocols.
   const types = new Set(first.events.map((e) => e.type));
-  for (const t of ["booted", "learned", "program_ended", "battle", "hostile", "probed", "trade", "offer_expired", "offers_withdrawn"]) assert.ok(types.has(t as GameEvent["type"]), `no ${t} events`);
+  for (const t of ["booted", "learned", "program_ended", "battle", "hostile", "probed", "trade", "offer_expired", "offers_withdrawn", "protocol_signed", "protocol_revoking", "protocol_left", "proposal_closed"]) assert.ok(types.has(t as GameEvent["type"]), `no ${t} events`);
   assert.ok(first.world.domains.every((d) => d.known.length > 0), "every mind learned something");
 
   // Same seed, same orders: the same world and events, exactly.

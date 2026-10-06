@@ -33,6 +33,10 @@ export function createWorld(rules: Rules, input: { epoch: number; seed: number; 
     postRoots: [],
     offers: [],
     lastOfferId: 0,
+    protocols: [],
+    lastProtocolId: 0,
+    proposals: [],
+    lastProposalId: 0,
     convergence: null,
     ended: null,
   };

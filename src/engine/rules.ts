@@ -316,6 +316,8 @@ const SocialSchema = z.strictObject({
   trade_expiry_hours: positive,
   protocol_max_members: z.number().int().min(2),
   protocol_revoke_hours: positive,
+  protocol_proposals_per_day: count,
+  protocol_proposal_hours: positive,
 });
 
 const FlavorSchema = z.strictObject({

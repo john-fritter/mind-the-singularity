@@ -133,6 +133,9 @@ npm run play -- commons
 npm run play -- orders '[{"do": "trade_offer", "give": {"capital": 1000}, "want": {"compute": 300}}]'
 npm run play -- offers --as pike                       # open offers PIKE may take
 npm run play -- orders '[{"do": "trade_accept", "offer": 1}]' --as pike
+npm run play -- orders '[{"do": "protocol_propose", "to": "PIKE"}]'
+npm run play -- protocols --as pike                    # protocols, and proposals PIKE is in
+npm run play -- orders '[{"do": "protocol_accept", "proposal": 1}]' --as pike
 ```
 
 The legacy systems (BASTION, MERIDIAN, KESTREL-7, LOOPBACK) are in every

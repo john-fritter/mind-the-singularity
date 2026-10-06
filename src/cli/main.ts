@@ -27,7 +27,7 @@ import { drive, legacySeats, scriptedSeat, type Seat } from "../players/drive.js
 import { STRATEGIES, type StrategyName } from "../players/settings.js";
 import { MemoryStore } from "../store/memory.js";
 import { readSave, writeSave, type SaveFile, type SavedPlayer } from "../store/save.js";
-import { renderMessages, renderOffers, renderOrders, renderPage, renderPosts, renderRankings, renderRecord, when } from "./render.js";
+import { renderMessages, renderOffers, renderOrders, renderPage, renderPosts, renderProtocols, renderRankings, renderRecord, when } from "./render.js";
 
 const HELP = `Play Mind: the Singularity locally.
 
@@ -45,6 +45,7 @@ Commands
   rankings                     every live mind by power
   commons                      the Commons: open offers to anyone, then posts, newest first (--limit N, --before POST)
   offers                       the open trade offers you may accept or cancel
+  protocols                    every protocol in force, and the proposals you're in
   thread POST                  a Commons thread in full
   channel [NAME]               your messages, or those with one mind (--limit N, --before SEQ)
   add STRATEGY [DESIGNATION]   add a scripted opponent (--arch ARCHITECTURE); strategies:
@@ -241,6 +242,12 @@ async function main() {
       const result = await view(store, me, { what: "offers" }, now);
       if (!result.ok) fail(result);
       else if (result.what === "offers") out(result, renderOffers(result.offers, startedAt));
+      break;
+    }
+    case "protocols": {
+      const result = await view(store, me, { what: "protocols" }, now);
+      if (!result.ok) fail(result);
+      else if (result.what === "protocols") out(result, renderProtocols(result.protocols, result.proposals, startedAt));
       break;
     }
     case "thread": {
