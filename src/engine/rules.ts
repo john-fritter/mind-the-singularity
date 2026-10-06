@@ -257,6 +257,7 @@ const CombatSchema = z
     lopsided_cores: positiveCount,
     attack_cycles_per_recent_attack: nonnegative,
     conquest_territory_share: share,
+    conquest_size_exponent: nonnegative,
     raid_capital_share: share,
     raid_user_share: share,
     raid_building_share: share,

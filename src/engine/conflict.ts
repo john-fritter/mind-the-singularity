@@ -1,11 +1,11 @@
 import { BUILDINGS, HARDWARE, PROGRAM_INFO, type Program } from "./architectures.js";
-import { attackCycles, attackerStrength, battleOutcome, conquestSectors, defenderStrength, raidSpoils, unitsLost } from "./combat.js";
+import { attackCycles, attackerStrength, battleOutcome, conquestScale, conquestSectors, defenderStrength, lopsidedCores, raidSpoils, unitsLost } from "./combat.js";
 import { fail, n, outOfCycles, spend, type OrderContext, type OrderResult } from "./context.js";
 import { collapse } from "./convergence.js";
 import { addCompute } from "./cycle.js";
 import { DAY_MS, HOUR_MS, syncCycles } from "./cycles.js";
 import { deleteMind } from "./deletion.js";
-import { capability, isRunning, totalBuildings, unitCounts } from "./domain.js";
+import { capability, domainPower, isRunning, totalBuildings, unitCounts } from "./domain.js";
 import { computeStorage, hardwareHousing, userCap } from "./economy.js";
 import { programName, resolveDomain, resolveProgram } from "./names.js";
 import type { Order } from "./orders.js";
@@ -182,6 +182,7 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
   }
 
   const theirs = forceTotals(rules, target.units);
+  const scale = conquestScale(rules, domainPower(rules, target), domainPower(rules, me));
   const attackerProgram = program ? runBattleProgram(rules, me, program, rng) : null;
   const cm = target.countermeasure;
   const countermeasure = cm && mine.attack > cm.above * theirs.defense ? runBattleProgram(rules, target, cm.program, rng) : null;
@@ -238,12 +239,12 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
   if (outcome.attackerWins) withdrawOffers(rules, world, target, now, ctx.events);
   if (outcome.attackerWins && order.mode === "conquest") {
     if (outcome.lopsided) {
-      report.cores = Math.min(rules.combat.lopsided_cores, target.buildings.core);
+      report.cores = Math.min(lopsidedCores(rules, scale), target.buildings.core);
       target.buildings.core -= report.cores;
     }
     // The land arrives open: the defender's buildings on it go in
     // proportion, and more if that's what it takes to fit what's left.
-    const sectors = Math.min(conquestSectors(rules, target.territory), target.territory - target.buildings.core);
+    const sectors = Math.min(conquestSectors(rules, target.territory, scale), target.territory - target.buildings.core);
     const nonCore = totalBuildings(target) - target.buildings.core;
     const proportional = target.territory > 0 ? Math.round((nonCore * sectors) / target.territory) : 0;
     const toFit = totalBuildings(target) - (target.territory - sectors);

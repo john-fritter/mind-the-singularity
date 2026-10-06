@@ -26,11 +26,11 @@
 # with revoke_on_converged leaves a protocol whose partner converges,
 # unless it joins convergences itself, and says so on the Commons.
 #
-# The raider and conqueror stay out of the market, and the conqueror signs
-# nothing (agreed with John in 4d, docs/decisions.md): trading sold them
-# capital for hardware, and weak minds' protocols with the conqueror
-# steered it onto rich ones, each enough to have it top over half the
-# epochs.
+# Everyone trades and signs. 4d kept the raider and conqueror out of the
+# market and the conqueror out of protocols, since either had it top over
+# half the epochs; the conquest tuning pass made a much larger mind take
+# less (combat.conquest_size_exponent) and let them back in
+# (docs/decisions.md).
 
 # 8 a day, the rate the bot runner is planned to wake bots at.
 wake_every_hours: 3
@@ -72,7 +72,7 @@ strategies:
     leftover: spin_up
     buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
-    social: { buys: null, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: false, accept: true, revoke_on_converged: false }
+    social: { buys: capital, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: false, accept: true, revoke_on_converged: false }
 
   # Cores, firewalls and sentries; banks cycles; never attacks; joins a
   # convergence.
@@ -126,7 +126,7 @@ strategies:
     leftover: spin_up
     buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
-    social: { buys: null, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: false, accept: false, revoke_on_converged: false }
+    social: { buys: capital, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: false, accept: true, revoke_on_converged: true }
 
 random:
   actions_per_wake: 6

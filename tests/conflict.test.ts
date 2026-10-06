@@ -42,6 +42,11 @@ function setup(
 
 /** HALCYON with 1,000 drones and nothing else: attack 3,000. */
 const strong = (a: Domain) => (a.units = { drones: 1000 });
+/**
+ * HALCYON strong and VESTA with two programs learned: power 3,420 against
+ * 3,630, so a won conquest takes the full share (see smallerTake).
+ */
+const evenPower = (a: Domain, b: Domain) => (strong(a), (b.known = ["probe", "exfiltration"]));
 
 function run(world: World, orders: unknown[], now = T, who = 1) {
   const out = applyOrders(rules, world, who, orders, now);
@@ -84,7 +89,7 @@ function attackCost() {
 }
 
 function conquest() {
-  const { a, b, results, events, world } = run(setup({ change: strong }), [{ do: "attack", target: "vesta", mode: "conquest" }]);
+  const { a, b, results, events, world } = run(setup({ change: evenPower }), [{ do: "attack", target: "vesta", mode: "conquest" }]);
   const [draw] = draws(1, 3, 1);
   const report = reportOf(events)!;
   // Steward against Symbiote: neighbors, no opposing bonus.
@@ -120,9 +125,35 @@ function conquest() {
   assert.match(results[0]!.message, /^HALCYON took 25 sectors from VESTA and destroyed 1 core\. Strength [\d,]+ against 633\. HALCYON lost \d+ units?, VESTA 87\.$/);
 
   // The same seed replays the battle exactly; another seed rolls differently.
-  assert.deepEqual(run(setup({ change: strong }), [{ do: "attack", target: "VESTA", mode: "conquest" }]).world, world);
-  const other = run(setup({ change: strong, seed: 2 }), [{ do: "attack", target: "VESTA", mode: "conquest" }]);
+  assert.deepEqual(run(setup({ change: evenPower }), [{ do: "attack", target: "VESTA", mode: "conquest" }]).world, world);
+  const other = run(setup({ change: evenPower, seed: 2 }), [{ do: "attack", target: "VESTA", mode: "conquest" }]);
   assert.notEqual(reportOf(other.events)!.attackerStrength, report.attackerStrength);
+}
+
+function smallerTake() {
+  // HALCYON at 3,420 power against VESTA at 3,030: (3,030 / 3,420)^2 = 0.785
+  // of a full conquest, so 19 of the 25 sectors, and the lopsided core still
+  // goes (0.785 rounds to 1).
+  const near = run(setup({ change: strong }), [{ do: "attack", target: "VESTA", mode: "conquest" }]);
+  assert.equal(near.b.territory, 250 - 19);
+  assert.equal(near.b.buildings.core, 9);
+
+  // VESTA with no army on 150 sectors: power 1,900, 0.556 of HALCYON's and
+  // still in range. 0.556^2 = 0.309 of a full conquest: 4 of 15 sectors, and
+  // no core though the win is lopsided.
+  const weak = (a: Domain, b: Domain) => {
+    strong(a);
+    b.units = {};
+    b.territory = 150;
+  };
+  const far = run(setup({ change: weak }), [{ do: "attack", target: "VESTA", mode: "conquest" }]);
+  const report = reportOf(far.events)!;
+  assert.ok(report.attackerWon);
+  assert.ok(report.attackerStrength / report.defenderStrength >= rules.combat.lopsided_ratio);
+  assert.equal(report.sectors, 4);
+  assert.equal(report.cores, 0);
+  assert.equal(far.b.buildings.core, 10);
+  assert.equal(far.b.deletedAt, null);
 }
 
 function raid() {
@@ -449,7 +480,7 @@ function probe() {
 
 function deletion() {
   // VESTA down to one core loses it to a lopsided conquest.
-  const out = run(setup({ change: (a, b) => (strong(a), (b.buildings.core = 1)) }), [{ do: "attack", target: "VESTA", mode: "conquest" }]);
+  const out = run(setup({ change: (a, b) => (evenPower(a, b), (b.buildings.core = 1)) }), [{ do: "attack", target: "VESTA", mode: "conquest" }]);
   assert.equal(out.b.buildings.core, 0);
   assert.equal(out.b.deletedAt, T);
   const deleted = out.events.find((e) => e.type === "deleted")!;
@@ -469,6 +500,7 @@ function deletion() {
 }
 
 conquest();
+smallerTake();
 attackCost();
 raid();
 repelled();

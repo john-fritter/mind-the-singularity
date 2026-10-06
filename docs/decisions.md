@@ -1201,3 +1201,63 @@ under 720 tokens, both games replay):
   strong scripted minds, and finished 6th of 11; the raider farmed
   KESTREL-7 (13 raids). Against minds that build defense, the conqueror
   is weak in its first week: the sim's dominance comes later in an epoch.
+
+## 2026-10-06 — The conquest tuning pass
+
+John asked for a focused pass on conquest after Phase 4e and before Phase
+5. 4d had kept the raider and conqueror out of trading and the conqueror
+out of protocols, because with them in the conqueror topped 63–64% of
+epochs (the limit is 50%). A won conquest took 10% of the victim's land
+whoever the victim was, and the conqueror attacks the weakest mind in
+range, so land compounded. Evidence, with every run's table:
+`/mnt/project-files/conquest-tuning/proposal.md` and
+`final-600-epochs.txt`.
+
+**Agreed with John:**
+
+- **A much larger mind takes less (a DESIGN.md change).** A won conquest
+  takes `conquest_territory_share × min(1, defender power ÷ attacker
+  power) ^ conquest_size_exponent` of the defender's land, with
+  `combat.conquest_size_exponent: 2`, and a lopsided win destroys
+  `round(lopsided_cores × the same factor)` cores. Powers are from before
+  the battle. Against an equal or stronger mind nothing changes; against
+  one at half the attacker's power it takes a quarter as much land and no
+  core. Conquest pays against rivals, not against the small.
+- **The core loss scales too.** Scaling only the land sent deletions from
+  8 to 155 minds in 200 epochs: victims shrank more slowly, stayed in
+  range and took more lopsided hits. With the core loss scaled, the
+  simulator deletes nobody, because there every lopsided win comes from a
+  much larger mind. Deletion is still possible against a mind of about
+  the attacker's size (at least 1/√2 of its power).
+- **Everyone trades and signs again.** The raider and conqueror buy
+  capital, and the conqueror accepts protocols and revokes when a partner
+  converges, as in 4d's "full social" run.
+- **The fallback not taken:** conquered land costing capital to hold
+  (10 a sector a cycle, settling 1% a cycle) also passed with trading on
+  (conqueror 38%), but it contradicts DESIGN.md's "Territory upkeep:
+  None", needs a brief line with the brief at 1,981 tokens worst case,
+  and scripted players would need to budget for it.
+
+| 200 epochs, seed 1 | Conqueror tops | Singularity | Minds deleted |
+|---|---|---|---|
+| main, trading off | 44% | 26% | 8 |
+| main, trading on | 63% | 12% | 13 |
+| exponent 1, trading on | 52% | 18% | 43 |
+| exponent 2, land only, trading on | 40% | 17% | 140 |
+| **exponent 2, land and cores, trading on** | **43%** | **19%** | **0** |
+| holding cost 10, trading on | 38% | 17% | 32 |
+
+**600 epochs on the committed numbers:** conqueror tops 45%, builder 25%,
+turtle 19%, random 7%, converger 3%, raider 0%; the Singularity in 22%;
+nobody deleted; 0 foreseeable failed orders; a median 25 trades, 8
+protocols signed and 6 revocations an epoch. All four checks pass.
+
+**Smaller calls, made here:**
+
+- **`npm run sim -- --settings path`** runs another players file, as
+  `--rules` does for the rules, for trying players' knobs.
+- **Scripted players estimate a conquest's land** with the same formula,
+  from their power and the target's in the brief.
+- **Phase 4's deferred condition.** When 4e merged, John chose to count
+  it done without a model bot revoking a protocol and to re-check that in
+  this pass (4e's entry ends before that choice was recorded).

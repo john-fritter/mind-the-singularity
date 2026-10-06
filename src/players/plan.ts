@@ -14,7 +14,7 @@ import {
   userCap,
   userChange,
 } from "../engine/economy.js";
-import { conquestSectors } from "../engine/combat.js";
+import { conquestScale, conquestSectors } from "../engine/combat.js";
 import { deployCount, programCompute, scaledShare } from "../engine/programs.js";
 import type { Rules } from "../engine/rules.js";
 import { forceTotals } from "../engine/units.js";
@@ -228,7 +228,10 @@ export class Plan {
       order.program = program;
       this.compute -= programCompute(this.rules, program);
     }
-    if (mode === "conquest") this.costTerritory += conquestSectors(this.rules, this.targets().find((t) => t.designation === target)!.territory);
+    if (mode === "conquest") {
+      const t = this.targets().find((t) => t.designation === target)!;
+      this.costTerritory += conquestSectors(this.rules, t.territory, conquestScale(this.rules, t.power, this.brief.you.power));
+    }
     this.attacked = true;
     this.spending.push(order);
     // A fight costs units; assume none, which only overstates upkeep.
