@@ -15,7 +15,8 @@
     "key": "tsx scripts/key.ts",
     "epoch": "tsx scripts/epoch.ts",
     "mcp": "tsx src/mcp/http.ts",
-    "runner": "tsx src/runner/main.ts"
+    "runner": "tsx src/runner/main.ts",
+    "week": "tsx scripts/week.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",

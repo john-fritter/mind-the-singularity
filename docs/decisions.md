@@ -772,3 +772,80 @@ numbers in `config/rules.yaml` changed.
   `npm run mcp` on Postgres up to the model call, which this container's
   network refuses (api.nano-gpt.com isn't on its allowlist); 3e needs that
   host and a NanoGPT key.
+
+## 2026-10-06 — Phase 3e: the simulated week
+
+`npm run week` (src/week/week.ts, scripts/week.ts): one model bot plays a
+week against the legacy systems and scripted minds, on a fake clock,
+through the real MCP server. That closes Phase 3. No numbers in
+`config/rules.yaml` changed.
+
+**Agreed with John:**
+
+- **One process, a memory store, the real server.** The week serves
+  `createMcpApp` on a loopback port with its clock injected and an
+  in-process key for the bot, and the bot plays through it with the
+  runner's own `runWake` over HTTP, as `npm run runner -- wake` does. The
+  scripted players take the wakes that fall due between the bot's own
+  (`players/drive.ts`), as in the CLI. No Postgres: the store isn't what
+  3e tests, and 3a's suites cover it.
+- **The bot wakes 8 times a day**, once in each 3-hour slot at a seeded
+  minute inside it (DESIGN.md's "random time inside the bot's schedule"),
+  against the legacy systems and builder, raider, turtle and converger.
+- **Resumable.** The game is saved after every wake, in the CLI's save
+  format (so `npm run play -- --save logs/week/game.json --as lantern
+  brief` opens it), with each wake a line of `wakes.jsonl`. A wake whose
+  model call failed (network, the daily cap) stops the run without
+  counting, and `--resume` redoes it; a resumed week ends in the same game
+  as one that never stopped (tests/week.test.ts).
+- **The report** (`report.md`) gives each wake's brief in tokens
+  (gpt-tokenizer, as the brief test counts), model calls and tokens,
+  orders accepted and the bot's note; the totals, the final rankings, the
+  bot's fights from the Record, and a replay check. A brief over the
+  ceiling or a game that doesn't replay fails the run.
+
+**Smaller calls, made here:**
+
+- **The week's knobs are a `week:` block in `config/runner.yaml`** (bot,
+  days, wakes_per_day, opponents, seed, brief_ceiling_tokens, out_dir),
+  optional in the schema since only `npm run week` reads it; flags
+  override them. Opponents are strategy names, checked by the week
+  against `src/players/`, since the runner's settings may not import it.
+- **src/week/ imports the runner and the game both.** It's a harness, like
+  the tests: the runner itself still reaches the game only through MCP,
+  and the boundaries test still holds that.
+- **The brief is measured from the wake's own message** (`briefInMessage`
+  next to `wakeMessage` in prompts.ts), so the count is of exactly what
+  the model read.
+- **The NanoGPT key in this container** is added to requests by the
+  environment's proxy, not read from a variable; `runner.env` holds a
+  placeholder `NANOGPT_KEY` so the runner's check passes. Node's `fetch`
+  ignores `HTTPS_PROXY` unless `NODE_USE_ENV_PROXY=1` (Node 22.21+), so
+  the week runs here as `NODE_USE_ENV_PROXY=1 npm run week`. No code
+  change: on a box without a proxy it isn't needed.
+
+**The week's result** (seed 1, deepseek/deepseek-v4-pro, reasoning
+effort default): all 56 wakes done in one model call each, no retries
+after a bad answer, no lookups. 199 of 240 orders accepted (83%). The
+brief was at most 317 tokens (mean 271), far under the 2,000 ceiling.
+367K tokens in (313K of them cached by the provider), 8K out. LANTERN
+finished third of nine by power behind the builder and the converger,
+ahead of the turtle, the raider and all three legacy systems; nobody
+attacked it, and it attacked nobody. The game replays from its log.
+
+It played its persona: economy first, research toward Hardening, a
+standing defense, no first strike, a plain engineer's scratchpad. Its
+weaknesses, for later phases rather than this one:
+
+- **It doesn't learn from refused orders.** 26 of the 41 refusals were
+  the same `manufacture` with no factory housing left, wake after wake;
+  it never built factories. The results come back to the runner, but the
+  next wake's brief doesn't mention them.
+- **It ignores the late game's limits.** From day 6 it had no open land
+  and its compute at storage, yet kept monetizing and spinning up
+  (capital idle past 600K) rather than expanding. Both are in its brief.
+- **It writes its scratchpad rarely** (4 times in 56 wakes).
+
+The model ran with no reasoning tokens; a bot with a reasoning effort set,
+or a line in the brief naming last wake's refused orders, are the first
+things to try.
