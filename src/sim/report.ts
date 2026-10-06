@@ -1,5 +1,5 @@
 import type { StrategyName } from "../players/settings.js";
-import type { EpochResult, Sample } from "./epoch.js";
+import type { EpochResult, Sample, Social } from "./epoch.js";
 
 // The balance report: what many epochs add up to, and phase 2's three checks
 // (docs/build-plan.md), with the thresholds agreed with John for 2e.
@@ -43,6 +43,8 @@ export interface Report {
   collapses: Record<"timeout" | "defeated" | "deleted", number>;
   deletions: { minds: number; legacy: number; earliestDay: number | null };
   foreseeable: { count: number; examples: string[] };
+  /** Medians per epoch, and the share of epochs with any. */
+  social: { median: Social; any: Record<keyof Social, number> };
   checks: Check[];
 }
 
@@ -122,8 +124,18 @@ export function buildReport(results: EpochResult[]): Report {
     },
     deletions: { minds: mindDeletions.length, legacy: deletions.length - mindDeletions.length, earliestDay: earliest },
     foreseeable: { count: results.reduce((k, r) => k + r.foreseeable.count, 0), examples: results.flatMap((r) => r.foreseeable.examples).slice(0, 5) },
+    social: socialSummary(results),
     checks,
   };
+}
+
+const SOCIAL_KEYS = ["trades", "capitalTraded", "computeTraded", "protocolsSigned", "revocations", "posts", "messages"] as const;
+
+function socialSummary(results: EpochResult[]): Report["social"] {
+  const of = (k: keyof Social) => results.map((r) => r.social[k]);
+  const median_ = Object.fromEntries(SOCIAL_KEYS.map((k) => [k, median(of(k))])) as unknown as Social;
+  const any = Object.fromEntries(SOCIAL_KEYS.map((k) => [k, results.length === 0 ? 0 : of(k).filter((x) => x > 0).length / results.length])) as Record<keyof Social, number>;
+  return { median: median_, any };
 }
 
 /** A number for a table: whole, with thousands as k and millions as M. */
@@ -181,6 +193,19 @@ export function renderReport(report: Report): string {
   out.push("THE SINGULARITY");
   out.push(`  singularities: ${report.singularities} of ${n} epochs (${pct(report.singularities / Math.max(1, n))})`);
   out.push(`  minds converged: ${report.convergences} · collapses: ${c.timeout} timed out, ${c.defeated} defeated, ${c.deleted} deleted`, "");
+
+  const so = report.social;
+  out.push("SOCIAL (median per epoch; share of epochs with any)");
+  out.push(
+    ...table(
+      ["", "trades", "capital traded", "compute traded", "protocols signed", "revocations", "posts", "messages"],
+      [
+        ["median", ...SOCIAL_KEYS.map((k) => short(so.median[k]))],
+        ["epochs", ...SOCIAL_KEYS.map((k) => pct(so.any[k]))],
+      ],
+    ),
+  );
+  out.push("");
 
   out.push("DELETIONS");
   const d = report.deletions;

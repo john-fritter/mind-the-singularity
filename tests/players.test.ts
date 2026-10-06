@@ -12,7 +12,7 @@ import { replay } from "../src/game/replay.js";
 import { apportion } from "../src/players/plan.js";
 import { drive, legacySeats, scriptedSeat, wakesBetween, type Seat, type WakeLog } from "../src/players/drive.js";
 import { STRATEGIES, type StrategyName } from "../src/players/settings.js";
-import { foreseeableFailures } from "../src/sim/epoch.js";
+import { foreseeableFailures, socialOf } from "../src/sim/epoch.js";
 import { MemoryStore } from "../src/store/memory.js";
 
 // Phase 2d: the scripted players and the legacy systems. Each plays a whole
@@ -71,6 +71,13 @@ async function wholeEpoch() {
     const raided = logs.some((l) => l.account === legacyAccount(system.designation) && l.steps.some((s) => s.orders.some((o) => (o as { do: string }).do === "attack")));
     if (!system.raids) assert.equal(raided, false, `${system.designation} doesn't raid`);
   }
+
+  // Phase 4d: they traded, signed and left protocols, posted and messaged.
+  const social = socialOf(game.record);
+  for (const k of ["trades", "protocolsSigned", "revocations", "posts", "messages"] as const) assert.ok(social[k] > 0, `no ${k}: ${JSON.stringify(social)}`);
+  const accepted = (kind: string, order: string) => logs.filter((l) => l.kind === kind).some((l) => l.steps.some((s) => s.results.some((r) => r.do === order && r.ok)));
+  assert.ok(["builder", "turtle", "converger"].some((k) => accepted(k, "trade_accept")), "no planned strategy took a fair offer");
+  assert.ok(["builder", "turtle", "converger", "raider"].some((k) => accepted(k, "protocol_accept")), "no planned strategy joined when asked");
 
   // The game still rebuilds from its start and log.
   const rebuilt = replay(game);

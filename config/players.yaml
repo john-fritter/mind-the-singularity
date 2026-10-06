@@ -13,6 +13,24 @@
 # `singularity` is the strategy's stance, from DESIGN.md's mind profile:
 # lead runs it as soon as it can; join runs it only while a convergence is
 # underway; hunt attacks converged minds by conquest; never ignores it.
+#
+# `social` (phase 4d) is how it trades and signs protocols, before it
+# spends anything. It values goods in cycles: what one Monetize cycle
+# yields it in capital, or one Spin Up in compute. It accepts an offer of
+# what it `buys` when that's worth at least (1 - accept_tolerance) of what
+# it pays; and while it has no offer open it puts up offer_share of its
+# spare stock of the other good (compute above reserve_compute, or capital),
+# to anyone, asking offer_margin more than it gives. A proposer proposes a
+# protocol to the strongest mind in range while in none, and messages it;
+# an accepter signs the first proposal it's asked into while in none; one
+# with revoke_on_converged leaves a protocol whose partner converges,
+# unless it joins convergences itself, and says so on the Commons.
+#
+# The raider and conqueror stay out of the market, and the conqueror signs
+# nothing (agreed with John in 4d, docs/decisions.md): trading sold them
+# capital for hardware, and weak minds' protocols with the conqueror
+# steered it onto rich ones, each enough to have it top over half the
+# epochs.
 
 # 8 a day, the rate the bot runner is planned to wake bots at.
 wake_every_hours: 3
@@ -34,6 +52,7 @@ strategies:
     leftover: monetize
     buildings: { city: 0.45, datacenter: 0.15, factory: 0.05, lab: 0.2, core: 0.1, firewall: 0.05 }
     hardware: { drones: 0, sentries: 1, walkers: 0 }
+    social: { buys: compute, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: true, accept: true, revoke_on_converged: false }
 
   # Builds a force and raids the weakest mind in range when it can win;
   # joins a convergence.
@@ -53,6 +72,7 @@ strategies:
     leftover: spin_up
     buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
+    social: { buys: null, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: false, accept: true, revoke_on_converged: false }
 
   # Cores, firewalls and sentries; banks cycles; never attacks; joins a
   # convergence.
@@ -70,6 +90,7 @@ strategies:
     leftover: monetize
     buildings: { city: 0.3, datacenter: 0.15, factory: 0.1, lab: 0.1, core: 0.2, firewall: 0.15 }
     hardware: { drones: 0, sentries: 0.8, walkers: 0.2 }
+    social: { buys: compute, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: true, accept: true, revoke_on_converged: false }
 
   # Labs, the shortest path to the Singularity, and runs it the moment it can.
   converger:
@@ -86,6 +107,7 @@ strategies:
     leftover: spin_up
     buildings: { city: 0.3, datacenter: 0.25, factory: 0, lab: 0.35, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0, sentries: 1, walkers: 0 }
+    social: { buys: compute, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: true, accept: true, revoke_on_converged: false }
 
   # The raider's build, but takes land: conquers the weakest mind in range
   # when it can win. Added in 2e so the simulator tests conquest, which any
@@ -104,6 +126,16 @@ strategies:
     leftover: spin_up
     buildings: { city: 0.35, datacenter: 0.15, factory: 0.3, lab: 0.1, core: 0.05, firewall: 0.05 }
     hardware: { drones: 0.6, sentries: 0, walkers: 0.4 }
+    social: { buys: null, offer_share: 0.2, offer_min_cycles: 3, offer_margin: 0.1, accept_tolerance: 0.1, propose: false, accept: false, revoke_on_converged: false }
 
 random:
   actions_per_wake: 6
+
+# What scripted players write. {me}, {them} and {partners} are designations.
+texts:
+  proposal: "{me} proposes a non-aggression protocol with {them}. Sign it and neither of us strikes the other."
+  revoke: "{me} is leaving its protocol with {partners}. A converged mind gets no shelter from me."
+  post:
+    - "{me} is open for trade: fair prices, posted on the Commons."
+    - "{me} builds. Leave {me} alone and {me} leaves you alone."
+    - "Anyone counting the minds converging? {me} is."

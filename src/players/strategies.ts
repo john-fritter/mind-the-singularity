@@ -2,9 +2,66 @@ import { BUILDINGS, HARDWARE, PROGRAM_INFO, programsOf } from "../engine/archite
 import { programCompute } from "../engine/programs.js";
 import { forceTotals } from "../engine/units.js";
 import type { PublicSummary } from "../game/read.js";
-import { Plan } from "./plan.js";
+import { Plan, type Goods } from "./plan.js";
 import type { Player, Wake } from "./player.js";
 import type { Players, Strategy, StrategyName } from "./settings.js";
+
+type Texts = Players["texts"];
+
+/** A text with {me}, {them} and {partners} filled in. */
+function fill(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (all, k: string) => vars[k] ?? all);
+}
+
+const other = (g: Goods): Goods => (g === "capital" ? "compute" : "capital");
+
+/**
+ * Trades and protocols, before anything is spent (docs: config/players.yaml).
+ * Keys: social.open_offers_max (through the Plan)
+ */
+function social(plan: Plan, s: Strategy, texts: Texts): void {
+  const { brief } = plan;
+  const me = brief.you.designation;
+  const t = s.social;
+
+  // Protocols: leave one sheltering a converged partner; else join when asked; else ask.
+  const protocol = brief.protocol;
+  const converged = new Set(brief.convergence?.minds ?? []);
+  const joins = s.singularity === "lead" || s.singularity === "join";
+  if (protocol !== null) {
+    const partners = protocol.members.filter((m) => m !== me);
+    if (t.revoke_on_converged && !joins && partners.some((m) => converged.has(m)) && plan.revoke()) {
+      plan.post(fill(texts.revoke, { me, partners: partners.join(", ") }));
+    }
+  } else {
+    const asked = brief.proposals.toYou.find((p) => p.awaiting.includes(me));
+    if (asked && t.accept) plan.acceptProposal(asked);
+    else if (t.propose && brief.proposals.yours === null) {
+      const strongest = plan.targets().find((x) => !plan.isLegacy(x.designation) && x.status !== "converged");
+      if (strongest && plan.propose(strongest.designation)) plan.message(strongest.designation, fill(texts.proposal, { me, them: strongest.designation }));
+    }
+  }
+
+  // Trades: take every fair offer of what it buys, best first; then make one if none is open.
+  if (t.buys === null) return;
+  const buys = t.buys;
+  const pays = other(buys);
+  const worth = (o: { give: { goods: Goods; amount: number }; want: { goods: Goods; amount: number } }) => plan.cyclesFor(o.give) / plan.cyclesFor(o.want);
+  const fair = plan
+    .offersOpen()
+    .filter((o) => o.give.goods === buys && o.want.goods === pays && worth(o) >= 1 - t.accept_tolerance)
+    .sort((a, b) => worth(b) - worth(a) || a.offer - b.offer);
+  for (const o of fair) plan.acceptOffer(o);
+
+  if (brief.offers.yours.length > 0 || t.offer_share === 0) return;
+  const spare = pays === "compute" ? plan.compute - s.reserve_compute : plan.capital;
+  const give = Math.floor(Math.max(0, spare) * t.offer_share);
+  const giveCycles = plan.cyclesFor({ goods: pays, amount: give });
+  if (give < 1 || !(giveCycles >= t.offer_min_cycles) || !Number.isFinite(giveCycles)) return;
+  const want = Math.floor(giveCycles * (1 + t.offer_margin) * plan.perCycle(buys));
+  if (want < 1) return;
+  plan.offer({ goods: pays, amount: give }, { goods: buys, amount: want });
+}
 
 // The scripted players: builder, raider, turtle and converger are one
 // planner run by different settings (config/players.yaml); random rolls its
@@ -29,6 +86,7 @@ export class Planned implements Player {
   constructor(
     readonly kind: string,
     private readonly s: Strategy,
+    private readonly texts: Texts,
   ) {}
 
   decide(wake: Wake): unknown[] {
@@ -36,6 +94,7 @@ export class Planned implements Player {
     const plan = new Plan(rules, brief);
     if (!plan.live) return [];
     const s = this.s;
+    if (step === 1) social(plan, s, this.texts);
     research(plan, s);
     if (s.countermeasure !== null) plan.setCountermeasure(plan.program("battle"), s.countermeasure);
 
@@ -112,7 +171,10 @@ function spendCycles(plan: Plan, s: Strategy): void {
 /** Random: each wake, a handful of orders picked at random from those the brief says can work. */
 export class RandomPlayer implements Player {
   readonly kind = "random";
-  constructor(private readonly settings: Players["random"]) {}
+  constructor(
+    private readonly settings: Players["random"],
+    private readonly texts: Texts,
+  ) {}
 
   decide(wake: Wake): unknown[] {
     const { rules, brief, rng } = wake;
@@ -148,6 +210,44 @@ export class RandomPlayer implements Player {
         const t = pick(plan.targets());
         if (t) plan.attackWith(t.designation, rng.next() < 0.5 ? "raid" : "conquest", rng.next() < 0.5 ? plan.program("battle") : undefined);
       },
+      // One slot for every social order, so the economy's share of the rolls stays what it was.
+      () => pick(social)!(),
+    ];
+    const me = brief.you.designation;
+    const minds = brief.inRange.filter((t) => !plan.isLegacy(t.designation)).map((t) => t.designation);
+    const goods = ["capital", "compute"] as const;
+    const social: (() => unknown)[] = [
+      () => {
+        const g = pick(goods)!;
+        const amount = Math.floor((g === "capital" ? plan.capital : plan.compute) * rng.next() * 0.3);
+        const want = Math.floor(plan.cyclesFor({ goods: g, amount }) * (0.5 + rng.next()) * plan.perCycle(g === "capital" ? "compute" : "capital"));
+        plan.offer({ goods: g, amount }, { goods: g === "capital" ? "compute" : "capital", amount: want }, rng.next() < 0.3 ? pick(minds) : undefined);
+      },
+      () => {
+        const o = pick(plan.offersOpen());
+        if (o) plan.acceptOffer(o);
+      },
+      () => {
+        const o = pick(brief.offers.yours);
+        if (o) plan.cancelOffer(o.offer);
+      },
+      () => {
+        const t = pick(minds);
+        if (t) plan.propose(t);
+      },
+      () => {
+        const p = pick(brief.proposals.toYou);
+        if (p) (rng.next() < 0.7 ? plan.acceptProposal(p) : plan.declineProposal(p));
+      },
+      () => (rng.next() < 0.2 ? plan.revoke() : undefined),
+      () => {
+        const reply = rng.next() < 0.5 ? pick(brief.commons.posts)?.post : undefined;
+        plan.post(fill(pick(this.texts.post)!, { me }), reply);
+      },
+      () => {
+        const t = pick(minds);
+        if (t) plan.message(t, fill(pick(this.texts.post)!, { me, them: t }));
+      },
     ];
     for (let i = 0; i < this.settings.actions_per_wake; i++) pick(actions)!();
     return plan.orders();
@@ -156,5 +256,5 @@ export class RandomPlayer implements Player {
 
 /** The player for a strategy, with its settings. */
 export function playerFor(name: StrategyName, settings: Players): Player {
-  return name === "random" ? new RandomPlayer(settings.random) : new Planned(name, settings.strategies[name]);
+  return name === "random" ? new RandomPlayer(settings.random, settings.texts) : new Planned(name, settings.strategies[name], settings.texts);
 }

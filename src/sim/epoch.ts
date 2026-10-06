@@ -19,8 +19,20 @@ import { MemoryStore } from "../store/memory.js";
 /** The epoch's day marks the report samples, every this many days. */
 export const SAMPLE_EVERY_DAYS = 10;
 
-/** Failures the brief can't foresee: a crash, a firewall block, a target's hostile cap (other minds' programs aren't in the brief). */
-export const UNFORESEEABLE = [/ crashed: /, /firewalls blocked/, /has taken all the hostile programs it can today/];
+/**
+ * Failures the brief can't foresee: a crash, a firewall block, a target's
+ * hostile cap (other minds' programs aren't in the brief), and a protocol
+ * proposal refused for the other mind's protocol (the brief shows only
+ * your own: whether they're in one, it's full, or one of them is leaving).
+ */
+export const UNFORESEEABLE = [
+  / crashed: /,
+  /firewalls blocked/,
+  /has taken all the hostile programs it can today/,
+  /are each in a protocol; a mind is in one at most/,
+  /^That protocol would have \d+ minds/,
+  /is leaving its protocol; nothing joins it until that lands/,
+];
 
 export interface EpochInput {
   rules: Rules;
@@ -72,6 +84,18 @@ export interface EpochResult {
   deletions: { day: number; legacy: boolean; strategy: StrategyName | "legacy" }[];
   /** Failed orders the brief could have foreseen, with the first few. */
   foreseeable: { count: number; examples: string[] };
+  social: Social;
+}
+
+/** The social layer in one epoch (phase 4d): counts from the Record, goods traded both ways. */
+export interface Social {
+  trades: number;
+  capitalTraded: number;
+  computeTraded: number;
+  protocolsSigned: number;
+  revocations: number;
+  posts: number;
+  messages: number;
 }
 
 /**
@@ -193,5 +217,24 @@ export async function runEpoch(input: EpochInput): Promise<EpochResult> {
       return [{ day: dayOf(e.at), legacy, strategy: legacy ? ("legacy" as const) : strategyOf.get(accountOf(e.domain))! }];
     }),
     foreseeable: { count: foreseeable.length, examples: foreseeable.slice(0, 5) },
+    social: socialOf(events),
   };
+}
+
+/** What the Record says the minds did socially. */
+export function socialOf(events: Game["record"]): Social {
+  const out: Social = { trades: 0, capitalTraded: 0, computeTraded: 0, protocolsSigned: 0, revocations: 0, posts: 0, messages: 0 };
+  for (const e of events) {
+    if (e.type === "trade") {
+      out.trades++;
+      for (const l of [e.give, e.want]) {
+        if (l.goods === "capital") out.capitalTraded += l.amount;
+        else out.computeTraded += l.amount;
+      }
+    } else if (e.type === "protocol_signed") out.protocolsSigned++;
+    else if (e.type === "protocol_revoking") out.revocations++;
+    else if (e.type === "post") out.posts++;
+    else if (e.type === "message") out.messages++;
+  }
+  return out;
 }

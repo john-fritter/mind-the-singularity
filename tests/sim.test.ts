@@ -65,6 +65,7 @@ function result(over: Partial<EpochResult>): EpochResult {
     collapses: { timeout: 0, defeated: 0, deleted: 0 },
     deletions: [],
     foreseeable: { count: 0, examples: [] },
+    social: { trades: 0, capitalTraded: 0, computeTraded: 0, protocolsSigned: 0, revocations: 0, posts: 0, messages: 0 },
     ...over,
   };
 }

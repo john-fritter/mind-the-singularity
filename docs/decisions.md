@@ -1052,3 +1052,67 @@ converged-mind exemption, so protocols hold through convergence.
   and after the orders.
 - **Scripted players don't use protocols;** that's 4d. `npm run sim`
   passes phase 2's checks unchanged.
+
+## 2026-10-06 — Phase 4d: scripted social play
+
+Scripted players trade, sign protocols, post and message, before they
+spend anything each wake. The knobs are a `social` block per strategy in
+`config/players.yaml`, plus `texts` for what they write. `npm run sim`
+reports a SOCIAL section (trades, goods traded, protocols signed,
+revocations, posts, messages per epoch) and still passes phase 2's four
+checks: conqueror tops 44% of 200 epochs, the Singularity happens in 26%,
+earliest deletion day 8.1, no foreseeable failed order (main before this:
+47%, 24%, day 6.6).
+
+**Agreed with John:**
+
+- **A trade is priced in the player's own cycles.** One Monetize cycle
+  yields its capital income, one Spin Up its compute income (the engine's
+  `monetizeYield` and `spinUpYield`, which the rules text documents). A
+  player accepts an offer of what it `buys` when that's worth at least
+  (1 − `accept_tolerance`) of what it pays, and keeps one offer of its own
+  open, `offer_share` of its spare stock, asking `offer_margin` more.
+  Minds' rates differ, so trades happen where both sides gain.
+- **A refused proposal the brief can't foresee** doesn't fail the sim's
+  fourth check: whether the other mind is in a protocol, its protocol is
+  full, or someone in it is leaving. The brief shows only your own
+  protocol; adding partners to IN RANGE would cost tokens every wake.
+- **The raider and conqueror stay out of the market, and the conqueror
+  signs nothing.** With everyone trading and accepting, the conqueror
+  topped 64% of epochs (trades alone 55%, protocols alone 60%). Raiders
+  and conquerors make compute cheaply and value capital, so trading sold
+  them capital for hardware, and more convergences were defeated
+  (Singularity 24% → 12%, and Shutdown epochs are where the conqueror
+  wins). Weak minds' protocols with the conqueror steered it, since it
+  attacks the weakest mind in range, onto builders and turtles with far
+  more land. `expansion.yield_min` 7 or 8 and
+  `combat.attack_cycles_per_recent_attack` 3 didn't fix it (62%, 56%,
+  89%). This is a player knob chosen to pass, unlike 2e's rule that knobs
+  aren't tuned to pass; put to John against retuning the rules or
+  shipping with the check failing. The cost:
+  about 3 trades an epoch (builder, turtle and converger all buy compute,
+  so random minds are most of the sellers). Model bots in 4e will trade
+  with anyone, so the market feeding attackers is a dynamic to watch
+  there. Tables: `/mnt/project-files/phase-4d/findings.md` in the
+  project.
+
+**Smaller calls, made here:**
+
+- **Builder, turtle and converger propose** a protocol to the strongest
+  mind in range while in none, and message it; **everyone but the
+  conqueror accepts** the first proposal it's asked into. Proposing to
+  whoever last beat it in battle instead changed nothing in the sim.
+- **`revoke_on_converged`** (leave a protocol whose partner converged,
+  unless it joins convergences, with a Commons post) is in the schema and
+  tested, but off for every strategy now that the conqueror signs
+  nothing; random minds still revoke.
+- **Goods move only before the first cycle is spent**, as do protocol
+  accepts: escrow and swaps run first in the engine, so the plan's
+  estimate stays a lower bound, and an attack already planned can't land
+  on a new partner (the simulator found that one).
+- **The random player** rolls every social order from one slot, so its
+  economy's share of the rolls is unchanged.
+- **Briefs** in a scripted epoch with social play: median 638 tokens, max
+  946 (332 and 588 before); `tests/brief.test.ts` checks every wake.
+- **cli.test.ts** reads offer and proposal numbers back instead of
+  assuming #1, since the scripted builder now makes its own.
