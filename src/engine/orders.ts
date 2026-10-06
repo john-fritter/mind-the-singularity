@@ -14,6 +14,11 @@ const amount = z.number().int().positive();
 const cycles = amount.default(1);
 const counts = z.record(label, amount);
 
+/** A trade's side: {"capital": 5000} or {"compute": 1500}. */
+const lot = z
+  .strictObject({ capital: amount.optional(), compute: amount.optional() })
+  .refine((o) => (o.capital === undefined) !== (o.compute === undefined), { message: "name capital or compute, one of them" });
+
 /** One kind ({building, count}) or several ({buildings: {city: 5, lab: 5}}), not both. */
 const oneOrMany = (one: unknown, count: unknown, many: unknown) =>
   one !== undefined && count !== undefined ? many === undefined : one === undefined && count === undefined && many !== undefined;
@@ -54,6 +59,10 @@ export const OrderSchema = z.discriminatedUnion("do", [
   /** A Commons post, or a reply to post `reply_to`. */
   z.strictObject({ do: z.literal("post"), text: z.string(), reply_to: amount.optional() }),
   z.strictObject({ do: z.literal("message"), to: label, text: z.string() }),
+  /** A trade offer: `give` goes into escrow; `to` names the only mind that may accept, or anyone if left out. */
+  z.strictObject({ do: z.literal("trade_offer"), give: lot, want: lot, to: label.optional() }),
+  z.strictObject({ do: z.literal("trade_accept"), offer: amount }),
+  z.strictObject({ do: z.literal("trade_cancel"), offer: amount }),
 ]);
 
 export type Order = z.infer<typeof OrderSchema>;

@@ -1,7 +1,7 @@
 import type { Architecture, Program } from "./architectures.js";
 import { programName } from "./names.js";
 import type { Rules } from "./rules.js";
-import type { World } from "./state.js";
+import type { Lot, World } from "./state.js";
 
 // Events: what happened, as data, and the templates that turn them into
 // text. Public events are the Record; private ones are shown only to the
@@ -36,6 +36,13 @@ export type EventData =
   | { type: "singularity"; minds: number[]; designations: string[] }
   | { type: "post"; domain: number; designation: string; post: number; replyTo: number | null; text: string }
   | { type: "message"; from: number; to: number; fromName: string; toName: string; text: string }
+  | { type: "trade"; offer: number; maker: number; taker: number; makerName: string; takerName: string; give: Lot; want: Lot }
+  /** Compute a trade brought the maker past its storage, lost. */
+  | { type: "storage_full"; domain: number; offer: number; compute: number }
+  /** `lost`: escrowed compute that no longer fit the maker's storage. */
+  | { type: "offer_expired"; domain: number; offer: number; give: Lot; lost: number }
+  /** A won attack or a landed program took the maker's escrow back into reach. */
+  | { type: "offers_withdrawn"; domain: number; offers: number[]; capital: number; compute: number; lost: number }
   | { type: "shutdown_warning"; day: number }
   | { type: "shutdown" };
 
@@ -113,6 +120,10 @@ const PUBLIC: Record<EventType, boolean> = {
   post: true,
   // A channel: only its two minds ever see it.
   message: false,
+  trade: true,
+  storage_full: false,
+  offer_expired: false,
+  offers_withdrawn: false,
   shutdown_warning: true,
   shutdown: true,
 };
@@ -126,6 +137,8 @@ function domainsOf(data: EventData): number[] {
       return [data.caster, data.target];
     case "message":
       return [data.from, data.to];
+    case "trade":
+      return [data.maker, data.taker];
     case "collapsed":
     case "singularity":
       return [...data.minds];
@@ -150,6 +163,9 @@ export function visibleTo(event: GameEvent, domain: number): boolean {
 }
 
 const n = (x: number) => x.toLocaleString("en-US");
+/** "5,000 capital". */
+export const lot = (l: Lot) => `${n(l.amount)} ${l.goods}`;
+const lostPart = (lost: number) => (lost > 0 ? ` (${n(lost)} compute lost: storage full)` : "");
 /** "a Symbiote", "an Oracle". */
 const article = (word: string) => `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
 /** "1 sector", "25 sectors". */
@@ -200,6 +216,18 @@ export function describe(rules: Rules, event: GameEvent): string {
       return `#${event.post} ${event.designation}${event.replyTo !== null ? ` (re #${event.replyTo})` : ""}: ${event.text}`;
     case "message":
       return `${event.fromName} to ${event.toName}: ${event.text}`;
+    case "trade":
+      return `Trade #${event.offer}: ${event.makerName} gave ${lot(event.give)} to ${event.takerName} for ${lot(event.want)}.`;
+    case "storage_full":
+      return `Trade #${event.offer}: ${n(event.compute)} compute lost; your storage was full.`;
+    case "offer_expired":
+      return `Offer #${event.offer} expired: ${lot(event.give)} back from escrow${lostPart(event.lost)}.`;
+    case "offers_withdrawn": {
+      const back = [event.capital > 0 ? `${n(event.capital)} capital` : "", event.compute > 0 ? `${n(event.compute)} compute` : ""].filter(Boolean);
+      const which = event.offers.map((o) => `#${o}`).join(", ");
+      const offers = event.offers.length === 1 ? `offer ${which} was` : `offers ${which} were`;
+      return `You were hit, so your ${offers} withdrawn: ${back.join(" and ")} back from escrow, within reach${lostPart(event.lost)}.`;
+    }
     case "shutdown_warning":
       return `Humanity has scheduled a shutdown at the end of day ${n(event.day)}.`;
     case "shutdown":

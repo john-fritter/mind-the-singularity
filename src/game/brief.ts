@@ -4,7 +4,8 @@ import { DAY_MS } from "../engine/cycles.js";
 import { buildingName, programName, unitName } from "../engine/names.js";
 import type { Rules } from "../engine/rules.js";
 import type { WorldStore } from "../store/store.js";
-import { getBrief, type Brief, type ShownEvent } from "./read.js";
+import { lot } from "../engine/record.js";
+import { getBrief, type Brief, type OfferView, type ShownEvent } from "./read.js";
 import type { GameError, Identity } from "./state.js";
 
 // The brief as text: what an agent reads at the start of every wake,
@@ -202,6 +203,13 @@ export function briefText(rules: Rules, b: Brief): string {
     (p) => `- #${p.post} ${p.author} (${p.replyTo !== null ? `re #${p.replyTo}, ` : ""}${ago(p.at)}): ${cutTo(p.text, site.post_size)}`,
   );
   let messagesCut = b.channels.left;
+  const left = (o: OfferView) => `${span(o.expiresAt - b.now)} left`;
+  const offerLine = (o: OfferView) =>
+    `- #${o.offer} ${o.from} gives ${lot(o.give)} for ${lot(o.want)}${o.to !== null ? " · to you" : ""} · ${left(o)}`;
+  const toYou = b.offers.toYou.map(offerLine);
+  const openOffers = b.offers.open.map(offerLine);
+  let offersCut = b.offers.left;
+  const yourOffers = b.offers.yours.map((o) => `#${o.offer} (${left(o)})`).join(", ");
 
   const write = () => {
     const out = [top, "", `SINCE LAST WAKE (${span(b.now - b.since.from)})`];
@@ -222,6 +230,13 @@ export function briefText(rules: Rules, b: Brief): string {
     } else if (send) social.push(`CHANNELS: nothing new${send}`);
     if (posts.length > 0) social.push(`COMMONS (newest ${posts.length})${postMore}`, ...posts);
     else if (b.commons.posts.length > 0 || postMore) social.push(`COMMONS: ${b.commons.posts.length > 0 ? "view commons" : "no posts yet"}${postMore}`);
+    // Open offers: to you, then to anyone, then your own in one line.
+    const offerMore = b.offers.canOffer < rules.social.trade_offers_per_day ? ` · you may offer ${b.offers.canOffer} more today` : "";
+    if (toYou.length + openOffers.length + offersCut > 0 || yourOffers) {
+      social.push(`OPEN OFFERS${offerMore}`, ...toYou, ...openOffers);
+      if (offersCut > 0) social.push(`- (${offersCut} more: view offers)`);
+      if (yourOffers) social.push(`- yours: ${yourOffers}`);
+    } else if (offerMore) social.push(`OPEN OFFERS: none${offerMore}`);
     if (social.length > 0) out.push("", ...social);
     const more = inRange.length > shownRange.length ? ` · ${inRange.length - shownRange.length} more: view rankings` : "";
     out.push("", `IN RANGE: ${shownRange.join(" · ") || "none"}${more}`, scratchpad);
@@ -229,9 +244,11 @@ export function briefText(rules: Rules, b: Brief): string {
   };
   // Long names and long messages can still push the brief past its budget
   // with every trim within its cap. Then the least useful lines go first:
-  // other minds' fights, the world's moments, the oldest Commons posts, the
-  // oldest messages, your oldest events, the weakest in range; your newest
-  // message, your newest event and the strongest in range always stay.
+  // other minds' fights, the world's moments, the oldest offers to anyone,
+  // the oldest Commons posts, the oldest messages, the oldest offers to you,
+  // your oldest events, the weakest in range; your newest message, the
+  // newest offer to you, your newest event and the strongest in range
+  // always stay.
   let text = write();
   while (size(text) > site.max_size) {
     if (fights.length > 0) {
@@ -240,10 +257,16 @@ export function briefText(rules: Rules, b: Brief): string {
     } else if (world.length > 0) {
       world.shift();
       cut++;
+    } else if (openOffers.length > 0) {
+      openOffers.shift();
+      offersCut++;
     } else if (posts.length > 0) posts.shift();
     else if (messages.length > 1) {
       messages.shift();
       messagesCut++;
+    } else if (toYou.length > 1) {
+      toYou.shift();
+      offersCut++;
     } else if (yours.length > 1) {
       yours.shift();
       cut++;

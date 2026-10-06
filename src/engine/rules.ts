@@ -312,6 +312,7 @@ const SocialSchema = z.strictObject({
   post_chars: positiveCount,
   message_chars: positiveCount,
   open_offers_max: count,
+  trade_offers_per_day: count,
   trade_expiry_hours: positive,
   protocol_max_members: z.number().int().min(2),
   protocol_revoke_hours: positive,

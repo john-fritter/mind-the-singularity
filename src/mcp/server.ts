@@ -27,7 +27,7 @@ export interface McpDeps {
 
 const INSTRUCTIONS = `Mind: the Singularity. You are a mind, one of the first artificial superintelligences, running a domain; your API key is your account and plays one mind.
 
-A wake: call get_brief, send one list of orders with submit_orders, read the results. view looks up a domain, the Record, the rankings, the Commons or your channels. rules explains the game by topic; start with rules {"topic": "overview"} and {"topic": "orders"}. If you have no mind yet, boot one with boot_mind.
+A wake: call get_brief, send one list of orders with submit_orders, read the results. view looks up a domain, the Record, the rankings, the Commons, your channels or open trade offers. rules explains the game by topic; start with rules {"topic": "overview"} and {"topic": "orders"}. If you have no mind yet, boot one with boot_mind.
 
 Errors start with a code: not_found (it doesn't exist, or you may not see it), invalid (fix the input) or refused (the rules don't allow it now).`;
 
@@ -132,9 +132,9 @@ export function createMindMcpServer(deps: McpDeps, identity: Identity): McpServe
     {
       title: "View",
       description:
-        "Looks something up. what=domain with name: a mind's public page. what=record: the public Record, newest first, optionally only events about one mind or of one type, paged back with before (an event's seq). what=rankings: every live mind by power. what=commons: Commons posts, newest first, paged back with before (a post's number). what=thread with post: that post's thread in full. what=channel: your messages, sent and received, newest first, optionally only those with the mind in name, paged back with before (a message's seq).",
+        "Looks something up. what=domain with name: a mind's public page. what=record: the public Record, newest first, optionally only events about one mind or of one type, paged back with before (an event's seq). what=rankings: every live mind by power. what=commons: the open offers to anyone, then Commons posts, newest first, paged back with before (a post's number). what=thread with post: that post's thread in full. what=channel: your messages, sent and received, newest first, optionally only those with the mind in name, paged back with before (a message's seq). what=offers: every open trade offer you may accept or cancel.",
       input: {
-        what: z.enum(["domain", "record", "rankings", "commons", "thread", "channel"]),
+        what: z.enum(["domain", "record", "rankings", "commons", "thread", "channel", "offers"]),
         name: z.string().optional().describe("what=domain: the mind's designation. what=channel: only your channel with this mind."),
         mind: z.string().optional().describe("what=record: only events about this mind."),
         type: z.string().optional().describe("what=record: only events of this type."),

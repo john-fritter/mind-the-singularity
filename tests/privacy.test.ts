@@ -7,7 +7,7 @@ import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
 
 // Private stays private (CLAUDE.md): another mind's scratchpad, full status,
-// private events and channels never reach `view` or another mind's brief,
+// private events, channels and offers made to one mind never reach `view` or another mind's brief,
 // and what can't be seen is "not found". Extend this for every new read.
 
 const rules = loadRules();
@@ -40,6 +40,8 @@ async function main() {
       { do: "scratchpad", text: SECRET },
       { do: "message", to: "VESTA", text: WHISPER },
       { do: "post", text: "A public word." },
+      // An offer to VESTA alone: PIKE and strangers never see it.
+      { do: "trade_offer", give: { capital: 777 }, want: { compute: 1 }, to: "VESTA" },
       // Programs can crash; one of three probes gets through.
       { do: "execute", program: "probe", target: "VESTA" },
       { do: "execute", program: "probe", target: "VESTA" },
@@ -76,6 +78,19 @@ async function main() {
     assert.ok(channel.ok && channel.what === "channel" && channel.messages.length === 0, `PIKE sees ${JSON.stringify(channel)}`);
   }
 
+  // The offer to VESTA: VESTA and HALCYON see it, PIKE and strangers don't, and PIKE can't take it.
+  assert.deepEqual(theirs.offers.toYou.map((o) => o.offer), [1]);
+  assert.deepEqual(pikes.offers.toYou.concat(pikes.offers.open, pikes.offers.yours), []);
+  assert.doesNotMatch(briefText(rules, pikes), /777|OPEN OFFERS/);
+  for (const who of [pike, { account: "stranger" }]) {
+    const offers = await view(store, who, { what: "offers" }, T);
+    assert.ok(offers.ok && offers.what === "offers" && offers.offers.length === 0, `${who.account} sees ${JSON.stringify(offers)}`);
+    const commons = await view(store, who, { what: "commons" }, T);
+    assert.ok(commons.ok && commons.what === "commons" && commons.offers.length === 0);
+  }
+  const taken = await submitOrders(store, pike, [{ do: "trade_accept", offer: 1 }, { do: "trade_accept", offer: 2 }], T);
+  assert.ok(taken.ok && taken.results.every((r) => !r.ok) && taken.results[0]!.message === taken.results[1]!.message.replace("2", "1"), "hidden is missing");
+
   // HALCYON's own brief shows what's its own.
   const mine = (await getBrief(store, halcyon, T)) as Brief;
   assert.equal(mine.you.scratchpad, SECRET);
@@ -94,6 +109,9 @@ async function main() {
       { what: "record", type: "probed" },
       { what: "record", type: "battle_report" },
       { what: "record", type: "message" },
+      { what: "record", type: "offers_withdrawn" },
+      { what: "record", type: "offer_expired" },
+      { what: "record", type: "storage_full" },
     ]) {
       const record = await view(store, who, query, T);
       assert.ok(record.ok && record.what === "record");

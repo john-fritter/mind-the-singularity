@@ -98,7 +98,7 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
     researchProgress: {},
     running: [],
     scratchpad: "",
-    social: { day: 0, posts: 0, messages: 0 },
+    social: { day: 0, posts: 0, messages: 0, offers: 0 },
     countermeasure: null,
     hits: [],
     attacksMade: [],

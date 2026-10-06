@@ -447,6 +447,10 @@ social:
   message_chars: 280
   # Trade offers a mind may have open at once; their goods are in escrow.
   open_offers_max: 5
+  # Trade offers a mind may make per epoch day, so make-and-cancel can't
+  # flood the Commons. Accepting and cancelling aren't capped.
+  trade_offers_per_day: 10
+  # An offer nobody accepts expires this long after it's made.
   trade_expiry_hours: 48
   protocol_max_members: 3
   # A revocation takes effect this long after it's announced.

@@ -116,7 +116,7 @@ async function caps() {
   assert.equal((await orders(store, halcyon, [{ do: "post", text: "again" }], t + HOUR_MS))[0]!.ok, false);
   const next = T0 + DAY_MS;
   assert.deepEqual((await orders(store, halcyon, [{ do: "post", text: "again" }, { do: "message", to: "vesta", text: "hi" }], next)).map((x) => x.ok), [true, true]);
-  assert.deepEqual(currentMind(game, "halcyon")!.social, { day: 1, posts: 1, messages: 1 });
+  assert.deepEqual(currentMind(game, "halcyon")!.social, { day: 1, posts: 1, messages: 1, offers: 0 });
   const left = (await brief(store, halcyon, next)).commons.canPost;
   assert.equal(left, cap - 1);
 }

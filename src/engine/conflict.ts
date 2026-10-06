@@ -16,6 +16,7 @@ import type { Rng } from "./rng.js";
 import type { Rules } from "./rules.js";
 import type { Domain } from "./state.js";
 import { domainStatus } from "./status.js";
+import { withdrawOffers } from "./trades.js";
 import { forceTotals, unitStats } from "./units.js";
 
 // Orders aimed at another mind: attacks (conquest and raid) with their
@@ -233,6 +234,8 @@ export function attack(ctx: OrderContext, order: Extract<Order, { do: "attack" }
     defenderRecycled,
   };
 
+  // Escrow is no vault: what a beaten mind has on offer comes back in reach.
+  if (outcome.attackerWins) withdrawOffers(rules, world, target, now, ctx.events);
   if (outcome.attackerWins && order.mode === "conquest") {
     if (outcome.lopsided) {
       report.cores = Math.min(rules.combat.lopsided_cores, target.buildings.core);
@@ -339,6 +342,9 @@ function hostileEffect(ctx: OrderContext, program: Program, target: Domain): Hos
   }
 }
 
+/** Hostile programs that take capital or compute, which escrow mustn't shelter. */
+const TAKES_GOODS: ReadonlySet<Program> = new Set(["blight", "exfiltration"]);
+
 /**
  * Runs a hostile program or Probe on another mind. Protection and the
  * hostile cap are checked first (nothing spent); then compute and the cycle
@@ -385,6 +391,7 @@ export function executeAgainst(ctx: OrderContext, order: Extract<Order, { do: "e
   noteHostile(target, now);
   noteAggression(rules, target, me, now);
   const blocked = rng.next() < firewallBlockChance(rules, target.buildings.firewall, target.territory);
+  if (!blocked && TAKES_GOODS.has(program)) withdrawOffers(rules, world, target, now, ctx.events);
   const effect = blocked ? {} : hostileEffect(ctx, program, target);
   const event = emit(world, ctx.events, now, {
     type: "hostile",

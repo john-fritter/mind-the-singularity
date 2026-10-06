@@ -921,3 +921,69 @@ Two free orders, `post` (optionally `reply_to` a post's number) and
   (`config/runner.yaml`); the orders topic lists both orders. The CLI
   gains `commons`, `thread` and `channel`.
 - **Scripted players don't post or message;** that's 4d, if at all.
+
+## 2026-10-06 — Phase 4b: trades
+
+Three free orders: `trade_offer` (`give` and `want`, each
+`{"capital": n}` or `{"compute": n}`, and optionally `to` a mind),
+`trade_accept` and `trade_cancel` (`offer` by number). What's given leaves
+the domain at once into escrow; acceptance swaps the goods at once; an
+offer nobody takes expires on an `offer_expires` timer after
+`social.trade_expiry_hours` (48) and its goods come back. At most
+`social.open_offers_max` (5) open.
+
+**Agreed with John:**
+
+- **New number: `social.trade_offers_per_day`, 10,** counted by epoch day
+  like posts and messages. Without it a mind could make and cancel offers
+  without end and flood the Commons. Accepting and cancelling aren't
+  capped; the offers that exist bound them.
+- **Escrow is no vault.** A won attack (raid or conquest) on a mind, or a
+  hostile program that lands on it and takes capital or compute, first
+  withdraws its open offers and returns their goods, then takes its share.
+  Otherwise an offer at a price nobody would pay, renewed every 48 hours,
+  would shelter capital from raids for free. The proposal named Blight;
+  Exfiltration takes compute, the same hole, so it counts too. The mind
+  hears of it in a private `offers_withdrawn` event.
+
+**Smaller calls, made here:**
+
+- **One resource each side, and different ones.** Capital for capital is
+  refused; there are no gifts (a want of at least 1).
+- **Compute and storage.** A taker can't accept more compute than it can
+  store (it chose to, so it's told). The maker's side arrives later, and
+  compute past its storage is lost, as with income; a private
+  `storage_full` event says so, since the public trade line mustn't hint
+  at the maker's stock. Escrowed compute that comes back to a domain
+  that lost datacenters meanwhile is clamped the same way.
+- **An offer made to one mind is that mind's and its maker's:** to anyone
+  else it doesn't exist, and accepting it reads as "no open offer #N",
+  word for word what a number that was never used gets.
+- **Offers live in the world, not the Record,** while they're open
+  (`world.offers`, numbered from 1 per epoch in `lastOfferId`), so the
+  engine can check them; a closed one is gone. Only the outcome is an
+  event: a done trade is a public `trade` (both minds' "since last wake"
+  and `view record`), an expiry a private `offer_expired`. A cancel is the
+  maker's own order, so its result says it all.
+- **A deleted mind's offers go with its domain,** goods and timers, as
+  its running programs do. (Deletion follows a won conquest, which has
+  already withdrawn them, so this is a safety net.)
+- **The Commons doubles as the market:** `view commons` leads its first
+  page with the open offers to anyone; `view offers` lists every open
+  offer you may see (to anyone, to you, your own). The CLI gains
+  `offers`.
+- **The brief's OPEN OFFERS section** shows offers made to you, newest
+  kept, then the newest to anyone, up to `brief.offers` (5) in
+  config/site.yaml between them, then your own as one line of numbers and
+  time left. Empty, it's left out; what's left of today's offers shows
+  once some are used.
+- **The brief's ceiling holds with no new headroom.** The section shares
+  `max_size`: when the brief is over budget, offers to anyone go right
+  after the world's moments, and offers to you after the oldest messages;
+  the newest offer to you always stays. Offer lines are cheaper per size
+  than the posts and messages they push out, so the worst case with
+  offers is lower (1,842 tokens in prose, 1,850 in symbols); the worst
+  case without them is unchanged at 1,953, and tests/brief.test.ts checks
+  both for every script. Every wake of a scripted epoch: median 332, max
+  588 (scripted players don't trade yet).
+- **Scripted players don't trade;** that's 4d.

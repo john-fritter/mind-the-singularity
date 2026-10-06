@@ -52,8 +52,8 @@ export interface Domain {
   running: RunningProgram[];
 
   scratchpad: string;
-  /** Commons posts and channel messages sent on epoch day `day` (from 0), for the daily caps. */
-  social: { day: number; posts: number; messages: number };
+  /** Commons posts, channel messages and trade offers made on epoch day `day` (from 0), for the daily caps. */
+  social: { day: number; posts: number; messages: number; offers: number };
 
   /** The battle program run automatically when attacked by a force above `above` × this domain's defense. */
   countermeasure: { program: Program; above: number } | null;
@@ -77,9 +77,30 @@ export interface Domain {
   lastLog: string;
 }
 
+/** What a trade moves: capital or compute. */
+export type Goods = "capital" | "compute";
+
+export interface Lot {
+  goods: Goods;
+  amount: number;
+}
+
+/** An open trade offer. Its `give` is in escrow: out of the maker's domain until it's accepted, cancelled or expires. */
+export interface Offer {
+  id: number;
+  from: number;
+  /** The only mind that may accept it, or null for anyone. */
+  to: number | null;
+  give: Lot;
+  want: Lot;
+  madeAt: number;
+  expiresAt: number;
+}
+
 /** Something due at a moment, run by settle() in time order. */
 export type Timer = { id: number; at: number } & (
   | { kind: "program_ends"; domain: number; program: Program }
+  | { kind: "offer_expires"; offer: number }
   | { kind: "convergence_collapses" }
   | { kind: "shutdown_warning" }
   | { kind: "shutdown" }
@@ -115,6 +136,10 @@ export interface World {
   timers: Timer[];
   /** Commons posts: entry i is the id of post i + 1's thread, its first post. The posts themselves are in the Record. */
   postRoots: number[];
+  /** Open trade offers, oldest first. Closed ones are gone; done trades are in the Record. */
+  offers: Offer[];
+  /** The last offer number used; they count from 1 for the epoch. */
+  lastOfferId: number;
   convergence: Convergence | null;
   /** Set once the epoch is over; nothing happens after. */
   ended: Ending | null;

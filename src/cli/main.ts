@@ -27,7 +27,7 @@ import { drive, legacySeats, scriptedSeat, type Seat } from "../players/drive.js
 import { STRATEGIES, type StrategyName } from "../players/settings.js";
 import { MemoryStore } from "../store/memory.js";
 import { readSave, writeSave, type SaveFile, type SavedPlayer } from "../store/save.js";
-import { renderMessages, renderOrders, renderPage, renderPosts, renderRankings, renderRecord, when } from "./render.js";
+import { renderMessages, renderOffers, renderOrders, renderPage, renderPosts, renderRankings, renderRecord, when } from "./render.js";
 
 const HELP = `Play Mind: the Singularity locally.
 
@@ -43,7 +43,8 @@ Commands
   view NAME                    a domain's public page
   record                       the public Record (--mind NAME, --type TYPE, --limit N, --before SEQ)
   rankings                     every live mind by power
-  commons                      the Commons, newest first (--limit N, --before POST)
+  commons                      the Commons: open offers to anyone, then posts, newest first (--limit N, --before POST)
+  offers                       the open trade offers you may accept or cancel
   thread POST                  a Commons thread in full
   channel [NAME]               your messages, or those with one mind (--limit N, --before SEQ)
   add STRATEGY [DESIGNATION]   add a scripted opponent (--arch ARCHITECTURE); strategies:
@@ -229,8 +230,17 @@ async function main() {
       };
       const result = await view(store, me, query, now);
       if (!result.ok) fail(result);
-      else if (result.what === "commons") out(result, renderPosts(result.posts, result.more, startedAt));
+      else if (result.what === "commons") {
+        const offers = result.offers.length > 0 ? `${renderOffers(result.offers, startedAt)}\n\n` : "";
+        out(result, offers + renderPosts(result.posts, result.more, startedAt));
+      }
       else if (result.what === "channel") out(result, renderMessages(result.messages, result.more, startedAt));
+      break;
+    }
+    case "offers": {
+      const result = await view(store, me, { what: "offers" }, now);
+      if (!result.ok) fail(result);
+      else if (result.what === "offers") out(result, renderOffers(result.offers, startedAt));
       break;
     }
     case "thread": {

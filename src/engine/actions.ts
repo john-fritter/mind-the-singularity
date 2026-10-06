@@ -11,11 +11,13 @@ import type { Order } from "./orders.js";
 import { deployCount, programCompute, programCrashChance, researchCost, scaledShare } from "./programs.js";
 import type { Rules } from "./rules.js";
 import { message, post } from "./social.js";
+import { acceptTrade, cancelTrade, offerTrade } from "./trades.js";
 
 export type { OrderContext, OrderResult } from "./context.js";
 
 // What each order does to the mind's own domain; orders aimed at other minds
-// are in conflict.ts, the Commons and channels in social.ts. Every function
+// are in conflict.ts, the Commons and channels in social.ts, trades in
+// trades.ts. Every function
 // here mutates the world it's given; world.ts hands them a copy. An order
 // that can't do anything fails without spending a cycle. One that can do
 // part of what was asked does that part and says why it stopped.
@@ -377,5 +379,11 @@ export function applyOrder(ctx: OrderContext, order: Order): OrderResult {
       return post(ctx, order);
     case "message":
       return message(ctx, order);
+    case "trade_offer":
+      return offerTrade(ctx, order);
+    case "trade_accept":
+      return acceptTrade(ctx, order);
+    case "trade_cancel":
+      return cancelTrade(ctx, order);
   }
 }

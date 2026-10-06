@@ -6,7 +6,7 @@ import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { describe, type EventData, type GameEvent } from "../src/engine/record.js";
 import { briefText, size } from "../src/game/brief.js";
 import { bootMind, newGame, submitOrders } from "../src/game/game.js";
-import { getBrief, type Brief, type PublicSummary, type ShownEvent } from "../src/game/read.js";
+import { getBrief, type Brief, type OfferView, type PublicSummary, type ShownEvent } from "../src/game/read.js";
 import { drive, legacySeats, scriptedSeat, type Seat } from "../src/players/drive.js";
 import { STRATEGIES } from "../src/players/settings.js";
 import { MemoryStore } from "../src/store/memory.js";
@@ -175,15 +175,40 @@ function worstCase(longName: (i: number) => string, big = 987_654_321, text: (ch
       })),
       canPost: 1,
     },
+    // Open offers with the largest amounts: as many to you as the brief
+    // shows (they're longer than offers to anyone), more not shown, and
+    // your own at the most you may have.
+    offers: {
+      toYou: Array.from({ length: site.brief.offers }, (_, i) => offer(longName(1000 + i), longName(1), i, big)),
+      open: [],
+      left: 99,
+      yours: Array.from({ length: rules.social.open_offers_max }, (_, i) => offer(longName(1), null, i, big)),
+      canOffer: 3,
+    },
     inRange,
   };
 }
 
-/** No messages or posts. */
+let offerSeq = 99_900;
+function offer(from: string, to: string | null, i: number, big: number): OfferView {
+  const now = T0 + 53 * DAY_MS;
+  return {
+    offer: ++offerSeq,
+    from,
+    to,
+    give: { goods: i % 2 ? "compute" : "capital", amount: big },
+    want: { goods: i % 2 ? "capital" : "compute", amount: big },
+    madeAt: now - (i + 1) * 61 * 60_000,
+    expiresAt: now + rules.social.trade_expiry_hours * HOUR_MS - (i + 1) * 61 * 60_000,
+  };
+}
+
+/** No messages, posts or offers. */
 const quiet = (b: Brief): Brief => ({
   ...b,
   channels: { messages: [], left: 0, canSend: rules.social.messages_per_day },
   commons: { posts: [], canPost: rules.social.commons_posts_per_day },
+  offers: { toYou: [], open: [], left: 0, yours: [], canOffer: rules.social.trade_offers_per_day },
 });
 
 /**
@@ -201,13 +226,14 @@ function trimsHold() {
   assert.match(since, /^- MIND-5\d\d .*; 3 more$/m, "a line names a few acts");
   assert.match(since, /^- \(\d+ more not shown; view the Record\)$/m);
   assert.match(text, new RegExp(` · ${20 - site.brief.in_range} more: view rankings$`, "m"));
-  assert.doesNotMatch(text, /^(CHANNELS|COMMONS)/m, "no empty sections");
+  assert.doesNotMatch(text, /^(CHANNELS|COMMONS|OPEN OFFERS)/m, "no empty sections");
   assert.ok(size(text) <= site.brief.max_size);
 
-  // Channels and the Commons, each line cut to its length.
+  // Channels and the Commons, each line cut to its length; then offers, on their own.
   const full = worstCase(shortName, 12_345);
-  const social = briefText(rules, { ...full, since: { ...full.since, yours: [], world: [], fights: [], left: 0 } });
-  socialTrimsHold(social);
+  const calm = { ...full, since: { ...full.since, yours: [], world: [], fights: [], left: 0 } };
+  socialTrimsHold(briefText(rules, { ...calm, offers: quiet(full).offers }));
+  offerTrimsHold(briefText(rules, { ...quiet(calm), offers: full.offers }));
 }
 
 function socialTrimsHold(text: string) {
@@ -221,26 +247,38 @@ function socialTrimsHold(text: string) {
   assert.ok(size(text) <= site.brief.max_size);
 }
 
+function offerTrimsHold(text: string) {
+  // Offers to you fill the section; the ones to anyone are a view away.
+  assert.match(text, /^OPEN OFFERS · you may offer 3 more today$/m);
+  const toYou = text.match(/^- #\d+ MIND-10\d\d gives [\d,]+ (capital|compute) for [\d,]+ (capital|compute) · to you · .* left$/gm) ?? [];
+  assert.equal(toYou.length, site.brief.offers);
+  assert.match(text, /^- \(99 more: view offers\)$/m);
+  assert.match(text, /^- yours: #\d+ \(1d 22h left\), #\d+ \(1d 21h left\), /m);
+  assert.ok(size(text) <= site.brief.max_size);
+}
+
 /** The longest names the game allows: the length budget cuts lines, and the brief stays under the ceiling. */
 function worstCaseFits() {
   // Messages in plain prose, and in scripts that cost a model more tokens per character.
-  for (const [what, text] of DENSE) {
-    const dense = briefText(rules, worstCase(longName, undefined, text));
-    const tokens = countTokens(dense);
-    console.log(`  worst case, ${what}: ${tokens} tokens, ${dense.length} characters`);
-    assert.ok(tokens <= MAX_TOKENS, `the worst-case brief with ${what} is ${tokens} tokens:\n${dense}`);
+  // Offers displace denser lines, so each case is checked without them too.
+  for (const [what, text] of [["prose", prose] as const, ...DENSE]) {
+    const full = worstCase(longName, undefined, text);
+    for (const [how, b] of [["with offers", full], ["without offers", { ...full, offers: quiet(full).offers }]] as const) {
+      const dense = briefText(rules, b);
+      const tokens = countTokens(dense);
+      console.log(`  worst case, ${what}, ${how}: ${tokens} tokens, ${dense.length} characters`);
+      assert.ok(tokens <= MAX_TOKENS, `the worst-case brief with ${what}, ${how}, is ${tokens} tokens:\n${dense}`);
+    }
   }
   const text = briefText(rules, worstCase(longName));
-  const tokens = countTokens(text);
-  console.log(`  worst case: ${tokens} tokens, ${text.length} characters`);
-  assert.ok(tokens <= MAX_TOKENS, `the worst-case brief is ${tokens} tokens:\n${text}`);
   assert.ok(size(text) <= site.brief.max_size);
   // Your newest event, a mind in range and the scratchpad always stay.
   assert.match(text, new RegExp(`^- ${longName(100 + site.brief.yours - 1)} took `, "m"));
   assert.match(text, /^IN RANGE: THE-SILENT-CHOIR-OF-THE-DEEP-ARCHIVE-700 /m);
   assert.match(text, /^SCRATCHPAD: PIKE raided me/m);
-  // The newest message always stays.
+  // The newest message and the newest offer to you always stay.
   assert.match(text, new RegExp(`^- ${longName(800 + site.brief.channels - 1)} \\(`, "m"));
+  assert.match(text, new RegExp(`^- #\\d+ ${longName(1000 + site.brief.offers - 1)} gives `, "m"));
 }
 
 /** Text that costs more tokens per character than English: other scripts, symbols, emoji. */
