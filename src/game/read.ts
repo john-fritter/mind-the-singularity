@@ -49,10 +49,25 @@ export interface PublicSummary {
   status: "active" | "boot period" | "safe mode" | "converged" | "deleted";
 }
 
-/** A domain's public page. */
+/** A tag a won conquest left on a domain. */
+export interface TagLeft {
+  by: string;
+  text: string;
+  at: number;
+}
+
+/** A domain's public page: its flavor, all of it, and the tags left on it. */
 export interface PublicPage extends PublicSummary {
   domainName: string;
   manifesto: string;
+  interface: string;
+  directive: string;
+  force: { name: string; description: string };
+  tag: string;
+  /** Newest first, up to site.yaml's view.tags; `more` when there are older ones. */
+  tagsLeft: { tags: TagLeft[]; more: boolean };
+  /** Once deleted, if it wrote one. */
+  lastLog: string;
   bootedAt: number;
   /** Its protocol partners, by designation; protocols are public. */
   protocol: string[];
@@ -91,6 +106,18 @@ function summary(rules: Rules, order: Domain[], d: Domain, now: number): PublicS
 export type ShownEvent = GameEvent & { text: string };
 
 const shown = (rules: Rules, e: GameEvent): ShownEvent => ({ ...e, text: describe(rules, e) });
+/** As the brief shows an event: without force names and tags, which cost tokens on every wake. */
+const briefed = (rules: Rules, e: GameEvent): ShownEvent => ({ ...e, text: describe(rules, e, { flavor: false }) });
+
+/** The tags won conquests left on a domain, newest first. */
+function tagsLeftOn(record: GameEvent[], domain: number, limit: number): PublicPage["tagsLeft"] {
+  const all = record.filter((e): e is GameEvent & { type: "battle" } => e.type === "battle" && e.defender === domain && Boolean(e.tag));
+  const tags = all
+    .slice(-limit)
+    .reverse()
+    .map((e) => ({ by: e.attackerName, text: e.tag, at: e.at }));
+  return { tags, more: all.length > limit };
+}
 
 /** Your own domain in the brief: full status, the scratchpad, and the numbers the brief's example shows. */
 export interface YourStatus extends DomainStatus {
@@ -107,6 +134,8 @@ export interface YourStatus extends DomainStatus {
   deletedAt: number | null;
   /** When the account may boot again, once deleted. */
   rebootAt: number | null;
+  /** Whether a deleted mind has written its last log. */
+  lastLogWritten: boolean;
 }
 
 export interface Brief {
@@ -359,12 +388,13 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
       bootPeriodEndsAt: bootPeriodEnds(rules, me),
       deletedAt: me.deletedAt,
       rebootAt: rebootAt(rules, me),
+      lastLogWritten: me.lastLog !== "",
     },
     since: {
       from: sinceAt,
-      yours: keptYours.map((e) => shown(rules, e)),
-      world: others.filter((e) => !isFight(e)).map((e) => shown(rules, e)),
-      fights: others.filter(isFight).map((e) => shown(rules, e)),
+      yours: keptYours.map((e) => briefed(rules, e)),
+      world: others.filter((e) => !isFight(e)).map((e) => briefed(rules, e)),
+      fights: others.filter(isFight).map((e) => briefed(rules, e)),
       left,
     },
     channels: { messages: kept.map(asMessage), left: inbox.length - kept.length, canSend: sendable.messages },
@@ -475,6 +505,12 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
           ...summary(rules, order, d, t),
           domainName: d.domainName,
           manifesto: d.manifesto,
+          interface: d.interface,
+          directive: d.directive,
+          force: { ...d.force },
+          tag: d.tag,
+          tagsLeft: tagsLeftOn(record, d.id, site.view.tags),
+          lastLog: d.lastLog,
           bootedAt: d.bootedAt,
           protocol: (protocolOf(world, d.id)?.members ?? []).filter((m) => m !== d.id).map((m) => designationOf(world, m)),
         },

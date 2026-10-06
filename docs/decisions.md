@@ -1279,3 +1279,51 @@ calls, every brief under 750 tokens, the game replays; report in
   once, 199 sectors) and finished 6th of 11, as in 4e: a week is too
   early for conquest to dominate, and the sim's dominance comes later in
   an epoch.
+
+## 2026-10-06 — Phase 5's subphases, and 5a: flavor
+
+John agreed to split Phase 5 into five subphases (5a flavor, 5b the public
+web view, 5c accounts and play pages, 5d social and flavor pages and his
+playtest, 5e the admin view; `docs/build-plan.md` has them), and to 5a's
+four calls, as proposed in `/mnt/project-files/phase-5a/proposal.md`:
+
+- **The force name gets its own limit: `flavor.force_name: 40`** (a new
+  key; `flavor.force: 300` is now the description's). The Record weaves
+  the name into battle entries, "The Pale Choir of HALCYON took 40
+  sectors from VESTA", and a 300-character name would swamp the line.
+  DESIGN.md's flavor table now has two rows.
+- **A tag is a standing calling card**, set with `flavor` and left on the
+  loser of every conquest the mind wins that takes land. No field on the
+  attack order, so no tokens per attack and nothing for an agent to
+  remember. DESIGN.md's tag row says so.
+- **The last log is written after deletion**, with `last_log`, once,
+  while the deleted mind is still the account's current one (until it
+  boots again). It's a public Record entry and stays on the domain for
+  the Archive. The deleted mind's brief asks for it until it's written.
+- **Briefs stay plain.** `describe` takes `{ flavor: false }`; the brief
+  and an attack's own result use it, so force names and tags appear only
+  in the Record's full text (`view`, later the web view). The brief's
+  worst case is unchanged (the test's battle reports now carry a maximal
+  force name and tag, and still count plain).
+
+**Smaller calls, made here:**
+
+- **One `flavor` order with any subset of fields**; `""` clears one; every
+  field is checked before any is kept. No Record entry, so editing flavor
+  isn't noise. One-line fields (directive, force name, tag, last log) have
+  whitespace runs made one space; paragraph fields (manifesto, interface,
+  force description) keep line breaks, with at most one blank line between
+  paragraphs. The boot manifesto uses the same check.
+- **A domain's page shows all its flavor** (`view` and the CLI): directive,
+  manifesto, interface, force, its own tag, the tags left on it (newest
+  first, up to `site.yaml`'s `view.tags`, read from the Record's battle
+  entries) and its last log. The privacy tests' list of public page keys
+  grew to match; the scratchpad stays off it.
+- **Scripted players set their strategy's flavor right after booting**
+  (`texts.flavor` in `config/players.yaml`, `{me}` filled in), as one
+  `flavor` order through `submitOrders`, sent by the driver like the boot.
+  Legacy systems get a manifesto, directive, force name and tag from
+  `config/rules.yaml` at boot, checked against the flavor limits. The
+  extra order shifts later orders' sequence numbers, so the simulator's
+  numbers moved: 200 epochs on seed 1 give conqueror 41%, Singularity
+  23%, no deletions, 0 foreseeable failed orders; all four checks pass.

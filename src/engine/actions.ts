@@ -10,6 +10,7 @@ import { buildingName, programName, resolveBuilding, resolveProgram, resolveUnit
 import type { Order } from "./orders.js";
 import { deployCount, programCompute, programCrashChance, researchCost, scaledShare } from "./programs.js";
 import type { Rules } from "./rules.js";
+import { lastLogWhileAlive, setFlavor } from "./flavor.js";
 import { message, post } from "./social.js";
 import { acceptProposal, declineProposal, proposeProtocol, revokeProtocol } from "./protocols.js";
 import { acceptTrade, cancelTrade, offerTrade } from "./trades.js";
@@ -372,6 +373,10 @@ export function applyOrder(ctx: OrderContext, order: Order): OrderResult {
       return setResearch(ctx, order);
     case "scratchpad":
       return scratchpad(ctx, order);
+    case "flavor":
+      return setFlavor(ctx, order);
+    case "last_log":
+      return lastLogWhileAlive(order);
     case "attack":
       return attack(ctx, order);
     case "set_countermeasure":

@@ -82,6 +82,15 @@ export type Strategy = z.infer<typeof StrategySchema>;
 export const STRATEGIES = ["builder", "raider", "turtle", "converger", "conqueror"] as const;
 export type StrategyName = (typeof STRATEGIES)[number] | "random";
 
+const FlavorSchema = z.strictObject({
+  manifesto: z.string().optional(),
+  interface: z.string().optional(),
+  directive: z.string().optional(),
+  force_name: z.string().optional(),
+  force_description: z.string().optional(),
+  tag: z.string().optional(),
+});
+
 export const PlayersSchema = z.strictObject({
   /** How often a scripted player wakes; each gets its own offset within the interval. */
   wake_every_hours: z.number().positive(),
@@ -100,6 +109,10 @@ export const PlayersSchema = z.strictObject({
     proposal: z.string().min(1),
     revoke: z.string().min(1),
     post: z.array(z.string().min(1)).min(1),
+    /** The flavor each strategy's minds set once booted: the flavor order's fields, {me} filled in. */
+    flavor: z.strictObject(
+      Object.fromEntries([...STRATEGIES, "random"].map((s) => [s, FlavorSchema])) as Record<StrategyName, typeof FlavorSchema>,
+    ),
   }),
 });
 export type Players = z.infer<typeof PlayersSchema>;

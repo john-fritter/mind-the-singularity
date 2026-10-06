@@ -327,6 +327,8 @@ const FlavorSchema = z.strictObject({
   manifesto: positiveCount,
   interface: positiveCount,
   directive: positiveCount,
+  /** A force's name, woven into battle entries; `force` is its description. */
+  force_name: positiveCount,
   force: positiveCount,
   tag: positiveCount,
   last_log: positiveCount,
@@ -346,6 +348,11 @@ const LegacySystemSchema = z.strictObject({
   orders: shares(["expand", "build", "manufacture"] as const),
   buildings: shares(BUILDINGS),
   hardware: shares(HARDWARE),
+  /** Flavor text, within the flavor limits, so the Record and the web view have something to show. */
+  manifesto: z.string().default(""),
+  directive: z.string().default(""),
+  force_name: z.string().default(""),
+  tag: z.string().default(""),
 });
 
 const LegacySchema = z
@@ -426,6 +433,9 @@ export const RulesSchema = z
       }
       if (l.domain_name.length > r.flavor.domain_name) {
         issue(["legacy", "systems", i, "domain_name"], `longer than flavor.domain_name (${r.flavor.domain_name})`);
+      }
+      for (const key of ["manifesto", "directive", "force_name", "tag"] as const) {
+        if (l[key].length > r.flavor[key]) issue(["legacy", "systems", i, key], `longer than flavor.${key} (${r.flavor[key]})`);
       }
     });
   });

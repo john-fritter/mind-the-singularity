@@ -47,7 +47,7 @@ export const SiteSchema = z.strictObject({
     max_size: count,
     scanned: count,
   }),
-  view: z.strictObject({ record_default: count, record_max: count }),
+  view: z.strictObject({ record_default: count, record_max: count, tags: count }),
 });
 export type Site = z.infer<typeof SiteSchema>;
 

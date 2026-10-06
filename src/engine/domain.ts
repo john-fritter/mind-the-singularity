@@ -81,6 +81,10 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
   const s = rules.start;
   return {
     ...input,
+    interface: "",
+    directive: "",
+    force: { name: "", description: "" },
+    tag: "",
     legacy: false,
     bootedAt: now,
     lastActiveAt: now,
@@ -119,8 +123,11 @@ export function startingDomain(rules: Rules, input: BootInput, now: number): Dom
  */
 export function legacyDomain(rules: Rules, system: Rules["legacy"]["systems"][number], id: number, now: number): Domain {
   const scale = (x: number) => Math.floor(x * system.scale);
-  const d = startingDomain(rules, { id, designation: system.designation, domainName: system.domain_name, architecture: system.architecture, manifesto: "" }, now);
+  const d = startingDomain(rules, { id, designation: system.designation, domainName: system.domain_name, architecture: system.architecture, manifesto: system.manifesto }, now);
   d.legacy = true;
+  d.directive = system.directive;
+  d.force.name = system.force_name;
+  d.tag = system.tag;
   d.territory = scale(d.territory);
   for (const b of BUILDINGS) d.buildings[b] = scale(d.buildings[b]);
   d.capital = scale(d.capital);

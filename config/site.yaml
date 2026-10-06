@@ -43,3 +43,5 @@ view:
   # asked for, and at most.
   record_default: 25
   record_max: 200
+  # Tags a domain's page lists, newest first.
+  tags: 10
