@@ -4,6 +4,7 @@ import { loadRules } from "../src/config.js";
 import { HOUR_MS } from "../src/engine/cycles.js";
 import { fixedEpoch } from "../src/game/epochs.js";
 import { bootMind, currentMind, newGame } from "../src/game/game.js";
+import { handbook } from "../src/game/handbook.js";
 import { MemoryStore } from "../src/store/memory.js";
 import { backTo, ordersFromForm } from "../src/web/forms.js";
 import { logIn, memoryLogins, ORIGIN } from "./logins.js";
@@ -28,16 +29,13 @@ function forms() {
   assert.deepEqual(ordersFromForm({ do: "set_countermeasure", program: "overclock", above: "80" }), { orders: [{ do: "set_countermeasure", program: "overclock", above: 0.8 }] });
   assert.deepEqual(ordersFromForm({ do: "set_countermeasure", program: "", above: "80" }), { orders: [{ do: "set_countermeasure", program: null }] });
   // A text may be blank: that clears it.
-  assert.deepEqual(ordersFromForm({ do: "scratchpad", text: "" }), { orders: [{ do: "scratchpad", text: "" }] });
+  assert.deepEqual(ordersFromForm({ do: "last_log", text: "" }), { orders: [{ do: "last_log", text: "" }] });
   // Fields a form doesn't have are dropped; an unknown form is refused.
   assert.deepEqual(ordersFromForm({ do: "expand", cycles: "1", extra: "x" }), { orders: [{ do: "expand", cycles: 1 }] });
   assert.ok("error" in ordersFromForm({ do: "seize_everything" }));
-  // The JSON box: a list as it is, one order as a list of one, bad JSON refused.
-  assert.deepEqual(ordersFromForm({ do: "json", orders: '[{"do":"expand"},{"do":"monetize","cycles":2}]' }), {
-    orders: [{ do: "expand" }, { do: "monetize", cycles: 2 }],
-  });
-  assert.deepEqual(ordersFromForm({ do: "json", orders: '{"do":"expand"}' }), { orders: [{ do: "expand" }] });
-  assert.ok("error" in ordersFromForm({ do: "json", orders: "[{" }));
+  // People have no JSON box and no scratchpad: agents send those over MCP.
+  assert.ok("error" in ordersFromForm({ do: "json", orders: '[{"do":"expand"}]' }));
+  assert.ok("error" in ordersFromForm({ do: "scratchpad", text: "notes" }));
 }
 
 const post = (app: App, url: string, cookie: string | null, fields: Record<string, string>, origin = ORIGIN) =>
@@ -91,7 +89,7 @@ async function playing() {
   // No mind yet: the boot form. Booting goes through bootMind as kit.
   const boot = await page(app, "/play", cookie);
   assert.match(boot, /Boot a mind/);
-  assert.match(boot, /<option value="oracle">/);
+  assert.match(boot, /<input type="radio" name="architecture" value="oracle"/);
   const bad = await post(app, "/play/boot", cookie, { designation: "", domainName: "Lamp", architecture: "oracle" });
   assert.equal(bad.status, 303);
   assert.match(await page(app, "/play", cookie), /class="error"/);
@@ -102,7 +100,7 @@ async function playing() {
   assert.equal(kit().manifesto, "Burn bright.");
   const dash = await page(app, "/play", cookie);
   assert.match(dash, /KIT is online/);
-  assert.match(dash, /KIT <span class="muted">of Lamplight/);
+  assert.match(dash, /<h1>KIT<\/h1>.*of Lamplight/);
   // The results show once.
   assert.doesNotMatch(await page(app, "/play", cookie), /KIT is online/);
   const fresh = await app.request("/play", { headers: { cookie } });
@@ -121,31 +119,31 @@ async function playing() {
   assert.deepEqual(lastOrders(), [{ do: "build", building: "factory", count: 1 }]);
   await order(app, cookie, { do: "manufacture", unit: "drones", count: "5" });
   assert.deepEqual(lastOrders(), [{ do: "manufacture", unit: "drones", count: 5 }]);
-  await order(app, cookie, { do: "set_research", program: "overclock" });
+  // Choosing research is free and says the labs earn the points.
+  assert.match(await order(app, cookie, { do: "set_research", program: "overclock" }), /Research<\/span> Your labs now research Overclock: 0 of 6,000 points so far, \+10 for each cycle you spend\./);
   assert.equal(kit().researchTarget, "overclock");
-  await order(app, cookie, { do: "scratchpad", text: "kit's own notes" });
-  assert.match(await page(app, "/play", cookie), /kit&#39;s own notes|kit's own notes/);
   // A refusal reads as the engine's reason.
   const refused = await order(app, cookie, { do: "attack", target: "VESTA", mode: "raid" });
   assert.match(refused, /refused: /);
   assert.deepEqual(lastOrders(), [{ do: "attack", target: "VESTA", mode: "raid" }]);
-  // Several orders at once through the JSON box.
-  await order(app, cookie, { do: "json", orders: '[{"do":"monetize"},{"do":"spin_up","cycles":1}]' });
-  assert.deepEqual(lastOrders(), [{ do: "monetize" }, { do: "spin_up", cycles: 1 }]);
+  // The JSON box is gone: a post that pretends to be it writes nothing.
   const writes = game.log.length;
-  assert.match(await order(app, cookie, { do: "json", orders: "not json" }), /isn&#39;t JSON|isn't JSON/);
-  assert.equal(game.log.length, writes, "bad JSON writes nothing");
+  assert.match(await order(app, cookie, { do: "json", orders: '[{"do":"monetize"}]' }), /That form isn/);
+  assert.equal(game.log.length, writes, "a JSON post writes nothing");
 
   // The dashboard: status, forms, the brief's sections; no other mind's private things.
   const full = await page(app, "/play", cookie);
-  for (const text of ["Cycles", "Economy", "Military", "Orders as JSON", "In range", "The Commons", 'action="/play/orders"']) assert.ok(full.includes(text), `the dashboard lacks ${text}`);
+  for (const text of ["Cycles", "Your domain", "Every cycle you spend", "Economy", "Military", "Research this", "Free · no cycles", "Your place on the wheel", "In range", "The Commons", 'action="/play/orders"']) {
+    assert.ok(full.includes(text), `the dashboard lacks ${text}`);
+  }
+  for (const text of ["Orders as JSON", 'name="orders"', "Your notes", 'value="scratchpad"']) assert.ok(!full.includes(text), `the dashboard still has ${text}`);
   assert.doesNotMatch(full, /<script|\sstyle=/);
 
-  // Another account never sees kit's scratchpad or results.
+  // Another account never sees kit's results.
   const other = await logIn(app, "other", "other-password");
   const theirs = await page(app, "/play", other);
   assert.match(theirs, /Boot a mind/);
-  assert.ok(!theirs.includes("kit's own notes") && !theirs.includes("kit&#39;s own notes"));
+  assert.ok(!theirs.includes("Your labs now research"));
 
   // Settings: the current password must be right; a change ends the other sessions.
   const second = await logIn(app, "kit", "kit-password-1");
@@ -164,12 +162,24 @@ async function playing() {
   assert.equal(after.headers.get("location"), "/login");
   assert.equal((await post(app, "/play/orders", cookie, { do: "expand", cycles: "1" })).status, 303);
   assert.equal(game.log.at(-1)!.account, "kit");
-  assert.deepEqual(lastOrders(), [{ do: "monetize" }, { do: "spin_up", cycles: 1 }], "a logged-out post writes nothing");
+  assert.deepEqual(lastOrders(), [{ do: "attack", target: "VESTA", mode: "raid" }], "a logged-out post writes nothing");
 
-  // The rules, by topic, for everyone.
-  assert.match(await page(app, "/rules", null), /href="\/rules\/combat"/);
-  assert.match(await page(app, "/rules/combat", null), /Numbers/);
+  // The rules for people, for everyone: the essentials, the wheel, a chapter per topic.
+  const howTo = await page(app, "/rules", null);
+  for (const text of ["The essentials", "Cycles are your turns.", 'class="wheel"', 'href="/rules/combat"', 'href="/rules/agents"']) assert.ok(howTo.includes(text), `/rules lacks ${text}`);
+  for (const chapter of handbook(rules).chapters) {
+    const html = await page(app, `/rules/${chapter.name}`, null);
+    assert.ok(html.includes(`<h1>${chapter.title}</h1>`), `/rules/${chapter.name} lacks its title`);
+    // Written for people: numbers, not the config keys the agents' text names.
+    assert.doesNotMatch(html, /\b(?:combat|economy|users|expansion|build|protection|social|convergence|research|capability|firewall|cycles)\.[a-z_]+/, `/rules/${chapter.name} names a config key`);
+    assert.doesNotMatch(html, /<script|\sstyle=/);
+  }
+  assert.match(await page(app, "/rules/architectures", null), /🧬 <b>Symbiote<\/b>/);
   await page(app, "/rules/nothing", null, 404);
+  // What the agents read, word for word, with its numbers.
+  assert.match(await page(app, "/rules/agents", null), /href="\/rules\/agents\/orders"/);
+  assert.match(await page(app, "/rules/agents/combat", null), /Numbers/);
+  await page(app, "/rules/agents/nothing", null, 404);
 }
 
 /** Posts a form from a play page and reads the page it sends you back to. */

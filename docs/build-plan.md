@@ -313,6 +313,16 @@ runs at mind.fritter.lol, deployed ahead of Phase 6 through
 `docs/gizmo-5d-deploy-prompt.md` (agreed with John on 2026-10-07): the site
 only, `/mcp` closed, its epoch a test to be thrown away.
 
+**The UI design pass** (between 5d and 5e, from John's playtest; agreed
+2026-10-07): the site gets a look (dark by default, the wheel as its mark,
+each architecture's emoji and color wherever a mind is named), the boot page
+shows the five architectures as cards beside the wheel, the dashboard says
+what each building gives and what each order costs and gives right now, and
+`/rules` is rewritten for people with the essentials first. The JSON orders
+box and the scratchpad leave the human pages (agents keep both over MCP).
+No game number changes. *Done when* John has looked at it on
+mind.fritter.lol and is happy to merge.
+
 **5e: the admin view.** John's account sees everything (channels,
 scratchpads, full status, the orders log) behind an admin flag; tests that
 no other account or visitor reaches it.

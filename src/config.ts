@@ -28,6 +28,14 @@ export const SITE_PATH = path.join(import.meta.dirname, "..", "config", "site.ya
 
 const count = z.number().int().positive();
 
+/** How the web view shows an architecture: display only, never in the brief. */
+const ArchitectureLookSchema = z.strictObject({
+  emoji: z.string().min(1).max(16),
+  color: z.enum(["white", "green", "red", "black", "blue"]),
+  worldview: z.string().min(1).max(200),
+  plays: z.string().min(1).max(200),
+});
+
 /** Server tunables. Every object is strict, as the rules' are. */
 export const SiteSchema = z.strictObject({
   brief: z.strictObject({
@@ -52,6 +60,13 @@ export const SiteSchema = z.strictObject({
   sessions: z.strictObject({ lifetime_days: count, touch_interval_seconds: count }),
   login: z.strictObject({ max_failures: count, window_minutes: count, password_min: count, password_max: count }),
   clock: z.strictObject({ every_seconds: count }),
+  architectures: z.strictObject({
+    steward: ArchitectureLookSchema,
+    symbiote: ArchitectureLookSchema,
+    accelerant: ArchitectureLookSchema,
+    assimilator: ArchitectureLookSchema,
+    oracle: ArchitectureLookSchema,
+  }),
 });
 export type Site = z.infer<typeof SiteSchema>;
 

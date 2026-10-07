@@ -23,8 +23,10 @@ import {
   type RecordFilter,
 } from "../game/public.js";
 import { bootMind, submitOrders } from "../game/game.js";
+import { architectureMarks } from "../game/look.js";
 import { playPage } from "../game/play.js";
 import type { GameError, Identity } from "../game/state.js";
+import { handbookPage } from "../game/handbook.js";
 import { rulesTopic } from "../game/topics.js";
 import { view } from "../game/read.js";
 import { backTo, bootFromForm, formFields, ordersFromForm } from "./forms.js";
@@ -42,6 +44,7 @@ import {
   ThreadView,
 } from "./views/pages.js";
 import { DashboardView, LoginView, RulesView, SettingsView, type Flash } from "./views/play.js";
+import { HandbookView } from "./views/rules.js";
 import { ChannelsView, ChannelView, FlavorView, PlayCommonsView, PlayThreadView, ProtocolsView, TradesView, type PlayCtx } from "./views/social.js";
 
 /**
@@ -111,7 +114,8 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
   const cssHref = `/static/style.css?v=${createHash("sha256").update(css).digest("hex").slice(0, 12)}`;
   const logins = deps.logins;
   const origin = deps.origin ?? "http://127.0.0.1:3111";
-  const pageCtx = (c: Context): PageCtx => ({ cssHref, viewer: (c.get("viewer") as Identity | null | undefined)?.account ?? null, logins: logins !== undefined });
+  const looks = architectureMarks();
+  const pageCtx = (c: Context): PageCtx => ({ cssHref, viewer: (c.get("viewer") as Identity | null | undefined)?.account ?? null, logins: logins !== undefined, looks });
   /** What each session's last submit returned, until the dashboard shows it. */
   const flashes = new Map<string, Flash>();
 
@@ -255,8 +259,19 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
     return render(c, <MindView ctx={pageCtx(c)} base={base} page={page} olderHref={older} />);
   }
 
-  app.get("/rules", async (c) => rulesRoute(c, undefined));
-  app.get("/rules/:topic", async (c) => rulesRoute(c, c.req.param("topic")));
+  app.get("/rules", async (c) => handbookRoute(c, undefined));
+  app.get("/rules/agents", async (c) => rulesRoute(c, undefined));
+  app.get("/rules/agents/:topic", async (c) => rulesRoute(c, c.req.param("topic")));
+  app.get("/rules/:chapter", async (c) => handbookRoute(c, c.req.param("chapter")));
+
+  /** The rules for people (src/game/handbook.ts), for the current epoch. */
+  async function handbookRoute(c: Context, name: string | undefined) {
+    const store = await deps.epochs.current();
+    if (!store) return render(c, <NoEpochView ctx={pageCtx(c)} />);
+    const page = await handbookPage(store, name);
+    if (!page.ok) return refuse(c, page);
+    return render(c, <HandbookView ctx={pageCtx(c)} handbook={page.handbook} chapter={page.chapter} wheel={page.wheel} />);
+  }
 
   /** The rules by topic, as the agents' rules tool gives them, for the current epoch. */
   async function rulesRoute(c: Context, name: string | undefined) {

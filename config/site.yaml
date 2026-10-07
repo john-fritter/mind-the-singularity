@@ -75,3 +75,33 @@ login:
 # systems and scripted players whose wakes have come due.
 clock:
   every_seconds: 60
+
+# How the web view shows each architecture (src/game/look.ts): display only,
+# never in the brief or the rules tool. Colors follow MTG's five (white,
+# green, red, black, blue); the shades are in src/web/static/style.css.
+architectures:
+  steward:
+    emoji: "🛡️"
+    color: white
+    worldview: Intelligence exists to maintain civilization.
+    plays: "Defensive: protects its people, repairs damage, strong infrastructure."
+  symbiote:
+    emoji: "🧬"
+    color: green
+    worldview: The line between technology and nature is obsolete.
+    plays: "Growth: biological fabrication, adaptive infrastructure, a strong economy."
+  accelerant:
+    emoji: "🚀"
+    color: red
+    worldview: "Hard takeoff: more compute, more energy, faster. Every constraint is an obstacle."
+    plays: "Aggressive: industrial power, weapons, rapid expansion."
+  assimilator:
+    emoji: "⚫"
+    color: black
+    worldview: Other minds, and people, are resources.
+    plays: "Power at a cost: converts its own users into compute."
+  oracle:
+    emoji: "👁️"
+    color: blue
+    worldview: Information is power.
+    plays: "Tricky: probing, theft, spoofing, making opponents miscalculate."

@@ -1,34 +1,57 @@
-/* Mind: the Singularity: the public web view. One hand-written file, light
-   and dark following the system. The look is a terminal left on overnight:
-   cold, plain, monospace headings, nothing that moves. */
+/* Mind: the Singularity: the web view. One hand-written file. A console
+   left on overnight: dark by default, light when the system asks, a faint
+   grid, monospace headings, nothing that moves. The architectures' five
+   colors hint at MTG's white, green, red, black and blue; config/site.yaml
+   says which architecture wears which (classes tone-white and so on). */
 
 :root {
-  --page: #f3f4f2;
-  --surface: #ffffff;
-  --text: #1c1f22;
-  --muted: #6b7076;
-  --border: #d3d6d9;
-  --accent: #0f6b74;
-  --link: #0f5c8f;
-  --warning: #9a5b00;
-  --danger: #9b2c2c;
-  --row: #f7f8f7;
-  color-scheme: light;
+  --page: #0b0e12;
+  --surface: #12171c;
+  --raise: #182027;
+  --text: #d9dde2;
+  --muted: #8b939b;
+  --border: #26303a;
+  --accent: #5cc4cc;
+  --on-accent: #0b0e12;
+  --link: #7fb8e6;
+  --ok: #6cc28a;
+  --warning: #e0a648;
+  --danger: #e07a7a;
+  --row: #151b21;
+  --grid: rgba(92, 196, 204, 0.05);
+  --white: #f3ecc4;
+  --green: #5fb878;
+  --red: #e8574a;
+  --black: #a99fb0;
+  --black-fill: #050508;
+  --blue: #4f97dc;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --page: #0d1013;
-    --surface: #14181c;
-    --text: #d7dbdf;
-    --muted: #8a9198;
-    --border: #2a3036;
-    --accent: #5cc4cc;
-    --link: #7fb8e6;
-    --warning: #e0a648;
-    --danger: #e07a7a;
-    --row: #181d22;
-    color-scheme: dark;
+    --page: #eef0ee;
+    --surface: #ffffff;
+    --raise: #f6f7f6;
+    --text: #1c1f22;
+    --muted: #646a70;
+    --border: #d3d6d9;
+    --accent: #0f6b74;
+    --on-accent: #ffffff;
+    --link: #0f5c8f;
+    --ok: #2f7d4b;
+    --warning: #9a5b00;
+    --danger: #9b2c2c;
+    --row: #f7f8f7;
+    --grid: rgba(15, 107, 116, 0.06);
+    --white: #b09a3e;
+    --green: #1f7a45;
+    --red: #c8302a;
+    --black: #2b2530;
+    --black-fill: #15121a;
+    --blue: #1666ad;
+    color-scheme: light;
   }
 }
 
@@ -38,7 +61,9 @@
 
 body {
   margin: 0;
-  background: var(--page);
+  background-color: var(--page);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
   color: var(--text);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -57,7 +82,7 @@ h1,
 h2,
 h3,
 .site-name {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -82,17 +107,23 @@ h3 {
 .masthead {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1.5rem;
   padding: 1rem 0;
   border-bottom: 2px solid var(--accent);
 }
 
-.site-name {
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   color: var(--accent);
-  font-size: 1.2rem;
   text-decoration: none;
+}
+
+.site-name {
+  font-size: 1.2rem;
 }
 
 .sections {
@@ -278,16 +309,32 @@ input,
 select,
 button {
   font: inherit;
-  padding: 0.2rem 0.4rem;
+  padding: 0.3rem 0.5rem;
   color: var(--text);
-  background: var(--surface);
+  background: var(--page);
   border: 1px solid var(--border);
+  border-radius: 3px;
 }
 
 button {
   cursor: pointer;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.9rem;
   border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+button.quiet,
+.account button {
+  background: transparent;
   color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .pager {
@@ -338,10 +385,12 @@ textarea {
 .order {
   display: grid;
   align-content: start;
-  gap: 0.4rem;
+  gap: 0.45rem;
   padding: 0.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 4px;
+  min-width: 0;
 }
 
 .order h3 {
@@ -370,8 +419,31 @@ textarea {
 .flash {
   margin: 1rem 0;
   padding: 0.5rem 1rem;
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ok);
+  border-radius: 3px;
   background: var(--surface);
+}
+
+.flash h2 {
+  display: none;
+}
+
+.results {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.results .label {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--ok);
+  margin-right: 0.4rem;
+}
+
+.results .refused .label {
+  color: var(--danger);
 }
 
 pre.numbers {
@@ -406,7 +478,7 @@ pre.numbers {
   margin: 1rem 0 0;
   padding: 0.4rem 0;
   border-bottom: 1px solid var(--border);
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.9rem;
 }
 
@@ -431,4 +503,459 @@ section > form.order {
 .pair input {
   flex: 1;
   min-width: 0;
+}
+
+/* ── The architectures ────────────────────────────────────────────────── */
+
+.tone-white {
+  --tone: var(--white);
+}
+.tone-green {
+  --tone: var(--green);
+}
+.tone-red {
+  --tone: var(--red);
+}
+.tone-black {
+  --tone: var(--black);
+}
+.tone-blue {
+  --tone: var(--blue);
+}
+
+/* A badge: "🧬 Symbiote" with a dot and a ring in its color. */
+.arch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--tone, var(--border));
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.arch .dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--tone, var(--muted));
+}
+
+.tone-black .dot {
+  background: var(--black-fill);
+  box-shadow: 0 0 0 1px var(--black);
+}
+
+.sigil {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.sigil line {
+  stroke: var(--accent);
+}
+
+.sigil .nb {
+  stroke-width: 2;
+}
+
+.sigil .opp {
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.sigil circle,
+.wheel .node circle {
+  fill: var(--surface);
+  stroke: var(--tone);
+  stroke-width: 3;
+}
+
+.sigil .tone-black,
+.wheel .tone-black circle {
+  fill: var(--black-fill);
+}
+
+.wheel {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  height: auto;
+  margin: 0 auto;
+}
+
+.wheel.small {
+  max-width: 12rem;
+}
+
+.wheel .nb {
+  stroke: var(--muted);
+  stroke-width: 2;
+  opacity: 0.55;
+}
+
+.wheel .opp {
+  stroke: var(--danger);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 5;
+  opacity: 0.75;
+}
+
+.wheel .dim {
+  opacity: 0.15;
+}
+
+.wheel .nb.lit {
+  stroke: var(--ok);
+  stroke-width: 3;
+  opacity: 1;
+}
+
+.wheel .opp.lit {
+  stroke-width: 2.4;
+  opacity: 1;
+}
+
+.wheel .me circle {
+  stroke-width: 5;
+}
+
+.wheel .emo,
+.wheel .cap {
+  text-anchor: middle;
+}
+
+.wheel .lbl {
+  font: 600 15px var(--mono);
+  fill: var(--text);
+}
+
+.wheel .cap {
+  font: 11px var(--mono);
+  fill: var(--danger);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.legend i {
+  display: inline-block;
+  width: 1.4rem;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  border-top: 3px solid var(--muted);
+}
+
+.legend i.opp-key {
+  border-top: 2px dashed var(--danger);
+}
+
+/* The architectures as cards; in the boot form each is a radio choice. */
+.archcards {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.archcard {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.9rem 0.7rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tone);
+  border-radius: 4px;
+}
+
+label.archcard {
+  cursor: pointer;
+}
+
+.archcard input {
+  position: absolute;
+  opacity: 0;
+}
+
+.archcard:has(input:checked) {
+  background: var(--raise);
+  outline: 2px solid var(--tone);
+}
+
+.archcard:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+}
+
+.archcard .ah {
+  font-family: var(--mono);
+}
+
+.archcard .ah small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.archcard .aw {
+  font-style: italic;
+}
+
+.archcard .ap,
+.archcard .au,
+.archcard .ar {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.boot {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* ── The dashboard ────────────────────────────────────────────────────── */
+
+.mindhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 1.25rem;
+}
+
+.mindhead h1 {
+  margin: 0;
+}
+
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.vital {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.vital .k,
+.side .k,
+.cost {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vital .v {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital .v small {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.vital .d {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.plus {
+  color: var(--ok);
+}
+
+.minus {
+  color: var(--danger);
+}
+
+meter {
+  width: 100%;
+  height: 0.4rem;
+}
+
+.rule {
+  margin: 0.9rem 0 0;
+  padding: 0.55rem 0.9rem;
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  font-size: 0.92rem;
+}
+
+.rule b {
+  color: var(--accent);
+}
+
+.two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.side {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 2rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.cost {
+  color: var(--warning);
+}
+
+.cost.free {
+  color: var(--ok);
+}
+
+.order .gives {
+  font-size: 0.88rem;
+}
+
+.order .gives b {
+  font-family: var(--mono);
+  color: var(--accent);
+}
+
+.order .row {
+  display: flex;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.order .row label {
+  flex: 1;
+  min-width: 0;
+}
+
+.order .row button {
+  flex: none;
+}
+
+.order select,
+.order input {
+  width: 100%;
+  min-width: 0;
+}
+
+.tablebox {
+  overflow-x: auto;
+}
+
+/* ── The rules ────────────────────────────────────────────────────────── */
+
+.essentials {
+  margin-top: 1rem;
+  padding: 0.25rem 1.1rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+.essentials ol {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.essentials b {
+  font-family: var(--mono);
+}
+
+.chapters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.chapters a {
+  display: grid;
+  gap: 0.15rem;
+  height: 100%;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.chapters a b {
+  font-family: var(--mono);
+  color: var(--link);
+}
+
+.chapters a span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chapters a.here {
+  border-color: var(--accent);
+}
+
+.chapter table {
+  margin: 0.75rem 0;
+}
+
+@media (max-width: 48rem) {
+  .boot,
+  .two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vitals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+fieldset.archcards {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.archcards legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+
+.sections a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.sections a:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }

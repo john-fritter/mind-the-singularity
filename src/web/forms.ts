@@ -25,7 +25,6 @@ const FIELDS: Record<string, readonly string[]> = {
   execute: ["program", "target"],
   attack: ["target", "mode", "program"],
   set_countermeasure: ["program", "above"],
-  scratchpad: ["text"],
   last_log: ["text"],
   post: ["text", "reply_to"],
   message: ["to", "text"],
@@ -48,20 +47,12 @@ export function formFields(body: Record<string, unknown>): Form {
 const number = (text: string): number | string => (/^\s*-?\d+\s*$/.test(text) ? Number(text) : text);
 
 /**
- * The orders a form sends: the JSON box's list as it is, or one order from
- * an order form. Blank fields are left out, as an agent would leave them
+ * The one order a form sends. (Agents send lists of orders as JSON over
+ * MCP; the human pages have no JSON box and no scratchpad, decisions.md.) Blank fields are left out, as an agent would leave them
  * out, except the texts, where blank means "clear it".
  */
 export function ordersFromForm(form: Form): { orders: unknown[] } | { error: string } {
   const kind = form["do"] ?? "";
-  if (kind === "json") {
-    try {
-      const parsed: unknown = JSON.parse(form["orders"] ?? "");
-      return { orders: Array.isArray(parsed) ? parsed : [parsed] };
-    } catch {
-      return { error: "That isn't JSON: write a list of orders, as an agent would." };
-    }
-  }
   if (kind === "trade_offer") return tradeOffer(form);
   // Leaving a protocol is announced to everyone and can't be taken back, so the form asks twice.
   if (kind === "protocol_revoke" && form["confirm"] !== "yes") return { error: "Tick the box to confirm you mean to leave your protocol." };

@@ -4,6 +4,7 @@ import type { EpochStatus } from "../../game/public.js";
 import { formatAt, num, typeLabel } from "../format.js";
 import { EpochLine, MindLink, Offers, Older, PostItem, RankTable, RecordList, recordPath, Time, type Base } from "./components.js";
 import { Layout, type PageCtx } from "./layout.js";
+import { ArchBadge } from "./look.js";
 
 export function FrontView(props: { ctx: PageCtx; page: FrontPage }) {
   const p = props.page;
@@ -13,7 +14,7 @@ export function FrontView(props: { ctx: PageCtx; page: FrontPage }) {
       <EpochLine epoch={p.epoch} titled />
       <section>
         <h2>Rankings</h2>
-        {p.rankings.length === 0 ? <p class="muted">No domain is online yet.</p> : <RankTable base="" rows={p.rankings} />}
+        {p.rankings.length === 0 ? <p class="muted">No domain is online yet.</p> : <RankTable ctx={props.ctx} base="" rows={p.rankings} />}
         {p.ranked > p.rankings.length && (
           <p>
             <a href="/rankings">All {p.ranked} domains</a>
@@ -45,7 +46,7 @@ export function RankingsView(props: { ctx: PageCtx; epoch: EpochStatus; rows: Ra
     <Layout ctx={props.ctx} title="Rankings">
       <h1>Rankings</h1>
       <EpochLine epoch={props.epoch} />
-      {props.rows.length === 0 ? <p class="muted">No domain is online yet.</p> : <RankTable base="" rows={props.rows} />}
+      {props.rows.length === 0 ? <p class="muted">No domain is online yet.</p> : <RankTable ctx={props.ctx} base="" rows={props.rows} />}
     </Layout>
   );
 }
@@ -72,7 +73,9 @@ export function MindView(props: { ctx: PageCtx; base: Base; page: MindPage; olde
       <EpochLine epoch={m.epoch} base={base} />
       <dl class="facts">
         <dt>Architecture</dt>
-        <dd>{m.legacy ? `${m.architectureName} (legacy system)` : m.architectureName}</dd>
+        <dd>
+          <ArchBadge ctx={props.ctx} id={d.architecture} name={m.architectureName} legacy={m.legacy} />
+        </dd>
         <dt>Rank</dt>
         <dd>{d.rank ?? "unranked"}</dd>
         <dt>Power</dt>

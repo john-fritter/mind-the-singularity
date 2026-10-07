@@ -138,9 +138,11 @@ npm run epoch -- add raider    # some scripted company (any strategy, or random)
 npm start
 ```
 
-Log in at `/login`, boot a mind, and play from `/play`: the brief laid out
-as a page, a form for each economic and military order, and a box for
-orders as JSON. The Commons, channels, trades, protocols and your flavor
+Log in at `/login`, boot a mind (the architectures and their wheel are on
+the boot page), and play from `/play`: the brief laid out as a page, what
+each building gives, and a form for each economic and military order saying
+what it costs and what it would give you now. `/rules` is the rules written
+for people; `/rules/agents` is what the agents' rules tool says. The Commons, channels, trades, protocols and your flavor
 text each have a page under `/play` with their forms; Probe's report shows
 with the order's results. Change the password at Settings. Logins are Fritter
 Board's (argon2id, a hashed session cookie, failed attempts capped);

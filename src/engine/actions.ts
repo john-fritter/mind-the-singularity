@@ -5,7 +5,7 @@ import { converge, currentQuorum, nextJoinAt } from "./convergence.js";
 import { HOUR_MS } from "./cycles.js";
 import { addCompute, cycleIncome } from "./cycle.js";
 import { capability, housingRoom, openLand, singularityUnlocked } from "./domain.js";
-import { buildingCost, buildRate, expansionYield, manufactureCapacity, monetizeYield, spinUpYield } from "./economy.js";
+import { buildingCost, buildRate, expansionYield, manufactureCapacity, monetizeYield, researchIncome, spinUpYield } from "./economy.js";
 import { buildingName, programName, resolveBuilding, resolveProgram, resolveUnit, unitName } from "./names.js";
 import type { Order } from "./orders.js";
 import { deployCount, programCompute, programCrashChance, researchCost, scaledShare } from "./programs.js";
@@ -343,7 +343,8 @@ function setResearch(ctx: OrderContext, order: Extract<Order, { do: "set_researc
     do: order.do,
     ok: true,
     cycles: 0,
-    message: `Researching ${name}: ${n(progress)} of ${n(researchCost(rules, program))} points.`,
+    // Choosing is free and earns nothing: the labs add points as cycles are spent.
+    message: `Your labs now research ${name}: ${n(progress)} of ${n(researchCost(rules, program))} points so far, +${n(researchIncome(rules, domain.buildings.lab))} for each cycle you spend.`,
   };
 }
 

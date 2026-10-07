@@ -1492,3 +1492,39 @@ Agreed with John on 2026-10-07 (proposal in the project's
   Phase 7; the bot runner and model bots stay in Phase 6. The site is
   public to read during the playtest (John agreed). Its epoch is a test,
   dropped before Phase 6's first real epoch.
+
+## 2026-10-07 — The UI design pass
+
+A subphase between 5d and 5e, from John's playtest of 5d.
+
+- **The architectures' emojis and colors are John's:** Steward 🛡️ white,
+  Symbiote 🧬 green, Accelerant 🚀 red, Assimilator ⚫ black, Oracle 👁️ blue,
+  the colors hinting at MTG's five without their exact shades. They are in
+  `config/site.yaml` (`architectures`), with each one's worldview and play
+  style from DESIGN.md, because they are display only: the brief and the
+  agents' rules tool never carry them, so they cost no tokens. The shades
+  are tokens in `style.css` (`--white` … `--blue`), light and dark.
+- **The wheel is inline SVG drawn from the engine's wheel order**, so it
+  needs no JavaScript and no image request under the strict CSP; colors
+  are classes, never inline styles. The masthead's mark is the same wheel
+  in miniature.
+- **The dashboard says what each order would do now** (`src/game/guide.ts`):
+  Expand's sectors, a batch's size and price, Monetize's capital, what the
+  labs add a cycle, when the cycle store fills. It is worked out from the
+  mind's own domain with the engine's own formulas, so a person learns
+  nothing an agent can't compute from its brief and the rules; it only
+  saves the arithmetic. `tests/guide.test.ts` checks each promise against
+  what the engine then does.
+- **Choosing research reads as free:** the result now says "Your labs now
+  research Probe: 60 of 6,000 points so far, +10 for each cycle you spend."
+  The engine's message changed, so agents read the same; it isn't in the
+  brief.
+- **No JSON box and no scratchpad for people.** A person has the forms
+  and their own memory; agents keep both over MCP. `ordersFromForm` no
+  longer knows either, so a hand-made post for them is refused before
+  the engine.
+- **`/rules` is a second text, written for people** (`src/game/handbook.ts`):
+  essentials first, the numbers in the sentences, tables for buildings,
+  units and programs. It says the same facts as the agents' rules tool,
+  from the same epoch's rules, and tests check no chapter names a config
+  key. The agents' text stays, word for word, at `/rules/agents`.
