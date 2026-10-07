@@ -49,6 +49,9 @@ export const SiteSchema = z.strictObject({
   }),
   view: z.strictObject({ record_default: count, record_max: count, tags: count }),
   web: z.strictObject({ front_rankings: count, front_record: count, page: count, archive_top: count }),
+  sessions: z.strictObject({ lifetime_days: count, touch_interval_seconds: count }),
+  login: z.strictObject({ max_failures: count, window_minutes: count, password_min: count, password_max: count }),
+  clock: z.strictObject({ every_seconds: count }),
 });
 export type Site = z.infer<typeof SiteSchema>;
 

@@ -309,7 +309,7 @@ export function EpochArchiveView(props: {
   );
 }
 
-const ERROR_TITLES: Record<number, string> = { 400: "Bad request", 404: "Not found", 500: "Something went wrong" };
+const ERROR_TITLES: Record<number, string> = { 400: "Bad request", 403: "Refused", 404: "Not found", 500: "Something went wrong" };
 
 export function ErrorView(props: { ctx: PageCtx; status: number; message: string }) {
   const title = ERROR_TITLES[props.status] ?? "Error";

@@ -1,8 +1,12 @@
 import type { Child } from "hono/jsx";
 
-/** What every page needs from the app: the stylesheet's address. */
+/** What every page needs from the app: the stylesheet's address, and who is logged in. */
 export interface PageCtx {
   cssHref: string;
+  /** The logged-in account's name, or null for a visitor. */
+  viewer: string | null;
+  /** Whether this site lets people log in at all. */
+  logins: boolean;
 }
 
 const SITE = "Mind: the Singularity";
@@ -30,7 +34,9 @@ export function Layout(props: { ctx: PageCtx; title?: string; children?: Child }
               <a href="/record">The Record</a>
               <a href="/commons">The Commons</a>
               <a href="/archive">The Archive</a>
+              <a href="/rules">Rules</a>
             </nav>
+            <Account ctx={props.ctx} />
           </header>
           <main>{props.children}</main>
           <footer class="footer">
@@ -39,5 +45,26 @@ export function Layout(props: { ctx: PageCtx; title?: string; children?: Child }
         </div>
       </body>
     </html>
+  );
+}
+
+/** The masthead's corner: log in, or the account's own pages and log out (a POST, so another site can't do it). */
+function Account(props: { ctx: PageCtx }) {
+  if (!props.ctx.logins) return null;
+  if (props.ctx.viewer === null) {
+    return (
+      <nav class="account" aria-label="Account">
+        <a href="/login">Log in</a>
+      </nav>
+    );
+  }
+  return (
+    <nav class="account" aria-label="Account">
+      <a href="/play">Play</a>
+      <a href="/settings">{props.ctx.viewer}</a>
+      <form method="post" action="/logout" class="inline">
+        <button type="submit">Log out</button>
+      </form>
+    </nav>
   );
 }

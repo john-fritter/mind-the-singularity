@@ -135,8 +135,9 @@ async function playing() {
   assert.equal((await app.request("/mcp", { method: "POST", headers: { origin: "https://example.com" } })).status, 403);
   assert.equal((await app.request("/mcp", { method: "POST" })).status, 401);
   assert.equal(await (await app.request("/health")).text(), "ok");
-  // Only GET: nothing on the site writes.
-  assert.equal((await app.request("/record", { method: "POST" })).status, 404);
+  // Only GET on the public pages; a post from another site is refused before anything else.
+  assert.equal((await app.request("/record", { method: "POST", headers: { origin: "http://127.0.0.1:3111" } })).status, 404);
+  assert.equal((await app.request("/record", { method: "POST", headers: { origin: "https://example.com" } })).status, 403);
   await get(app, "/no/such/page", 404);
 }
 

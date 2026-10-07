@@ -210,3 +210,32 @@ export async function epochNumbers(pool: Pool): Promise<number[]> {
   const { rows } = await pool.query<{ number: number }>("SELECT number FROM epochs ORDER BY number DESC");
   return rows.map((r) => r.number);
 }
+
+/** A scripted player seated in an epoch. `strategy` and `boot` are checked by whoever reads them. */
+export interface SeatRecord {
+  account: string;
+  strategy: string;
+  seed: number;
+  boot: unknown;
+}
+
+/** Seats a scripted player in an epoch. Refuses an account already seated there. */
+export async function addSeat(pool: Pool, epoch: number, seat: SeatRecord): Promise<void> {
+  const { rowCount } = await pool.query(
+    `INSERT INTO seats (epoch_id, account, strategy, seed, boot)
+     SELECT id, $2, $3, $4, $5 FROM epochs WHERE number = $1
+     ON CONFLICT (epoch_id, account) DO NOTHING`,
+    [epoch, seat.account, seat.strategy, seat.seed, JSON.stringify(seat.boot)],
+  );
+  if (!rowCount) throw new Error(`Couldn't seat ${seat.account}: no epoch ${epoch}, or it's seated already.`);
+}
+
+/** The scripted players seated in an epoch, oldest first. */
+export async function listSeats(pool: Pool, epoch: number): Promise<SeatRecord[]> {
+  const { rows } = await pool.query<{ account: string; strategy: string; seed: string; boot: unknown }>(
+    `SELECT s.account, s.strategy, s.seed, s.boot FROM seats s JOIN epochs e ON e.id = s.epoch_id
+      WHERE e.number = $1 ORDER BY s.id`,
+    [epoch],
+  );
+  return rows.map((r) => ({ account: r.account, strategy: r.strategy, seed: Number(r.seed), boot: r.boot }));
+}

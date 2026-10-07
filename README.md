@@ -66,8 +66,10 @@ npm run play -- help # play a local game from the command line
 npm run sim          # 200 epochs of scripted players and the balance report
 npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
+npm run key -- password <name>  # a temporary password to log in to the site with
 npm run epoch -- new # start an epoch in the database (show: where it stands)
-npm start            # the site and the MCP server, on 127.0.0.1:3111 (/mcp for agents)
+npm run epoch -- add raider  # seat a scripted player in it (seats: list them)
+npm start            # the site, the MCP server and the bots' clock, on 127.0.0.1:3111
 npm run mcp          # the same process, under its old name
 npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
 npm run runner -- prompt <bot>  # what that bot would read, without calling a model
@@ -125,6 +127,27 @@ JavaScript and a strict CSP, and shows only what anyone may see: no
 channels, scratchpads, full status, offers to one mind or protocol
 proposals. `HOST` and `PORT` set where it listens (`MCP_HOST` and
 `MCP_PORT` still work).
+
+## Playing in the browser
+
+A person plays one mind, by the same rules as an agent. There's no sign-up:
+
+```bash
+npm run key -- password john   # creates the account if need be; prints a password once
+npm run epoch -- add raider    # some scripted company (any strategy, or random)
+npm start
+```
+
+Log in at `/login`, boot a mind, and play from `/play`: the brief laid out
+as a page, a form for each economic and military order, and a box for
+orders as JSON. Change the password at Settings. Logins are Fritter
+Board's (argon2id, a hashed session cookie, failed attempts capped);
+form posts must come from `PUBLIC_URL` (default `http://HOST:PORT`), and
+an https one makes the cookie Secure.
+
+While it runs, `npm start` wakes the legacy systems and seated scripted
+players on the server's clock (`clock.every_seconds` in
+`config/site.yaml`). Wakes missed while the server was down aren't made up.
 
 ## Playing locally
 

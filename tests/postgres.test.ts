@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import type { Pool } from "pg";
 import { createAccount, findAccount, identityForKey, issueKey, KEY_PREFIX, listAccounts, revokeKeys, sha256 } from "../src/auth/keys.js";
-import { loadPlayers, loadRules } from "../src/config.js";
+import { databaseLogins, endSessions, setPassword } from "../src/auth/logins.js";
+import { loadPlayers, loadRules, loadSite } from "../src/config.js";
 import { ARCHITECTURES } from "../src/engine/architectures.js";
 import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { createPool, withTransaction } from "../src/db/index.js";
@@ -13,7 +14,8 @@ import type { Game, Write } from "../src/game/state.js";
 import { drive, legacySeats, scriptedSeat, type Seat } from "../src/players/drive.js";
 import { STRATEGIES } from "../src/players/settings.js";
 import { MemoryStore } from "../src/store/memory.js";
-import { createEpoch, latestEpoch, openEpoch, PostgresStore } from "../src/store/postgres.js";
+import { addSeat, createEpoch, latestEpoch, listSeats, openEpoch, PostgresStore } from "../src/store/postgres.js";
+import { ServerClock, type SeatRow } from "../src/players/clock.js";
 import type { WorldStore } from "../src/store/store.js";
 import { freshDatabase } from "./db.js";
 import { createApp } from "../src/app.js";
@@ -22,7 +24,9 @@ import { archivePage } from "../src/game/public.js";
 
 // The Postgres store and the accounts (phase 3a): a game kept in the
 // database plays exactly as one in memory, from any number of processes,
-// and API keys are stored hashed and resolve to their account.
+// and API keys are stored hashed and resolve to their account. Since 5c,
+// people's passwords and sessions, and the scripted players seated in an
+// epoch for the server's clock.
 
 const rules = loadRules();
 const T0 = Date.UTC(2026, 9, 5, 12);
@@ -201,10 +205,83 @@ async function archive(pool: Pool) {
   assert.match(await res.text(), /Glasswater/);
 }
 
+async function logins(pool: Pool) {
+  const site = loadSite();
+  const capped = { ...site, login: { ...site.login, max_failures: 3 } };
+  const l = databaseLogins(pool, capped);
+  const id = await createAccount(pool, "Lamp");
+  await createAccount(pool, "nopass");
+  const refused = "That name and password don't match an account.";
+  // No password yet, an unknown name, a wrong password: one answer for all.
+  assert.deepEqual(await l.logIn("Lamp", "anything-at-all"), { ok: false, error: refused });
+  await setPassword(pool, id, "kit-password-1");
+  const { rows: stored } = await pool.query<{ password_hash: string }>("SELECT password_hash FROM accounts WHERE id = $1", [id]);
+  assert.match(stored[0]!.password_hash, /^\$argon2id\$/);
+  assert.deepEqual(await l.logIn("nobody", "kit-password-1"), { ok: false, error: refused });
+  assert.deepEqual(await l.logIn("nopass", ""), { ok: false, error: refused });
+  assert.deepEqual(await l.logIn("bad:name", "x"), { ok: false, error: refused });
+
+  // The right password, in any case of the name: a session, stored by its hash only.
+  const one = await l.logIn("lamp", "kit-password-1");
+  assert.ok(one.ok);
+  assert.deepEqual(await l.session(one.token), { account: "Lamp" });
+  const { rows: sessions } = await pool.query<{ id: string }>("SELECT id FROM sessions");
+  assert.deepEqual(sessions.map((r) => r.id), [sha256(one.token)]);
+  assert.equal(await l.session("not-a-token"), null);
+
+  // The cap: past max_failures, even the right password is refused for the window.
+  for (let i = 0; i < 3; i++) assert.equal((await l.logIn("LAMP", "wrong")).ok, false);
+  const blocked = await l.logIn("lamp", "kit-password-1");
+  assert.ok(!blocked.ok && /Too many/.test(blocked.error));
+  const fresh = databaseLogins(pool, capped);
+  const two = await fresh.logIn("lamp", "kit-password-1");
+  assert.ok(two.ok, "a restart resets the cap");
+
+  // Changing the password: the current one must be right, the new one long enough; other sessions end.
+  assert.deepEqual(await fresh.changePassword(two.token, "wrong", "another-password"), { ok: false, error: "Your current password isn't right." });
+  const short = await fresh.changePassword(two.token, "kit-password-1", "short");
+  assert.ok(!short.ok && /at least/.test(short.error));
+  assert.deepEqual(await fresh.changePassword(two.token, "kit-password-1", "another-password"), { ok: true });
+  assert.equal(await fresh.session(one.token), null, "the other session ended");
+  assert.deepEqual(await fresh.session(two.token), { account: "Lamp" });
+  assert.equal((await fresh.logIn("lamp", "kit-password-1")).ok, false);
+  const three = await fresh.logIn("lamp", "another-password");
+  assert.ok(three.ok);
+
+  // Expired sessions and logged-out ones are nobody's.
+  await pool.query("UPDATE sessions SET expires_at = NOW() - INTERVAL '1 second' WHERE id = $1", [sha256(three.token)]);
+  assert.equal(await fresh.session(three.token), null);
+  await fresh.logOut(two.token);
+  assert.equal(await fresh.session(two.token), null);
+  // A new password from the command line ends every session.
+  const four = await fresh.logIn("lamp", "another-password");
+  assert.ok(four.ok);
+  await endSessions(pool, id);
+  assert.equal(await fresh.session(four.token), null);
+}
+
+async function seats(pool: Pool) {
+  const number = (await latestEpoch(pool))! + 1;
+  const store = await createEpoch(pool, newGame(rules, { epoch: number, seed: 9, startedAt: T0 }));
+  const seat: SeatRow = { account: "bot:turtle-1", strategy: "turtle", seed: 5, boot: { designation: "TURTLE-1", domainName: "The turtle domain", architecture: "steward" } };
+  await addSeat(pool, number, seat);
+  await assert.rejects(addSeat(pool, number, seat), /seated already/);
+  await assert.rejects(addSeat(pool, number + 1, seat), /no epoch/);
+  assert.deepEqual(await listSeats(pool, number), [seat]);
+  // The server's clock boots it from the database's seat.
+  const clock = new ServerClock(
+    { current: async () => store, seats: async (n) => (await listSeats(pool, n)) as SeatRow[], settings: loadPlayers() },
+    T0 + HOUR_MS,
+  );
+  const woke = await clock.pass(T0 + HOUR_MS + 1000);
+  assert.ok(woke.length === 1 && woke[0]!.booted && !woke[0]!.error, JSON.stringify(woke));
+  assert.equal(currentMind(await store.read(), "bot:turtle-1")?.designation, "TURTLE-1");
+}
+
 async function migrations(pool: Pool) {
   assert.deepEqual(await migrate(pool, () => {}), [], "migrating again applies nothing");
   const { rows } = await pool.query<{ table_schema: string }>(
-    "SELECT DISTINCT table_schema FROM information_schema.tables WHERE table_name IN ('_migrations', 'epochs', 'accounts', 'api_keys', 'orders_log', 'record', 'owners')",
+    "SELECT DISTINCT table_schema FROM information_schema.tables WHERE table_name IN ('_migrations', 'epochs', 'accounts', 'api_keys', 'orders_log', 'record', 'owners', 'sessions', 'seats')",
   );
   assert.deepEqual(rows.map((r) => r.table_schema), ["mind"], "everything is in the mind schema");
 }
@@ -218,6 +295,8 @@ async function main() {
     await epochs(pool);
     await keys(pool);
     await archive(pool);
+    await logins(pool);
+    await seats(pool);
     await migrations(pool);
   } finally {
     await pool.end();

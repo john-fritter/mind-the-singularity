@@ -55,3 +55,23 @@ web:
   page: 50
   # Minds the Archive lists for each finished epoch, strongest first.
   archive_top: 5
+
+# Logged-in browsers (src/auth/sessions.ts), as Fritter Board's.
+sessions:
+  lifetime_days: 60
+  # How often a request may bump last_seen_at; avoids a write per page view.
+  touch_interval_seconds: 60
+
+login:
+  # Failed logins per account name before further attempts are refused for
+  # the rest of the window. In memory; resets on restart, which is fine.
+  max_failures: 10
+  window_minutes: 15
+  # A password's length, at least and at most.
+  password_min: 10
+  password_max: 200
+
+# The server's clock (src/players/clock.ts): how often it wakes the legacy
+# systems and scripted players whose wakes have come due.
+clock:
+  every_seconds: 60
