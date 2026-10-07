@@ -224,7 +224,7 @@ async function anonymousVisitor(store: MemoryStore) {
       if (href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/static/") && !pages.has(href)) queue.push(href);
     }
   }
-  for (const must of ["/", "/rankings", "/record", "/commons", "/archive", "/minds/HALCYON", "/minds/VESTA", "/minds/PIKE", "/commons/1", "/login", "/rules", "/rules/orders"]) {
+  for (const must of ["/", "/rankings", "/record", "/commons", "/archive", "/minds/HALCYON", "/minds/VESTA", "/minds/PIKE", "/commons/1", "/login", "/rules", "/rules/combat", "/rules/agents", "/rules/agents/orders"]) {
     assert.equal(pages.get(must), 200, `the crawl didn't reach ${must}`);
   }
   // Private event types aren't a filter: refused, and nothing shown.

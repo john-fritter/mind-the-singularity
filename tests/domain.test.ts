@@ -177,7 +177,7 @@ function manufacturing() {
 function research() {
   const steward = setup("steward", (d) => (d.researchProgress.probe = 5995));
   const set = run(steward, [{ do: "set_research", program: "Probe" }, { do: "expand" }]);
-  assert.equal(set.results[0]!.message, "Researching Probe: 5,995 of 6,000 points.");
+  assert.equal(set.results[0]!.message, "Your labs now research Probe: 5,995 of 6,000 points so far, +10 for each cycle you spend.");
   assert.equal(set.results[0]!.cycles, 0);
   assert.deepEqual(set.d.known, ["probe"]);
   assert.equal(set.d.researchTarget, null);

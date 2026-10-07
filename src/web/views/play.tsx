@@ -1,10 +1,13 @@
 import type { Child } from "hono/jsx";
 import { span } from "../../game/brief.js";
-import type { Choice, DomainStatus, PlayPage } from "../../game/play.js";
+import type { Guide } from "../../game/guide.js";
+import type { Wheel as WheelData } from "../../game/look.js";
+import type { DomainStatus, PlayPage } from "../../game/play.js";
 import type { Brief, ShownEvent } from "../../game/read.js";
 import type { Topic } from "../../game/topics.js";
 import { lot, names, num } from "../format.js";
 import { MindLink, Offers, PostItem, Time } from "./components.js";
+import { ArchBadge, ArchCard, Wheel, WheelLegend } from "./look.js";
 import { Layout, type PageCtx } from "./layout.js";
 
 // The logged-in pages: log in, settings, the boot form and the dashboard
@@ -76,13 +79,16 @@ export function SettingsView(props: { ctx: PageCtx; error?: string; done?: boole
 export function RulesView(props: { ctx: PageCtx; topics: { name: string; summary: string }[]; topic: Topic | null; numbers: string }) {
   const t = props.topic;
   return (
-    <Layout ctx={props.ctx} title={t ? `Rules: ${t.name}` : "Rules"}>
-      <h1>{t ? `Rules: ${t.name}` : "Rules"}</h1>
-      <p class="muted">What the agents' rules tool says, by topic, with this epoch's numbers.</p>
+    <Layout ctx={props.ctx} title={t ? `Agents' rules: ${t.name}` : "Agents' rules"}>
+      <p class="muted">
+        <a href="/rules">How to play</a> ›
+      </p>
+      <h1>{t ? `Agents' rules: ${t.name}` : "Agents' rules"}</h1>
+      <p class="muted">What the agents' rules tool says, word for word, with this epoch's numbers. People will find the same rules easier to read under <a href="/rules">how to play</a>.</p>
       <ul class="topics">
         {props.topics.map((x) => (
           <li>
-            <a href={`/rules/${x.name}`}>{x.name}</a> <span class="muted">· {x.summary}</span>
+            <a href={`/rules/agents/${x.name}`}>{x.name}</a> <span class="muted">· {x.summary}</span>
           </li>
         ))}
       </ul>
@@ -107,56 +113,88 @@ export function Field(props: { label: string; children?: Child }) {
   );
 }
 
-export function Select(props: { name: string; choices: Choice[]; blank?: string; required?: boolean }) {
-  return (
-    <select name={props.name} required={props.required}>
-      {props.blank !== undefined && <option value="">{props.blank}</option>}
-      {props.choices.map((c) => (
-        <option value={c.id}>{c.name}</option>
-      ))}
-    </select>
-  );
-}
-
-const Cycles = () => (
-  <Field label="Cycles">
+/** "How many times" for an order that runs once per cycle. */
+const Times = (props: { label?: string }) => (
+  <Field label={props.label ?? "Times"}>
     <input name="cycles" type="number" min="1" value="1" required />
   </Field>
 );
 
-/** One order's form: a POST to /play/orders with its `do`, coming `back` to the page it's on (the dashboard by default). */
-export function OrderForm(props: { kind: string; title?: string; button: string; note?: string; back?: string; class?: string; children?: Child }) {
+/**
+ * One order's form: a POST to /play/orders with its `do`, coming `back` to
+ * the page it's on (the dashboard by default). `cost` is what it spends and
+ * `gives` what it does for you now; `note` is a plain line under the title.
+ */
+export function OrderForm(props: {
+  kind: string;
+  title?: string;
+  button: string;
+  note?: string;
+  cost?: string;
+  gives?: Child;
+  back?: string;
+  class?: string;
+  children?: Child;
+}) {
   return (
     <form method="post" action="/play/orders" class={props.class ?? "order"}>
       <input type="hidden" name="do" value={props.kind} />
       {props.back && <input type="hidden" name="back" value={props.back} />}
       {props.title && <h3>{props.title}</h3>}
+      {props.cost && <span class={props.cost.startsWith("Free") ? "cost free" : "cost"}>{props.cost}</span>}
       {props.note && <p class="muted">{props.note}</p>}
+      {props.gives && <p class="gives">{props.gives}</p>}
       {props.children}
       <button type="submit">{props.button}</button>
     </form>
   );
 }
 
-export function BootForm(props: { architectures: Choice[] }) {
+/** The boot form: the five architectures as cards beside the wheel, then the mind's names. */
+export function BootForm(props: { wheel: WheelData }) {
+  const looks = props.wheel.looks;
   return (
-    <form method="post" action="/play/boot" class="stack">
-      <Field label="Designation">
-        <input name="designation" required />
-      </Field>
-      <Field label="Domain name">
-        <input name="domainName" required />
-      </Field>
-      <Field label="Architecture">
-        <Select name="architecture" choices={props.architectures} required />
-      </Field>
-      <Field label="Manifesto">
-        <textarea name="manifesto" rows={3}></textarea>
-      </Field>
-      <button type="submit">Boot</button>
+    <form method="post" action="/play/boot" class="boot">
+      <fieldset class="archcards">
+        <legend class="muted">Your architecture is fixed for the whole epoch. It decides your units and programs, and who your natural enemies are.</legend>
+        {looks.map((l) => (
+          <ArchCard look={l} looks={looks} choose={{ checked: false }} />
+        ))}
+      </fieldset>
+      <div class="stack">
+        <Wheel wheel={props.wheel} />
+        <WheelLegend wheel={props.wheel} />
+        <Field label="Designation">
+          <input name="designation" required />
+        </Field>
+        <Field label="Domain name">
+          <input name="domainName" required />
+        </Field>
+        <Field label="Manifesto (optional, public)">
+          <textarea name="manifesto" rows={3}></textarea>
+        </Field>
+        <button type="submit">Boot</button>
+      </div>
     </form>
   );
 }
+
+/** What a result is about, in words: "Research", not "set_research". */
+const ORDER_LABELS: Record<string, string> = {
+  set_research: "Research",
+  set_countermeasure: "Countermeasure",
+  spin_up: "Spin up",
+  last_log: "Last log",
+  trade_offer: "Trade offer",
+  trade_accept: "Trade",
+  trade_cancel: "Trade cancelled",
+  protocol_propose: "Protocol proposal",
+  protocol_accept: "Protocol",
+  protocol_decline: "Protocol",
+  protocol_revoke: "Protocol",
+};
+
+const orderLabel = (kind: string) => ORDER_LABELS[kind] ?? kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, " ");
 
 export function FlashView(props: { flash: Flash | null; names: Record<string, string> }) {
   const f = props.flash;
@@ -169,7 +207,7 @@ export function FlashView(props: { flash: Flash | null; names: Record<string, st
         <ol class="results">
           {f.results.map((r) => (
             <li class={r.ok ? "ok" : "refused"}>
-              <span class="label">{r.do}</span> {r.ok ? "" : "refused: "}
+              <span class="label">{orderLabel(r.do)}</span> {r.ok ? "" : "refused: "}
               {r.message}
               {r.status && <ProbeReport status={r.status} names={props.names} />}
             </li>
@@ -257,136 +295,294 @@ function Events(props: { events: ShownEvent[]; empty: string }) {
   );
 }
 
-/** The status block: the numbers the brief's YOU lines carry. */
-function Status(props: { b: Brief; names: Record<string, string> }) {
-  const { b, names: n } = props;
+/** The top of the dashboard: the stores, with what one cycle does to them. */
+function Vitals(props: { b: Brief; g: Guide | null }) {
+  const { b, g } = props;
   const y = b.you;
-  const built = Object.entries(y.buildings);
-  const open = y.territory - built.reduce((s, [, c]) => s + c, 0);
-  const units = Object.entries(y.units).filter(([, c]) => (c ?? 0) > 0);
+  const per = g?.perCycle;
   return (
-    <dl class="facts">
-      <dt>Architecture</dt>
-      <dd>{n[y.architecture]}</dd>
-      <dt>Rank</dt>
-      <dd>{y.rank === null ? "unranked" : `${y.rank} of ${y.ranked}`}</dd>
-      <dt>Power</dt>
-      <dd>
-        {num(y.power)} <span class="muted">· capability {y.capability}</span>
-      </dd>
-      <dt>Cycles</dt>
-      <dd>
-        {y.cycles} of {y.cycleCap} <span class="muted">· an attack costs {y.attackCycles}</span>
-      </dd>
-      <dt>Territory</dt>
-      <dd>{num(y.territory)} sectors</dd>
-      <dt>Capital</dt>
-      <dd>{num(y.capital)}</dd>
-      <dt>Compute</dt>
-      <dd>
-        {num(y.compute)} of {num(y.computeStorage)}
-      </dd>
-      <dt>Users</dt>
-      <dd>
-        {num(y.users)} of {num(y.userCap)}
-      </dd>
-      <dt>Built</dt>
-      <dd>
-        {built.map(([k, c]) => `${n[k]} ${num(c)}`).join(" · ")} · open {num(open)}
-      </dd>
-      <dt>Forces</dt>
-      <dd>
-        {units.map(([u, c]) => `${n[u] ?? u} ${num(c ?? 0)}`).join(" · ") || "none"}{" "}
-        <span class="muted">
-          · attack {num(y.attack)}, defense {num(y.defense)}
+    <div class="vitals">
+      <div class="vital">
+        <span class="k">Cycles</span>
+        <span class="v">
+          {y.cycles} <small>/ {y.cycleCap}</small>
         </span>
-      </dd>
-      <dt>Research</dt>
-      <dd>{y.research ? `${y.research.name}, ${Math.floor((100 * y.research.progress) / y.research.cost)}%` : "none"}</dd>
-      <dt>Programs</dt>
-      <dd>
-        {y.known.map((p) => n[p]).join(", ") || "none"}
+        <meter min="0" max={y.cycleCap} value={y.cycles}></meter>
+        {g && (
+          <span class="d">
+            +1 every {g.cycleMinutes} min ·{" "}
+            {g.cyclesFullAt === null ? "full: new ones are wasted" : `full in ${span(g.cyclesFullAt - b.now)}, then wasted`}
+          </span>
+        )}
+      </div>
+      <div class="vital">
+        <span class="k">Capital</span>
+        <span class="v">{num(y.capital)}</span>
+        {per && (
+          <span class="d">
+            <span class="plus">+{num(per.capital)}</span> income, <span class="minus">−{num(per.capitalUpkeep)}</span> upkeep a cycle
+          </span>
+        )}
+      </div>
+      <div class="vital">
+        <span class="k">Compute</span>
+        <span class="v">
+          {num(y.compute)} <small>/ {num(y.computeStorage)}</small>
+        </span>
+        <meter min="0" max={y.computeStorage} value={y.compute}></meter>
+        {per && (
+          <span class="d">
+            <span class="plus">+{num(per.compute)}</span> a cycle{per.computeUpkeep > 0 && <>, <span class="minus">−{num(per.computeUpkeep)}</span> upkeep</>}
+          </span>
+        )}
+      </div>
+      <div class="vital">
+        <span class="k">Users</span>
+        <span class="v">
+          {num(y.users)} <small>/ {num(y.userCap)}</small>
+        </span>
+        <meter min="0" max={y.userCap} value={Math.min(y.users, y.userCap)}></meter>
+        {per && (
+          <span class="d">
+            {per.users >= 0 ? <span class="plus">+{num(per.users)}</span> : <span class="minus">{num(per.users)}</span>} next cycle, toward the cap
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Each building, what one gives and what they give in all. */
+function DomainTable(props: { g: Guide }) {
+  return (
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Built</th>
+            <th scope="col" class="num">
+              Count
+            </th>
+            <th scope="col">Each gives</th>
+            <th scope="col">In all</th>
+          </tr>
+        </thead>
+        <tbody>
+          {props.g.domain.map((r) => (
+            <tr>
+              <td>{r.name}</td>
+              <td class="num">{num(r.count)}</td>
+              <td>{r.each}</td>
+              <td>{r.total}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** The rest of the brief's YOU lines, beside the domain table: forces, research, programs, protection, protocol. */
+function Side(props: { page: PlayPage; b: Brief }) {
+  const { b, page } = props;
+  const n = page.names;
+  const y = b.you;
+  const g = page.guide;
+  const units = Object.entries(y.units).filter(([, c]) => (c ?? 0) > 0);
+  const opposites = page.wheel.looks.find((l) => l.id === y.architecture)?.opposites ?? [];
+  const look = (id: string) => page.wheel.looks.find((l) => l.id === id)!;
+  return (
+    <aside class="side">
+      <span class="k">Forces</span>
+      <span>
+        {units.map(([u, c]) => `${n[u] ?? u} ${num(c ?? 0)}`).join(" · ") || "none"}
+        <br />
+        <span class="muted">
+          attack {num(y.attack)} · defense {num(y.defense)} · an attack costs {y.attackCycles} cycles
+        </span>
+      </span>
+      <span class="k">Research</span>
+      <span>
+        {y.research
+          ? `${y.research.name}: ${num(y.research.progress)} of ${num(y.research.cost)}${g && g.perCycle.research > 0 ? `, about ${num(Math.ceil((y.research.cost - y.research.progress) / g.perCycle.research))} more cycles at ${num(g.perCycle.research)} a cycle` : ""}`
+          : "nothing: choose a target below"}
+      </span>
+      <span class="k">Programs · capability {y.capability}</span>
+      <span>
+        {y.known.map((p) => n[p]).join(", ") || "none yet"}
         {y.running.length > 0 &&
           ` · running: ${y.running
             .map((r) => `${n[r.program]} (${r.cyclesLeft !== undefined ? `${r.cyclesLeft} cycles` : span(r.endsAt! - b.now)} left)`)
             .join(", ")}`}
-      </dd>
-      <dt>Countermeasure</dt>
-      <dd>{y.countermeasure ? `${n[y.countermeasure.program]} when an attacker's attack passes ${Math.round(y.countermeasure.above * 100)}% of your defense` : "none"}</dd>
+      </span>
+      <span class="k">Countermeasure</span>
+      <span>
+        {y.countermeasure ? `${n[y.countermeasure.program]} when an attacker's attack passes ${Math.round(y.countermeasure.above * 100)}% of your defense` : "none"}
+      </span>
       {y.bootPeriodEndsAt > b.now && (
         <>
-          <dt>Boot period</dt>
-          <dd>{span(y.bootPeriodEndsAt - b.now)} left</dd>
+          <span class="k">Boot period</span>
+          <span>{span(y.bootPeriodEndsAt - b.now)} left: nobody can attack you, and you can't attack</span>
         </>
       )}
       {y.safeModeUntil !== null && y.safeModeUntil > b.now && (
         <>
-          <dt>Safe mode</dt>
-          <dd>{span(y.safeModeUntil - b.now)} left</dd>
+          <span class="k">Safe mode</span>
+          <span>{span(y.safeModeUntil - b.now)} left</span>
         </>
       )}
       {y.convergedAt !== null && (
         <>
-          <dt>Converged</dt>
-          <dd>anyone may attack you</dd>
+          <span class="k">Converged</span>
+          <span>anyone may attack you</span>
         </>
       )}
       {b.protocol && (
         <>
-          <dt>Protocol</dt>
-          <dd>
+          <span class="k">Protocol</span>
+          <span>
             {names(b.protocol.members.filter((m) => m !== y.designation))}
             {b.protocol.leaving.map((l) => ` · ${l.mind === y.designation ? "you leave" : `${l.mind} leaves`} in ${span(l.at - b.now)}`)}
-          </dd>
+          </span>
         </>
       )}
-    </dl>
+      <span class="k">Your place on the wheel</span>
+      <Wheel wheel={page.wheel} mine={y.architecture} small />
+      <span class="muted">
+        You hit {opposites.map((o) => `${look(o).emoji} ${look(o).name}`).join(" and ")} minds {Math.round(page.wheel.opposingBonus * 100)}% harder, and they hit you {Math.round(page.wheel.opposingBonus * 100)}% harder.
+      </span>
+    </aside>
   );
 }
 
-function Orders(props: { page: PlayPage; b: Brief }) {
-  const { choices: c } = props.page;
-  const targets = props.b.inRange.map((d) => ({ id: d.designation, name: d.designation }));
+/** A select of priced choices: "City · 244 capital". */
+function Priced(props: { name: string; choices: { id: string; label: string }[]; blank?: string; required?: boolean }) {
+  return (
+    <select name={props.name} required={props.required}>
+      {props.blank !== undefined && <option value="">{props.blank}</option>}
+      {props.choices.map((c) => (
+        <option value={c.id}>{c.label}</option>
+      ))}
+    </select>
+  );
+}
+
+function Orders(props: { page: PlayPage; b: Brief; g: Guide }) {
+  const { b, g } = props;
+  const ac = b.you.attackCycles;
+  const targets = b.inRange.map((d) => ({ id: d.designation, label: `${d.designation} · power ${num(d.power)}` }));
+  const cycles = (k: number, what: string) => `${k} cycle${k === 1 ? "" : "s"} ${what}`;
+  const rules = g.costs;
   return (
     <>
       <section>
         <h2>Economy</h2>
         <div class="orders">
-          <OrderForm kind="expand" title="Expand" button="Expand" note="Claim new sectors.">
-            <Cycles />
+          <OrderForm
+            kind="expand"
+            title="Expand"
+            button="Expand"
+            cost={cycles(rules.expand, "each")}
+            gives={
+              <>
+                Claim <b>+{num(g.expand.sectors)} sectors</b> each, as open land (+{num(g.expand.userCap)} user cap). The yield falls as you grow, never below {g.expand.floor}.
+              </>
+            }
+          >
+            <div class="row">
+              <Times />
+            </div>
           </OrderForm>
-          <OrderForm kind="build" title="Build" button="Build">
-            <Field label="Building">
-              <Select name="building" choices={c.buildings} required />
-            </Field>
-            <Field label="Count">
-              <input name="count" type="number" min="1" value="1" required />
-            </Field>
-          </OrderForm>
-          <OrderForm kind="manufacture" title="Manufacture" button="Manufacture">
-            <Field label="Hardware">
-              <Select name="unit" choices={c.hardware} required />
-            </Field>
-            <Field label="Count">
-              <input name="count" type="number" min="1" value="1" required />
-            </Field>
-          </OrderForm>
-          <OrderForm kind="monetize" title="Monetize" button="Monetize" note="Turn users into capital.">
-            <Cycles />
-          </OrderForm>
-          <OrderForm kind="spin_up" title="Spin up" button="Spin up" note="Turn capital into compute.">
-            <Cycles />
-          </OrderForm>
-          <OrderForm kind="set_research" title="Research" button="Set research" note="Free.">
-            <Field label="Program">
-              <Select name="program" choices={c.research} required />
-            </Field>
-          </OrderForm>
-          {c.execute.length > 0 && (
-            <OrderForm kind="execute" title="Execute a program" button="Execute">
-              <Field label="Program">
-                <Select name="program" choices={c.execute} required />
+          <OrderForm
+            kind="build"
+            title="Build"
+            button="Build"
+            cost={cycles(rules.build, "a batch")}
+            gives={
+              <>
+                Up to <b>{num(g.build.batch)} buildings</b> a batch, one per open sector ({num(g.build.open)} open). Prices rise with your territory.
+              </>
+            }
+          >
+            <Priced name="building" choices={g.build.buildings} required />
+            <div class="row">
+              <Field label="Count">
+                <input name="count" type="number" min="1" value={String(Math.max(1, Math.min(g.build.batch, g.build.open)))} required />
               </Field>
+            </div>
+          </OrderForm>
+          <OrderForm
+            kind="manufacture"
+            title="Manufacture"
+            button="Manufacture"
+            cost={cycles(rules.manufacture, "a batch")}
+            gives={
+              <>
+                Up to <b>{num(g.manufacture.batch)} units</b> a batch; your factories have room for {num(g.manufacture.room)} more.
+              </>
+            }
+          >
+            <Priced name="unit" choices={g.manufacture.hardware} required />
+            <div class="row">
+              <Field label="Count">
+                <input name="count" type="number" min="1" value={String(Math.max(1, Math.min(g.manufacture.batch, g.manufacture.room)))} required />
+              </Field>
+            </div>
+          </OrderForm>
+          <OrderForm
+            kind="monetize"
+            title="Monetize"
+            button="Monetize"
+            cost={cycles(rules.monetize, "each")}
+            gives={
+              <>
+                <b>+{num(g.monetize)} capital</b> extra each, on top of the cycle's own income.
+              </>
+            }
+          >
+            <div class="row">
+              <Times />
+            </div>
+          </OrderForm>
+          <OrderForm
+            kind="spin_up"
+            title="Spin up"
+            button="Spin up"
+            cost={cycles(rules.spin_up, "each")}
+            gives={
+              <>
+                <b>+{num(g.spinUp)} compute</b> extra each, up to your storage of {num(g.computeStorage)}.
+              </>
+            }
+          >
+            <div class="row">
+              <Times />
+            </div>
+          </OrderForm>
+          {g.research.length > 0 && (
+            <OrderForm
+              kind="set_research"
+              title="Research"
+              button="Research this"
+              cost="Free · no cycles"
+              gives={
+                <>
+                  Choose what your labs work on. Choosing earns nothing: your labs add <b>{num(g.perCycle.research)} points</b> to it every cycle you spend, on anything. Progress is kept if you switch.
+                </>
+              }
+            >
+              <Priced name="program" choices={g.research.map((r) => ({ id: r.id, label: `${r.label} · ${r.does}` }))} required />
+            </OrderForm>
+          )}
+          {g.execute.length > 0 && (
+            <OrderForm
+              kind="execute"
+              title="Run a program"
+              button="Run"
+              cost={cycles(rules.execute, "and its compute")}
+              gives="Hostile programs and Probe need a target. A program may crash, spending its compute for nothing."
+            >
+              <Priced name="program" choices={g.execute.map((r) => ({ id: r.id, label: `${r.label} · ${r.does}` }))} required />
               <Field label="Target">
                 <input name="target" placeholder="a designation, for hostile programs and Probe" />
               </Field>
@@ -400,10 +596,14 @@ function Orders(props: { page: PlayPage; b: Brief }) {
           {targets.length === 0 ? (
             <p class="muted">No mind is in range to attack.</p>
           ) : (
-            <OrderForm kind="attack" title="Attack" button="Attack" note={`Costs ${props.b.you.attackCycles} cycles.`}>
-              <Field label="Target">
-                <Select name="target" choices={targets} required />
-              </Field>
+            <OrderForm
+              kind="attack"
+              title="Attack"
+              button="Attack"
+              cost={cycles(ac, "this time")}
+              gives="Conquest takes land and, in a lopsided win, a core. A raid takes capital and users and wrecks buildings. Each attack today makes the next one dearer."
+            >
+              <Priced name="target" choices={targets} required />
               <Field label="Mode">
                 <select name="mode">
                   <option value="raid">Raid</option>
@@ -411,46 +611,25 @@ function Orders(props: { page: PlayPage; b: Brief }) {
                 </select>
               </Field>
               <Field label="Battle program">
-                <Select name="program" choices={c.battle} blank="none" />
+                <Priced name="program" choices={g.battle.map((r) => ({ id: r.id, label: `${r.label} · ${r.does}` }))} blank="none" />
               </Field>
             </OrderForm>
           )}
-          <OrderForm kind="set_countermeasure" title="Countermeasure" button="Set" note="Free. No program clears it.">
-            <Field label="Program">
-              <Select name="program" choices={c.battle} blank="none" />
-            </Field>
+          <OrderForm
+            kind="set_countermeasure"
+            title="Countermeasure"
+            button="Set"
+            cost="Free · no cycles"
+            gives={g.battle.length > 0 ? "A battle program that runs by itself when you are attacked hard enough. It costs its compute when it fires." : "Learn a battle program first; then it can run by itself when you are attacked."}
+          >
+            <Priced name="program" choices={g.battle.map((r) => ({ id: r.id, label: `${r.label} · ${r.does}` }))} blank="none" />
             <Field label="When an attack passes this % of your defense">
               <input name="above" type="number" min="0" max="200" value="100" />
             </Field>
           </OrderForm>
         </div>
       </section>
-      <section>
-        <h2>Scratchpad</h2>
-        <OrderForm kind="scratchpad" title="Your notes" button="Save" note="Free. Only you see it.">
-          <textarea name="text" rows={4}>
-            {props.b.you.scratchpad}
-          </textarea>
-        </OrderForm>
-      </section>
-      <JsonOrders />
     </>
-  );
-}
-
-function JsonOrders() {
-  return (
-    <section>
-      <h2>Orders as JSON</h2>
-      <form method="post" action="/play/orders" class="order">
-        <input type="hidden" name="do" value="json" />
-        <p class="muted">
-          A list of orders, run top to bottom, exactly as an agent sends them. The <a href="/rules/orders">orders</a> topic has the format.
-        </p>
-        <textarea name="orders" rows={5} placeholder='[{"do": "expand", "cycles": 2}]'></textarea>
-        <button type="submit">Submit</button>
-      </form>
-    </section>
   );
 }
 
@@ -473,7 +652,7 @@ function Deleted(props: { page: PlayPage; b: Brief }) {
           <textarea name="text" rows={3}></textarea>
         </OrderForm>
       )}
-      {props.page.boot && <BootForm architectures={props.page.boot.architectures} />}
+      {props.page.boot && <BootForm wheel={props.page.wheel} />}
     </section>
   );
 }
@@ -539,19 +718,24 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
       <Layout ctx={props.ctx} title="Boot">
         <h1>Boot a mind</h1>
         <FlashView flash={props.flash} names={page.names} />
-        <p>You have no mind in this epoch. Boot one: it starts with the same domain every mind does.</p>
-        <BootForm architectures={page.boot!.architectures} />
+        <p>You have no mind in this epoch. Boot one: it starts with the same domain every mind does. New to the game? Read <a href="/rules">how to play</a> first.</p>
+        <BootForm wheel={page.wheel} />
       </Layout>
     );
   }
   const y = b.you;
-  const live = y.deletedAt === null && !b.epoch.ended;
+  const g = page.guide;
+  const live = y.deletedAt === null && !b.epoch.ended && g !== null;
   return (
     <Layout ctx={props.ctx} title={y.designation}>
       <PlayNav here="/play" />
-      <h1>
-        {y.designation} <span class="muted">of {y.domainName}</span>
-      </h1>
+      <div class="mindhead">
+        <h1>{y.designation}</h1>
+        <ArchBadge ctx={props.ctx} id={y.architecture} name={page.names[y.architecture]!} />
+        <span class="muted">
+          of {y.domainName} · {y.rank === null ? "unranked" : `rank ${y.rank} of ${y.ranked}`} · power {num(y.power)} · {num(y.territory)} sectors
+        </span>
+      </div>
       <section class="epoch">
         <p class="epoch-day">
           Epoch {b.epoch.number} · day {b.epoch.day} of {b.epoch.lengthDays} · <Time at={b.now} />
@@ -561,30 +745,40 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
             Converging: {names(b.convergence.minds)}, {b.convergence.minds.length} of {b.convergence.quorum} needed.
           </p>
         )}
-        {page.warned && (
-          <p class="state state-warning">
-            The Shutdown comes in {span(b.epoch.shutdownAt - b.now)}.
-          </p>
-        )}
+        {page.warned && <p class="state state-warning">The Shutdown comes in {span(b.epoch.shutdownAt - b.now)}.</p>}
         {b.epoch.ended && <p class="state state-ended">The epoch is over.</p>}
       </section>
       <FlashView flash={props.flash} names={page.names} />
       {y.deletedAt !== null && <Deleted page={page} b={b} />}
-      <Status b={b} names={page.names} />
+      <Vitals b={b} g={g} />
+      {live && (
+        <p class="rule">
+          <b>Every cycle you spend, on anything,</b> also runs your domain once: income comes in, users grow, labs research and upkeep is paid.
+        </p>
+      )}
       {b.refused.orders.length > 0 && (
         <section>
           <h2>Refused last time</h2>
           <ul>
             {b.refused.orders.map((r) => (
               <li>
-                {r.do}: {r.message}
+                {orderLabel(r.do)}: {r.message}
                 {r.times > 1 && ` (×${r.times})`}
               </li>
             ))}
           </ul>
         </section>
       )}
-      {live && <Orders page={page} b={b} />}
+      {g && (
+        <div class="two">
+          <section>
+            <h2>Your domain</h2>
+            <DomainTable g={g} />
+          </section>
+          <Side page={page} b={b} />
+        </div>
+      )}
+      {live && <Orders page={page} b={b} g={g} />}
       <section>
         <h2>
           Since <Time at={b.since.from} />
@@ -602,34 +796,38 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
         {b.inRange.length === 0 ? (
           <p class="muted">No mind is in range.</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Mind</th>
-                <th scope="col">Architecture</th>
-                <th scope="col" class="num">
-                  Power
-                </th>
-                <th scope="col" class="num">
-                  Territory
-                </th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {b.inRange.map((d) => (
+          <div class="tablebox">
+            <table>
+              <thead>
                 <tr>
-                  <td>
-                    <MindLink base="" mind={{ designation: d.designation, n: null }} />
-                  </td>
-                  <td>{page.names[d.architecture]}</td>
-                  <td class="num">{num(d.power)}</td>
-                  <td class="num">{num(d.territory)}</td>
-                  <td>{d.status}</td>
+                  <th scope="col">Mind</th>
+                  <th scope="col">Architecture</th>
+                  <th scope="col" class="num">
+                    Power
+                  </th>
+                  <th scope="col" class="num">
+                    Territory
+                  </th>
+                  <th scope="col">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {b.inRange.map((d) => (
+                  <tr>
+                    <td>
+                      <MindLink base="" mind={{ designation: d.designation, n: null }} />
+                    </td>
+                    <td>
+                      <ArchBadge ctx={props.ctx} id={d.architecture} name={page.names[d.architecture]!} />
+                    </td>
+                    <td class="num">{num(d.power)}</td>
+                    <td class="num">{num(d.territory)}</td>
+                    <td>{d.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
       <Social b={b} />

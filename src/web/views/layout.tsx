@@ -1,4 +1,5 @@
 import type { Child } from "hono/jsx";
+import { Sigil } from "./look.js";
 
 /** What every page needs from the app: the stylesheet's address, and who is logged in. */
 export interface PageCtx {
@@ -7,6 +8,8 @@ export interface PageCtx {
   viewer: string | null;
   /** Whether this site lets people log in at all. */
   logins: boolean;
+  /** Each architecture's emoji and color, in wheel order, by id. */
+  looks: Record<string, { emoji: string; color: string }>;
 }
 
 const SITE = "Mind: the Singularity";
@@ -26,8 +29,9 @@ export function Layout(props: { ctx: PageCtx; title?: string; children?: Child }
       <body>
         <div class="wrap">
           <header class="masthead">
-            <a class="site-name" href="/">
-              {SITE}
+            <a class="brand" href="/">
+              <Sigil ctx={props.ctx} />
+              <span class="site-name">{SITE}</span>
             </a>
             <nav class="sections" aria-label="Sections">
               <a href="/rankings">Rankings</a>

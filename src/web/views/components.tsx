@@ -2,6 +2,8 @@ import type { Child } from "hono/jsx";
 import type { EpochStatus, MindRef, RankRow, RecordEntry } from "../../game/public.js";
 import type { OfferView, Post } from "../../game/read.js";
 import { formatAt, isoAt, lot, names, num } from "../format.js";
+import type { PageCtx } from "./layout.js";
+import { ArchBadge } from "./look.js";
 
 /**
  * Where a set of pages lives: "" for the epoch being played, "/archive/3"
@@ -107,7 +109,7 @@ function EpochState(props: { epoch: EpochStatus; base: Base }) {
   );
 }
 
-export function RankTable(props: { base: Base; rows: RankRow[] }) {
+export function RankTable(props: { ctx: PageCtx; base: Base; rows: RankRow[] }) {
   return (
     <table class="rankings">
       <thead>
@@ -132,7 +134,9 @@ export function RankTable(props: { base: Base; rows: RankRow[] }) {
             <td>
               <MindLink base={props.base} mind={r.mind} /> <span class="muted">of {r.domainName}</span>
             </td>
-            <td>{r.legacy ? `${r.architectureName} (legacy system)` : r.architectureName}</td>
+            <td>
+              <ArchBadge ctx={props.ctx} id={r.architecture} name={r.architectureName} legacy={r.legacy} />
+            </td>
             <td class="num">{num(r.power)}</td>
             <td class="num">{num(r.territory)}</td>
             <td>{r.status}</td>
