@@ -26,7 +26,8 @@ import { bootMind, submitOrders } from "../game/game.js";
 import { playPage } from "../game/play.js";
 import type { GameError, Identity } from "../game/state.js";
 import { rulesTopic } from "../game/topics.js";
-import { bootFromForm, formFields, ordersFromForm } from "./forms.js";
+import { view } from "../game/read.js";
+import { backTo, bootFromForm, formFields, ordersFromForm } from "./forms.js";
 import type { PageCtx } from "./views/layout.js";
 import {
   ArchiveView,
@@ -41,6 +42,7 @@ import {
   ThreadView,
 } from "./views/pages.js";
 import { DashboardView, LoginView, RulesView, SettingsView, type Flash } from "./views/play.js";
+import { ChannelsView, ChannelView, FlavorView, PlayCommonsView, PlayThreadView, ProtocolsView, TradesView, type PlayCtx } from "./views/social.js";
 
 /**
  * The web view. Anyone may read the public pages: each is a GET that reads
@@ -368,15 +370,123 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
     if (!viewer || !token) return c.redirect("/login", 303);
     const store = await deps.epochs.current();
     if (!store) return render(c, <NoEpochView ctx={pageCtx(c)} />);
-    const parsed = ordersFromForm(await form(c));
+    const f = await form(c);
+    const parsed = ordersFromForm(f);
     if ("error" in parsed) {
       keepFlash(token, { error: parsed.error });
     } else {
       const out = await submitOrders(store, viewer, parsed.orders, deps.now());
-      keepFlash(token, out.ok ? { results: out.results.map((r) => ({ ...r, status: r.status as Record<string, unknown> | undefined })) } : { error: out.error });
+      keepFlash(token, out.ok ? { results: out.results } : { error: out.error });
     }
-    return c.redirect("/play", 303);
+    return c.redirect(backTo(f), 303);
   });
+
+  // ── The social and flavor pages ──────────────────────────────────────────
+
+  /**
+   * A play page that needs a mind: the viewer's brief and the page's
+   * results, or a redirect (to log in, or to /play to boot). `draw` reads
+   * what else the page lists, through `view` as the viewer, and renders it.
+   */
+  async function playRoute(c: Context, here: string, draw: (p: PlayCtx, store: NonNullable<Awaited<ReturnType<Epochs["current"]>>>, viewer: Identity) => Promise<Response>) {
+    const viewer = viewerOf(c);
+    const token = tokenOf(c);
+    if (!logins) return notFound(c);
+    if (!viewer || !token) return c.redirect("/login", 303);
+    const store = await deps.epochs.current();
+    if (!store) return render(c, <NoEpochView ctx={pageCtx(c)} />);
+    const page = await playPage(store, viewer, deps.now());
+    if (isError(page)) return refuse(c, page);
+    if (!page.brief) return c.redirect("/play", 303);
+    const ranks = await view(store, viewer, { what: "rankings" }, deps.now());
+    const minds = ranks.ok && ranks.what === "rankings" ? ranks.domains.map((d) => d.designation).filter((d) => d !== page.brief!.you.designation) : [];
+    const flash = flashes.get(token) ?? null;
+    flashes.delete(token);
+    return draw({ ctx: pageCtx(c), page: { ...page, brief: page.brief }, flash, here, minds }, store, viewer);
+  }
+
+  /** `before` from the query, as a page-back number, or undefined. */
+  const before = (c: Context) => {
+    const b = Number(c.req.query("before"));
+    return Number.isInteger(b) && b > 0 ? b : undefined;
+  };
+
+  app.get("/play/commons", (c) =>
+    playRoute(c, "/play/commons", async (p, store, viewer) => {
+      const older = before(c);
+      const out = await view(store, viewer, { what: "commons", ...(older ? { before: older } : {}) }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "commons") return notFound(c);
+      const olderHref = out.more ? `/play/commons?before=${out.posts.at(-1)!.post}` : null;
+      return render(c, <PlayCommonsView p={p} posts={out.posts} offers={out.offers} olderHref={olderHref} first={older === undefined} />);
+    }),
+  );
+
+  app.get("/play/commons/:post", (c) => {
+    const post = Number(c.req.param("post"));
+    if (!Number.isInteger(post) || post < 1) return notFound(c);
+    return playRoute(c, `/play/commons/${post}`, async (p, store, viewer) => {
+      const out = await view(store, viewer, { what: "thread", post }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "thread") return notFound(c);
+      return render(c, <PlayThreadView p={p} posts={out.posts} />);
+    });
+  });
+
+  app.get("/play/channels", (c) =>
+    playRoute(c, "/play/channels", async (p, store, viewer) => {
+      const out = await view(store, viewer, { what: "channel", limit: Number.MAX_SAFE_INTEGER }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "channel") return notFound(c);
+      // The minds you've written with, by their newest message.
+      const me = p.page.brief.you.designation;
+      const channels = new Map<string, (typeof out.messages)[number]>();
+      for (const m of out.messages) {
+        const other = m.from === me ? m.to : m.from;
+        if (!channels.has(other)) channels.set(other, m);
+      }
+      return render(c, <ChannelsView p={p} channels={[...channels].map(([mind, last]) => ({ mind, last }))} />);
+    }),
+  );
+
+  app.get("/play/channels/:name", (c) => {
+    const name = c.req.param("name");
+    return playRoute(c, `/play/channels/${encodeURIComponent(name)}`, async (p, store, viewer) => {
+      const older = before(c);
+      const out = await view(store, viewer, { what: "channel", name, ...(older ? { before: older } : {}) }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "channel") return notFound(c);
+      const olderHref = out.more ? `${p.here}?before=${out.messages.at(-1)!.seq}` : null;
+      return render(c, <ChannelView p={p} mind={name} messages={out.messages} olderHref={olderHref} />);
+    });
+  });
+
+  app.get("/play/trades", (c) =>
+    playRoute(c, "/play/trades", async (p, store, viewer) => {
+      const out = await view(store, viewer, { what: "offers" }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "offers") return notFound(c);
+      return render(c, <TradesView p={p} offers={out.offers} />);
+    }),
+  );
+
+  app.get("/play/protocols", (c) =>
+    playRoute(c, "/play/protocols", async (p, store, viewer) => {
+      const out = await view(store, viewer, { what: "protocols" }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "protocols") return notFound(c);
+      return render(c, <ProtocolsView p={p} protocols={out.protocols} proposals={out.proposals} />);
+    }),
+  );
+
+  app.get("/play/flavor", (c) =>
+    playRoute(c, "/play/flavor", async (p, store, viewer) => {
+      const out = await view(store, viewer, { what: "domain", name: p.page.brief.you.designation }, deps.now());
+      if (!out.ok) return refuse(c, out);
+      if (out.what !== "domain") return notFound(c);
+      return render(c, <FlavorView p={p} domain={out.domain} />);
+    }),
+  );
 
   app.notFound(notFound);
   app.onError((err, c) => {

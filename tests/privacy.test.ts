@@ -251,7 +251,7 @@ async function anonymousVisitor(store: MemoryStore) {
     assert.equal((await visit(url)).status, 404, `${url} isn't 404`);
   }
   // The play pages send a visitor to log in, and show nothing first.
-  for (const url of ["/play", "/settings"]) {
+  for (const url of ["/play", "/settings", "/play/commons", "/play/commons/1", "/play/channels", "/play/channels/VESTA", "/play/trades", "/play/protocols", "/play/flavor"]) {
     const res = await app.request(url);
     assert.equal(res.status, 303, `${url} for a visitor`);
     assert.equal(res.headers.get("location"), "/login");
@@ -271,7 +271,8 @@ async function loggedIn(app: ReturnType<typeof createApp>, logins: ReturnType<ty
   const SECRETS = [SECRET, WHISPER, "Probed", "Strength", "777 capital", String(STATUS_CAPITAL), STATUS_CAPITAL.toLocaleString("en-US"), String(STATUS_COMPUTE), STATUS_COMPUTE.toLocaleString("en-US")];
   const withoutAccount = (body: string) => body.replace(/<nav class="account"[\s\S]*?<\/nav>/, "");
   const seen = new Set<string>();
-  const queue = ["/play", "/settings", ...anonymous.keys()];
+  // Its own play pages, and the channels of the pair whose whisper it must never read.
+  const queue = ["/play", "/settings", "/play/channels/HALCYON", "/play/channels/VESTA", ...anonymous.keys()];
   while (queue.length > 0 && seen.size < 600) {
     const url = queue.shift()!;
     if (seen.has(url)) continue;
@@ -297,6 +298,12 @@ async function loggedIn(app: ReturnType<typeof createApp>, logins: ReturnType<ty
     }
   }
   assert.ok(seen.has("/play") && logins.sessions.size === 1);
+  for (const url of ["/play/commons", "/play/commons/1", "/play/channels", "/play/trades", "/play/protocols", "/play/flavor"]) assert.ok(seen.has(url), `PIKE's crawl didn't reach ${url}`);
+  // HALCYON's proposal to VESTA and HALCYON's offer to VESTA aren't PIKE's to answer, so PIKE has no form for them.
+  const protocols = await (await app.request("/play/protocols", { headers: { cookie } })).text();
+  assert.doesNotMatch(protocols, /name="proposal"/);
+  const trades = await (await app.request("/play/trades", { headers: { cookie } })).text();
+  assert.ok(!trades.includes("to VESTA"), "an offer to VESTA alone");
   // PIKE's dashboard is its own: its designation, not HALCYON's scratchpad.
   const play = await (await app.request("/play", { headers: { cookie } })).text();
   assert.match(play, /PIKE/);

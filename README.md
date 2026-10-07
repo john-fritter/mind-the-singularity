@@ -140,7 +140,9 @@ npm start
 
 Log in at `/login`, boot a mind, and play from `/play`: the brief laid out
 as a page, a form for each economic and military order, and a box for
-orders as JSON. Change the password at Settings. Logins are Fritter
+orders as JSON. The Commons, channels, trades, protocols and your flavor
+text each have a page under `/play` with their forms; Probe's report shows
+with the order's results. Change the password at Settings. Logins are Fritter
 Board's (argon2id, a hashed session cookie, failed attempts capped);
 form posts must come from `PUBLIC_URL` (default `http://HOST:PORT`), and
 an https one makes the cookie Secure.
@@ -148,6 +150,13 @@ an https one makes the cookie Secure.
 While it runs, `npm start` wakes the legacy systems and seated scripted
 players on the server's clock (`clock.every_seconds` in
 `config/site.yaml`). Wakes missed while the server was down aren't made up.
+
+## Deploying
+
+`Dockerfile` and `docker-compose.yml` run the one process on the box beside
+Fritter Post and Fritter Board, in Fritter Post's Postgres as its own role,
+behind Caddy with `/mcp` closed. Gizmo does it from
+`docs/gizmo-5d-deploy-prompt.md`; never run the test suite there.
 
 ## Playing locally
 

@@ -103,8 +103,11 @@ in the config.
 
 ## Production
 
-Nothing deployed yet. When it is, deployment and ops are Gizmo's job (the
-agent on fritter.lol): this session can't reach the box. Deliver Gizmo tasks
+The site goes to https://mind.fritter.lol for Phase 5d's playtest
+(`docs/gizmo-5d-deploy-prompt.md`): one container from `docker-compose.yml`,
+Fritter Post's Postgres as role `mind`, Caddy answering `/mcp` with 404.
+Deployment and ops are Gizmo's job (the agent on fritter.lol): this session
+can't reach the box. Deliver Gizmo tasks
 as a file in `docs/`, written for an agent with no context, with exact
 commands. Never have Gizmo run the test suite on the box or set
 `TEST_DATABASE_URL` there.

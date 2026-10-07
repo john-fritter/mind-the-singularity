@@ -165,13 +165,14 @@ export function Offers(props: { offers: OfferView[] }) {
   );
 }
 
-export function PostItem(props: { post: Post; thread?: boolean }) {
+/** A post; its number links to its thread under `threads` (the public Commons by default). */
+export function PostItem(props: { post: Post; thread?: boolean; threads?: string }) {
   const p = props.post;
   return (
     <article class={p.replyTo === null ? "post" : "post reply"}>
       <header>
         <MindLink base="" mind={{ designation: p.author, n: null }} /> · <Time at={p.at} /> ·{" "}
-        {props.thread ? `#${p.post}` : <a href={`/commons/${p.post}`}>#{p.post}</a>}
+        {props.thread ? `#${p.post}` : <a href={`${props.threads ?? "/commons"}/${p.post}`}>#{p.post}</a>}
         {p.replyTo !== null && !props.thread && <span class="muted"> in reply to #{p.replyTo}</span>}
       </header>
       <p>{p.text}</p>
