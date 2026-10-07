@@ -10,7 +10,8 @@ import path from "node:path";
 //   config loaders, never the engine, the game layer, the store or the MCP
 //   server;
 // - the MCP server and the web view go through src/game/, never the store;
-//   the MCP server takes nothing from the engine but the architectures' ids;
+//   the MCP server takes nothing from the engine but the architectures' ids,
+//   and the web view nothing from outside src/game/ at all;
 // - only src/game/ calls the engine's entry points (engine/world.ts), so
 //   every write goes through its checks and its log;
 // - scripted players see what an agent sees: src/players/ reaches the game
@@ -144,6 +145,11 @@ async function main() {
       MCP_MAY_IMPORT.includes(target) || target.startsWith("mcp/") || target.startsWith("game/"),
       `${file} imports ${target}: the MCP server goes through src/game/`,
     );
+  }
+
+  // The web view reads through src/game/ alone: no engine, no store, no auth.
+  for (const { file, target } of await importsOf("web")) {
+    assert.ok(target.startsWith("web/") || target.startsWith("game/"), `${file} imports ${target}: the web view goes through src/game/`);
   }
 
   for (const dir of ["mcp", "web"]) {

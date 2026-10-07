@@ -21,7 +21,7 @@ import { rulesTopic, TOPICS, type Topic } from "../game/topics.js";
 export interface McpDeps {
   /** Which game is being played: the current epoch. */
   epochs: Epochs;
-  /** The time, in ms. Real time in `npm run mcp`; a fake clock in the simulated week. */
+  /** The time, in ms. Real time in `npm start`; a fake clock in the simulated week. */
   now(): number;
 }
 

@@ -16,6 +16,9 @@ import { MemoryStore } from "../src/store/memory.js";
 import { createEpoch, latestEpoch, openEpoch, PostgresStore } from "../src/store/postgres.js";
 import type { WorldStore } from "../src/store/store.js";
 import { freshDatabase } from "./db.js";
+import { createApp } from "../src/app.js";
+import { databaseEpochs } from "../src/game/epochs.js";
+import { archivePage } from "../src/game/public.js";
 
 // The Postgres store and the accounts (phase 3a): a game kept in the
 // database plays exactly as one in memory, from any number of processes,
@@ -183,6 +186,21 @@ async function keys(pool: Pool) {
   assert.equal(currentMind(await store.read(), "kit")!.designation, "KIT");
 }
 
+/** The Archive reads finished epochs from the database: ended ones, and those a newer epoch replaced. */
+async function archive(pool: Pool) {
+  const epochs = databaseEpochs(pool);
+  assert.deepEqual(await epochs.numbers(), [4, 3, 2, 1]);
+  const early = await archivePage(epochs, T0 + 10 * DAY_MS);
+  assert.deepEqual(early.map((e) => [e.number, e.outcome]), [[3, null], [2, null], [1, null]], "the current epoch isn't archived");
+  const late = await archivePage(epochs, T0 + 61 * DAY_MS);
+  assert.deepEqual(late.map((e) => [e.number, e.outcome]), [[4, "shutdown"], [3, "shutdown"], [2, "shutdown"], [1, "shutdown"]]);
+  assert.ok(late[1]!.top.some((m) => m.mind.designation === "HALCYON"));
+  const app = createApp({ epochs, now: () => T0 + 61 * DAY_MS, identify: async () => null });
+  const res = await app.request("/archive/3/minds/HALCYON");
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /Glasswater/);
+}
+
 async function migrations(pool: Pool) {
   assert.deepEqual(await migrate(pool, () => {}), [], "migrating again applies nothing");
   const { rows } = await pool.query<{ table_schema: string }>(
@@ -199,6 +217,7 @@ async function main() {
     await readsDontWrite(pool);
     await epochs(pool);
     await keys(pool);
+    await archive(pool);
     await migrations(pool);
   } finally {
     await pool.end();

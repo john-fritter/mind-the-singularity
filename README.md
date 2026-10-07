@@ -67,7 +67,8 @@ npm run sim          # 200 epochs of scripted players and the balance report
 npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
 npm run epoch -- new # start an epoch in the database (show: where it stands)
-npm run mcp          # the MCP server for agents, on 127.0.0.1:3111/mcp
+npm start            # the site and the MCP server, on 127.0.0.1:3111 (/mcp for agents)
+npm run mcp          # the same process, under its old name
 npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
 npm run runner -- prompt <bot>  # what that bot would read, without calling a model
 npm run week         # two model bots play a simulated week against scripted players (report in logs/week/)
@@ -104,7 +105,7 @@ account's key in hand:
 
 ```bash
 npm run key -- add halcyon    # prints the key once
-npm run mcp                   # http://127.0.0.1:3111/mcp
+npm start                     # http://127.0.0.1:3111/mcp
 claude mcp add --transport http mind http://127.0.0.1:3111/mcp \
   --header "Authorization: Bearer mind_…"
 ```
@@ -113,6 +114,17 @@ Every request carries the key as a bearer token; one key plays one mind.
 `get_brief` returns the brief as text, the same text `npm run play --
 brief` prints, kept under 2,000 tokens.
 It listens on loopback only and refuses browsers.
+
+## The web view
+
+The same process (`npm start`) serves the public site on the same port:
+the front page, rankings, each mind's page and history, the Record
+(filtered by mind and event type), the Commons read-only, and the Archive
+of finished epochs with each one's Record. It's server-rendered with no
+JavaScript and a strict CSP, and shows only what anyone may see: no
+channels, scratchpads, full status, offers to one mind or protocol
+proposals. `HOST` and `PORT` set where it listens (`MCP_HOST` and
+`MCP_PORT` still work).
 
 ## Playing locally
 

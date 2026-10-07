@@ -5,10 +5,14 @@ import { bootMind, currentMind, newGame, submitOrders } from "../src/game/game.j
 import { briefText } from "../src/game/brief.js";
 import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
+import { createApp } from "../src/app.js";
+import { fixedEpoch } from "../src/game/epochs.js";
 
 // Private stays private (CLAUDE.md): another mind's scratchpad, full status,
 // private events, channels, offers made to one mind and protocol proposals never reach `view` or another mind's brief,
 // and what can't be seen is "not found". Extend this for every new read.
+// The web view is checked by crawling it as an anonymous visitor, so a page
+// added later is checked without changing this file.
 
 const rules = loadRules();
 const T0 = Date.UTC(2026, 9, 5, 12);
@@ -149,6 +153,97 @@ async function main() {
   // Without a mind there are no channels: not found, as anything hidden is.
   const noChannel = await view(store, { account: "stranger" }, { what: "channel", name: "VESTA" }, T);
   assert.ok(!noChannel.ok && noChannel.code === "not_found");
+
+  await anonymousVisitor(store);
+}
+
+/** Text only a mind and those it chose may see, and full status no one else may. None may appear on a public page. */
+const STATUS_CAPITAL = 9876543;
+const STATUS_COMPUTE = 1234567;
+
+/**
+ * An anonymous visitor to the web view: crawls every page reachable from the
+ * front page, plus the Record filtered by every event type and some guessed
+ * addresses, and finds nothing private anywhere.
+ */
+async function anonymousVisitor(store: MemoryStore) {
+  const game = await store.read();
+  // An open proposal and full status worth hiding, as the crawl starts.
+  const proposed = await submitOrders(store, { account: "halcyon" }, [{ do: "protocol_propose", to: "VESTA" }], T);
+  assert.ok(proposed.ok && proposed.results[0]!.ok);
+  const halcyon = currentMind(game, "halcyon")!;
+  halcyon.capital = STATUS_CAPITAL;
+  halcyon.compute = STATUS_COMPUTE;
+  assert.ok(game.world.offers.some((o) => o.to !== null), "a private offer is open");
+
+  const app = createApp({ epochs: fixedEpoch(store), now: () => T, identify: async () => null });
+  const LEAKS = [
+    SECRET,
+    WHISPER,
+    "Probed",
+    "Strength",
+    "777 capital",
+    String(STATUS_CAPITAL),
+    STATUS_CAPITAL.toLocaleString("en-US"),
+    String(STATUS_COMPUTE),
+    STATUS_COMPUTE.toLocaleString("en-US"),
+    "proposal",
+    "scratchpad",
+  ];
+  const pages = new Map<string, number>();
+
+  async function visit(url: string): Promise<{ status: number; body: string }> {
+    const res = await app.request(url);
+    const body = await res.text();
+    pages.set(url, res.status);
+    for (const leak of LEAKS) assert.ok(!body.includes(leak), `${url} shows "${leak}"`);
+    if (res.headers.get("content-type")?.startsWith("text/html")) {
+      assert.match(res.headers.get("content-security-policy") ?? "", /default-src 'none'/, `${url} has no CSP`);
+      assert.doesNotMatch(body, /<script|\sstyle=|\son[a-z]+=/i, `${url} has a script or inline style`);
+    }
+    return { status: res.status, body };
+  }
+
+  // Every same-site link, breadth first, from the front page and every Record filter.
+  const queue = ["/"];
+  const types = [...new Set([...game.record.map((e) => e.type), "probed", "message", "battle_report", "proposal_closed", "offers_withdrawn"])];
+  for (const type of types) queue.push(`/record?type=${type}`);
+  while (queue.length > 0 && pages.size < 500) {
+    const url = queue.shift()!;
+    if (pages.has(url)) continue;
+    const { status, body } = await visit(url);
+    assert.ok([200, 400, 404].includes(status), `${url} answered ${status}`);
+    for (const m of body.matchAll(/href="([^"]+)"/g)) {
+      const href = m[1]!.replace(/&amp;/g, "&");
+      if (href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/static/") && !pages.has(href)) queue.push(href);
+    }
+  }
+  for (const must of ["/", "/rankings", "/record", "/commons", "/archive", "/minds/HALCYON", "/minds/VESTA", "/minds/PIKE", "/commons/1"]) {
+    assert.equal(pages.get(must), 200, `the crawl didn't reach ${must}`);
+  }
+  // Private event types aren't a filter: refused, and nothing shown.
+  for (const type of ["probed", "message", "battle_report", "proposal_closed", "offers_withdrawn"]) {
+    assert.equal(pages.get(`/record?type=${type}`), 400, `/record?type=${type}`);
+  }
+
+  // What's private has no address: hidden is the same as missing.
+  for (const url of [
+    "/channels",
+    "/channel/VESTA",
+    "/minds/VESTA/channel",
+    "/minds/HALCYON/status",
+    "/minds/HALCYON/scratchpad",
+    "/scratchpad",
+    "/offers",
+    "/proposals",
+    "/protocols/proposals",
+    "/brief",
+    "/minds/NOBODY",
+    "/commons/99",
+    "/archive/1",
+  ]) {
+    assert.equal((await visit(url)).status, 404, `${url} isn't 404`);
+  }
 }
 
 main().then(

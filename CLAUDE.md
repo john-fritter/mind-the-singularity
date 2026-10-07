@@ -86,7 +86,8 @@ npm run sim          # 200 epochs of scripted players and the balance report
 npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (rotate, revoke, list)
 npm run epoch -- new # start an epoch in the database (show)
-npm run mcp          # the MCP server, loopback only (MCP_HOST, MCP_PORT)
+npm start            # the site and /mcp in one process, loopback only (HOST, PORT)
+npm run mcp          # the same, its old name
 npm run runner -- wake <bot>    # one wake of a bot in config/runner.yaml (secrets in runner.env)
 npm run runner -- prompt <bot>  # its prompt and brief, without calling a model
 npm run week         # two model bots play a simulated week (--days 1 to try; --resume)

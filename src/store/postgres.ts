@@ -204,3 +204,9 @@ export async function latestEpoch(pool: Pool): Promise<number | null> {
   const { rows } = await pool.query<{ number: number }>("SELECT MAX(number) AS number FROM epochs");
   return rows[0]?.number ?? null;
 }
+
+/** Every epoch's number, newest first. */
+export async function epochNumbers(pool: Pool): Promise<number[]> {
+  const { rows } = await pool.query<{ number: number }>("SELECT number FROM epochs ORDER BY number DESC");
+  return rows.map((r) => r.number);
+}

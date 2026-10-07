@@ -14,7 +14,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "key": "tsx scripts/key.ts",
     "epoch": "tsx scripts/epoch.ts",
-    "mcp": "tsx src/mcp/http.ts",
+    "start": "tsx src/server.ts",
+    "mcp": "tsx src/server.ts",
     "runner": "tsx src/runner/main.ts",
     "week": "tsx scripts/week.ts"
   },

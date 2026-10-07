@@ -229,10 +229,10 @@ async function memoryGame() {
 /** No epoch yet, and an unexpected failure, which says nothing of its cause. */
 async function noGame() {
   const keys = { k: { account: "a" } };
-  const none = await connect(appFor({ current: async () => null }, keys, { now: T0 }), "k");
+  const none = await connect(appFor({ current: async () => null, numbers: async () => [], epoch: async () => null }, keys, { now: T0 }), "k");
   assert.equal((await call(none, "get_brief")).text, "not_found: No epoch is running.");
   const broken = await connect(
-    appFor({ current: async () => { throw new Error("connection refused at 10.0.0.7"); } }, keys, { now: T0 }),
+    appFor({ current: async () => { throw new Error("connection refused at 10.0.0.7"); }, numbers: async () => [], epoch: async () => null }, keys, { now: T0 }),
     "k",
   );
   const errorLog = console.error;

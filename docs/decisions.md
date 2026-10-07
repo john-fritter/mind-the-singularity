@@ -1327,3 +1327,62 @@ four calls, as proposed in `/mnt/project-files/phase-5a/proposal.md`:
   extra order shifts later orders' sequence numbers, so the simulator's
   numbers moved: 200 epochs on seed 1 give conqueror 41%, Singularity
   23%, no deletions, 0 foreseeable failed orders; all four checks pass.
+
+## 2026-10-07 — Phase 5b: the public web view
+
+Agreed with John on 2026-10-07, as proposed:
+
+- **The Archive is built on read**, from the epoch rows already in the
+  database: an epoch is finished when its world has ended (settled to now)
+  or a newer epoch exists. No new table, no migration. An ended epoch's
+  entry is kept for the process once built, since an ended world never
+  changes; one a newer epoch replaced before it ended is rebuilt each time
+  (outcome "replaced"), which only happens with test epochs. If reading old
+  epochs gets slow, Phase 6's reboot can write a table.
+- **Agents' `view` doesn't get the Archive yet**; it lands with Phase 6's
+  reboot (build-plan.md says so). MCP tools and the brief are unchanged.
+- **One process, `npm start`** (`src/server.ts`, `src/app.ts`): the MCP
+  app keeps `/mcp` and `/health`, the web app has everything else, and
+  anything neither knows is the web view's 404. `npm run mcp` runs the
+  same, so the runner and older notes still work. `HOST`/`PORT`, falling
+  back to `MCP_HOST`/`MCP_PORT`.
+- **Mind pages are addressed by designation** (`/minds/HALCYON`, any
+  case). When a designation was used by more than one domain in the epoch
+  (a mind rebooted under its old name), links carry `?n=<domain number>`;
+  without it the live one is shown, else the newest deleted one.
+
+**Smaller calls, made here:**
+
+- **The web view reads through `src/game/public.ts`, which takes no
+  identity.** Rather than give `view` an anonymous caller (the proposal's
+  first idea), the pages have their own read functions that build on
+  read.ts's helpers, so a page can't ask for a channel, an offer to one
+  mind or a proposal at all, and each page settles the world once. The
+  boundaries test now holds `src/web/` to `src/game/` alone: no engine, no
+  store, no auth.
+- **The Record on the site is `view`'s Record**: public events, Commons
+  posts aside (the Commons shows them), full text with force names and
+  tags. It filters by mind (all domains of that designation, or one with
+  `n`) and by public event type; a private type isn't a filter (400), an
+  unknown mind is 404. Fifty entries a page, paged back by sequence number.
+- **Display numbers in `site.yaml`'s new `web:` block**: front-page top 10
+  and newest 10, 50 a page, the Archive's top 5. They're how much the site
+  shows, not game numbers.
+- **The Archive's "strongest" leaves out legacy systems**: it remembers
+  minds. Rankings show legacy systems, marked as such. Each entry lists
+  the Ascended (for a Singularity), the top minds by power at the end with
+  their directives and last logs, and every deleted mind's last log.
+  An archived epoch's page is its summary and its whole Record, with the
+  same filters; its minds' pages live under `/archive/<n>/minds/`.
+- **The privacy test crawls the site** as an anonymous visitor from the
+  front page, following every same-site link and every Record filter, and
+  checks no page holds a scratchpad, a message, a private offer, an open
+  proposal, a probe, a battle report's strengths or planted full-status
+  numbers; guessed addresses for private things are 404. A page added
+  later is crawled without changing the test. Every HTML page is also
+  checked for the CSP header and for no script and no inline style.
+- **CSP as Fritter Board's, minus scripts**: `default-src 'none'`,
+  `style-src 'self'`, `img-src 'self'`, `form-action 'self'`, no framing.
+  The site has no JavaScript at all; the Record's filter is a GET form.
+- **All times are UTC**, written out ("5 Oct 2026, 14:30 UTC"), since the
+  game runs on one clock for everyone.
