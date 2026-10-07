@@ -1,4 +1,5 @@
 import { currentMind } from "../game/game.js";
+import { epochOf } from "../game/read.js";
 import type { WorldStore } from "../store/store.js";
 import { legacySeats, scriptedSeat, wake, wakesBetween, type Seat, type WakeLog } from "./drive.js";
 import type { Players, StrategyName } from "./settings.js";
@@ -62,7 +63,8 @@ export class ServerClock {
     const store = await this.deps.current();
     if (!store) return [];
     const game = await store.read();
-    if (game.world.ended) return [];
+    // Over, saved or not: nobody wakes in the downtime (lifecycle.ts boots the next epoch).
+    if (game.world.ended || now >= epochOf(game.rules, game.world, now).shutdownAt) return [];
     const epoch = game.start.epoch;
     // An epoch that started after the server did gets its first wakes too.
     const from = this.last.get(epoch) ?? Math.max(this.startedAt, game.start.startedAt - 1);

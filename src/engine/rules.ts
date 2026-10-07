@@ -46,6 +46,7 @@ const EpochSchema = z
   .strictObject({
     length_days: positiveCount,
     shutdown_warning_days: positiveCount,
+    downtime_hours: positiveCount,
   })
   .refine((e) => e.shutdown_warning_days < e.length_days, {
     message: "shutdown_warning_days must be shorter than the epoch",

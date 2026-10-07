@@ -2,7 +2,7 @@ import { z } from "zod";
 import { loadSite } from "../config.js";
 import { programName, resolveDomain } from "../engine/names.js";
 import type { Architecture, Program } from "../engine/architectures.js";
-import { nextJoinAt, currentQuorum } from "../engine/convergence.js";
+import { nextEpochAt, nextJoinAt, currentQuorum } from "../engine/convergence.js";
 import { DAY_MS } from "../engine/cycles.js";
 import { rebootAt } from "../engine/deletion.js";
 import { domainPower } from "../engine/domain.js";
@@ -146,7 +146,8 @@ export interface Brief {
     day: number;
     lengthDays: number;
     shutdownAt: number;
-    ended: { at: number; outcome: "singularity" | "shutdown"; ascended: string[] } | null;
+    /** How the epoch ended, and when the next one boots (epoch.downtime_hours later). */
+    ended: { at: number; outcome: "singularity" | "shutdown"; ascended: string[]; nextEpochAt: number } | null;
   };
   convergence: { minds: string[]; quorum: number; nextJoinAt: number | null; collapsesAt: number | null } | null;
   you: YourStatus;
@@ -306,7 +307,11 @@ export function epochOf(rules: Rules, world: World, now: number): Brief["epoch"]
     day: Math.min(rules.epoch.length_days, Math.floor((now - world.startedAt) / DAY_MS) + 1),
     lengthDays: rules.epoch.length_days,
     shutdownAt: world.startedAt + rules.epoch.length_days * DAY_MS,
-    ended: world.ended && { ...world.ended, ascended: world.ended.ascended.map((d) => designationOf(world, d)) },
+    ended: world.ended && {
+      ...world.ended,
+      ascended: world.ended.ascended.map((d) => designationOf(world, d)),
+      nextEpochAt: nextEpochAt(rules, world.ended),
+    },
   };
 }
 

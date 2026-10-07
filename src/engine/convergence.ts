@@ -38,6 +38,11 @@ export function nextJoinAt(rules: Rules, world: World): number | null {
   return world.convergence ? world.convergence.lastJoinAt + rules.convergence.join_gap_hours * HOUR_MS : null;
 }
 
+/** When the next epoch boots, after this one's ending. Keys: epoch.downtime_hours */
+export function nextEpochAt(rules: Rules, ending: Ending): number {
+  return ending.at + rules.epoch.downtime_hours * HOUR_MS;
+}
+
 /** Ends the epoch: nothing happens after. Mutates the world. */
 export function endEpoch(world: World, ending: Ending): void {
   world.ended = ending;

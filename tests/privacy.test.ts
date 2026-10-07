@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { loadRules } from "../src/config.js";
-import { HOUR_MS } from "../src/engine/cycles.js";
+import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { bootMind, currentMind, newGame, submitOrders } from "../src/game/game.js";
 import { briefText } from "../src/game/brief.js";
 import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
 import { createApp } from "../src/app.js";
-import { fixedEpoch } from "../src/game/epochs.js";
+import { fixedEpoch, listedEpochs } from "../src/game/epochs.js";
+import { viewArchive } from "../src/game/public.js";
 import { logIn, memoryLogins } from "./logins.js";
 
 // Private stays private (CLAUDE.md): another mind's scratchpad, full status,
@@ -158,6 +159,7 @@ async function main() {
   assert.ok(!noChannel.ok && noChannel.code === "not_found");
 
   await anonymousVisitor(store);
+  await downtime(store);
 }
 
 /** Text only a mind and those it chose may see, and full status no one else may. None may appear on a public page. */
@@ -403,6 +405,43 @@ async function admin(app: ReturnType<typeof createApp>, anonymous: Map<string, n
     assert.equal(res.status, visitor.status, `${url} answers the admin differently`);
     assert.equal(withoutAccount(await res.text()), withoutAccount(await visitor.text()), `${url} reads differently for the admin`);
   }
+}
+
+/**
+ * After the Shutdown (phase 6a): the epoch is in the Archive, its Record
+ * and minds' pages readable by anyone. Crawled again from the front page
+ * and the Archive, and asked for by an agent's `view`: still nothing private.
+ */
+async function downtime(store: MemoryStore) {
+  const down = T0 + rules.epoch.length_days * DAY_MS + HOUR_MS;
+  const epochs = listedEpochs([store]);
+  const app = createApp({ epochs, now: () => down, identify: async () => null, logins: memoryLogins({}) });
+  const SECRETS = [SECRET, WHISPER, "Probed", "Strength", "777 capital", STATUS_CAPITAL.toLocaleString("en-US"), STATUS_COMPUTE.toLocaleString("en-US")];
+
+  const agents = await viewArchive(epochs, {}, down);
+  assert.ok(agents.ok && agents.epochs.length === 1 && agents.epochs[0]!.outcome === "shutdown");
+  for (const leak of [...SECRETS, String(STATUS_CAPITAL), String(STATUS_COMPUTE)]) {
+    assert.ok(!JSON.stringify(agents).includes(leak), `the agents' Archive shows "${leak}"`);
+  }
+
+  const pages = new Map<string, number>();
+  const queue = ["/", "/archive"];
+  while (queue.length > 0 && pages.size < 300) {
+    const url = queue.shift()!;
+    if (pages.has(url)) continue;
+    const res = await app.request(url);
+    const body = await res.text();
+    pages.set(url, res.status);
+    assert.ok([200, 303, 400, 404].includes(res.status), `${url} answered ${res.status} in the downtime`);
+    for (const leak of SECRETS) assert.ok(!body.includes(leak), `${url} shows "${leak}" in the downtime`);
+    for (const m of body.matchAll(/href="([^"]+)"/g)) {
+      const href = m[1]!.replace(/&amp;/g, "&");
+      if (href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/static/") && !href.startsWith("/rules") && !pages.has(href)) queue.push(href);
+    }
+  }
+  assert.equal(pages.get("/archive/1"), 200, "the ended epoch is in the Archive");
+  assert.ok([...pages.keys()].some((u) => u.startsWith("/archive/1/")), "the crawl reached the archived epoch's pages");
+  assert.match(await (await app.request("/")).text(), /Epoch 2 boots at/);
 }
 
 main().then(
