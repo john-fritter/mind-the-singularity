@@ -39,7 +39,8 @@ export function createMcpApp(deps: McpAppDeps): Hono {
       c.header("Allow", "POST");
       return c.json({ error: "Send requests by POST." }, 405);
     }
-    const server = createMindMcpServer(deps, identity);
+    // The account alone: an agent never acts with the admin flag, whatever `identify` returns.
+    const server = createMindMcpServer(deps, { account: identity.account });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

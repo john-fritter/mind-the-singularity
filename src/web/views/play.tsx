@@ -219,7 +219,7 @@ export function FlashView(props: { flash: Flash | null; names: Record<string, st
 }
 
 /** What Probe found: the target's full status, shown once with the result, as an agent gets it. */
-function ProbeReport(props: { status: DomainStatus; names: Record<string, string> }) {
+export function ProbeReport(props: { status: DomainStatus; names: Record<string, string> }) {
   const s = props.status;
   const n = props.names;
   const built = Object.entries(s.buildings).filter(([, c]) => c > 0);

@@ -67,6 +67,7 @@ npm run sim          # 200 epochs of scripted players and the balance report
 npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
 npm run key -- password <name>  # a temporary password to log in to the site with
+npm run key -- admin <name>     # the account sees the admin view at /admin (unadmin to undo)
 npm run epoch -- new # start an epoch in the database (show: where it stands)
 npm run epoch -- add raider  # seat a scripted player in it (seats: list them)
 npm start            # the site, the MCP server and the bots' clock, on 127.0.0.1:3111
@@ -148,6 +149,22 @@ with the order's results. Change the password at Settings. Logins are Fritter
 Board's (argon2id, a hashed session cookie, failed attempts capped);
 form posts must come from `PUBLIC_URL` (default `http://HOST:PORT`), and
 an https one makes the cookie Secure.
+
+## The admin view
+
+An account with the admin flag sees everything at `/admin` when logged in:
+every mind's full status, owner and scratchpad, every channel, the whole
+Record with its private entries, and the orders log with each order's
+result, for any epoch. It is read only. The flag is set from the command
+line, and only a web login carries it; an API key never does:
+
+```bash
+npm run key -- password admin  # an account of its own, so no playing mind sees more
+npm run key -- admin admin     # unadmin to take it away; either takes effect at once
+```
+
+To anyone else, logged in or not, every `/admin` page is the same 404 as an
+address that doesn't exist.
 
 While it runs, `npm start` wakes the legacy systems and seated scripted
 players on the server's clock (`clock.every_seconds` in

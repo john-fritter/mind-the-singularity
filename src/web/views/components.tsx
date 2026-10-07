@@ -17,8 +17,9 @@ export const recordPath = (base: Base) => (base === "" ? "/record" : base);
 export const mindHref = (base: Base, m: MindRef) =>
   `${base}/minds/${encodeURIComponent(m.designation)}${m.n === null ? "" : `?n=${m.n}`}`;
 
-export function MindLink(props: { base: Base; mind: MindRef }) {
-  return <a href={mindHref(props.base, props.mind)}>{props.mind.designation}</a>;
+/** A link to a mind's page under `base`, or to `href` when the page lives elsewhere (the admin view's). */
+export function MindLink(props: { base: Base; mind: MindRef; href?: string }) {
+  return <a href={props.href ?? mindHref(props.base, props.mind)}>{props.mind.designation}</a>;
 }
 
 export function Time(props: { at: number }) {
@@ -27,8 +28,8 @@ export function Time(props: { at: number }) {
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** An entry's text with the minds it names linked to their pages. */
-export function Linked(props: { base: Base; text: string; minds: MindRef[] }) {
+/** An entry's text with the minds it names linked to their pages (or to `hrefOf`'s). */
+export function Linked(props: { base: Base; text: string; minds: MindRef[]; hrefOf?: (m: MindRef) => string }) {
   const byName = new Map<string, MindRef>();
   for (const m of props.minds) if (m.designation !== "?" && !byName.has(m.designation)) byName.set(m.designation, m);
   if (byName.size === 0) return <>{props.text}</>;
@@ -36,7 +37,7 @@ export function Linked(props: { base: Base; text: string; minds: MindRef[] }) {
   const parts = props.text.split(new RegExp(`(?<![A-Za-z0-9_-])(${alternatives})(?![A-Za-z0-9_-])`));
   const out: Child[] = parts.map((part, i) => {
     const mind = i % 2 === 1 ? byName.get(part) : undefined;
-    return mind ? <MindLink base={props.base} mind={mind} /> : part;
+    return mind ? <MindLink base={props.base} mind={mind} href={props.hrefOf?.(mind)} /> : part;
   });
   return <>{out}</>;
 }

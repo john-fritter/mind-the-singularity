@@ -22,6 +22,8 @@ export interface Account {
   id: number;
   name: string;
   createdAt: Date;
+  /** Whether it may see the admin view, logged in on the web. */
+  admin: boolean;
   /** Whether it has a live key, and when that key was last used. */
   keyLive: boolean;
   keyLastUsedAt: Date | null;
@@ -45,15 +47,15 @@ export async function findAccount(db: Db, name: string): Promise<Account | null>
 
 /** Every account, oldest first, or the one named. */
 export async function listAccounts(db: Db, name?: string): Promise<Account[]> {
-  const { rows } = await db.query<{ id: number; name: string; created_at: Date; key_id: number | null; last_used_at: Date | null }>(
-    `SELECT a.id, a.name, a.created_at, k.id AS key_id, k.last_used_at
+  const { rows } = await db.query<{ id: number; name: string; created_at: Date; admin: boolean; key_id: number | null; last_used_at: Date | null }>(
+    `SELECT a.id, a.name, a.created_at, a.admin, k.id AS key_id, k.last_used_at
        FROM accounts a
        LEFT JOIN api_keys k ON k.account_id = a.id AND k.revoked_at IS NULL
       WHERE $1::text IS NULL OR LOWER(a.name) = LOWER($1)
       ORDER BY a.id`,
     [name ?? null],
   );
-  return rows.map((r) => ({ id: r.id, name: r.name, createdAt: r.created_at, keyLive: r.key_id !== null, keyLastUsedAt: r.last_used_at }));
+  return rows.map((r) => ({ id: r.id, name: r.name, createdAt: r.created_at, admin: r.admin, keyLive: r.key_id !== null, keyLastUsedAt: r.last_used_at }));
 }
 
 /**
@@ -76,9 +78,15 @@ export async function revokeKeys(db: Db, accountId: number): Promise<number> {
   return rowCount ?? 0;
 }
 
+/** Grants or removes an account's admin flag. */
+export async function setAdmin(db: Db, accountId: number, admin: boolean): Promise<void> {
+  await db.query("UPDATE accounts SET admin = $2 WHERE id = $1", [accountId, admin]);
+}
+
 /**
  * The identity a key acts as, or null for a key that's unknown, revoked or
- * malformed. Records when the key was last used.
+ * malformed. Records when the key was last used. Never an admin: the
+ * admin view is the web's alone.
  */
 export async function identityForKey(db: Db, key: string): Promise<Identity | null> {
   if (!key.startsWith(KEY_PREFIX)) return null;

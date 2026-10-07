@@ -6,6 +6,8 @@ export interface PageCtx {
   cssHref: string;
   /** The logged-in account's name, or null for a visitor. */
   viewer: string | null;
+  /** Whether the logged-in account may see the admin view. */
+  admin: boolean;
   /** Whether this site lets people log in at all. */
   logins: boolean;
   /** Each architecture's emoji and color, in wheel order, by id. */
@@ -65,6 +67,7 @@ function Account(props: { ctx: PageCtx }) {
   return (
     <nav class="account" aria-label="Account">
       <a href="/play">Play</a>
+      {props.ctx.admin && <a href="/admin">Admin</a>}
       <a href="/settings">{props.ctx.viewer}</a>
       <form method="post" action="/logout" class="inline">
         <button type="submit">Log out</button>

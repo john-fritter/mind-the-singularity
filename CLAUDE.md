@@ -86,6 +86,7 @@ npm run sim          # 200 epochs of scripted players and the balance report
 npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (rotate, revoke, list)
 npm run key -- password <name>  # a temporary web password (creates the account)
+npm run key -- admin <name>  # the admin view at /admin, web login only (unadmin)
 npm run epoch -- new # start an epoch in the database (show)
 npm run epoch -- add <strategy> [DESIGNATION]  # seat a scripted player (seats)
 npm start            # the site, /mcp and the bots' clock, loopback only (HOST, PORT, PUBLIC_URL)

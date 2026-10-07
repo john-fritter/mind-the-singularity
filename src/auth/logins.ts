@@ -58,8 +58,8 @@ export function databaseLogins(db: Db, site: Site): Logins {
   const limiter = new LoginLimiter(site.login.max_failures, site.login.window_minutes * 60_000);
 
   async function sessionRow(token: string) {
-    const { rows } = await db.query<{ account_id: string; name: string; touch: boolean }>(
-      `SELECT s.account_id, a.name, (s.last_seen_at < NOW() - $2::float8 * INTERVAL '1 second') AS touch
+    const { rows } = await db.query<{ account_id: string; name: string; admin: boolean; touch: boolean }>(
+      `SELECT s.account_id, a.name, a.admin, (s.last_seen_at < NOW() - $2::float8 * INTERVAL '1 second') AS touch
          FROM sessions s JOIN accounts a ON a.id = s.account_id
         WHERE s.id = $1 AND s.expires_at > NOW()`,
       [sha256(token), site.sessions.touch_interval_seconds],
@@ -93,7 +93,8 @@ export function databaseLogins(db: Db, site: Site): Logins {
       const row = await sessionRow(token);
       if (!row) return null;
       if (row.touch) await db.query("UPDATE sessions SET last_seen_at = NOW() WHERE id = $1", [sha256(token)]);
-      return { account: row.name };
+      // The admin flag is read on every request, so granting or removing it takes effect at once.
+      return row.admin ? { account: row.name, admin: true } : { account: row.name };
     },
 
     async logOut(token) {

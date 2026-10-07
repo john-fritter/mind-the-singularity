@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { Pool } from "pg";
-import { createAccount, findAccount, identityForKey, issueKey, KEY_PREFIX, listAccounts, revokeKeys, sha256 } from "../src/auth/keys.js";
+import { createAccount, findAccount, identityForKey, issueKey, KEY_PREFIX, listAccounts, revokeKeys, setAdmin, sha256 } from "../src/auth/keys.js";
 import { databaseLogins, endSessions, setPassword } from "../src/auth/logins.js";
 import { loadPlayers, loadRules, loadSite } from "../src/config.js";
 import { ARCHITECTURES } from "../src/engine/architectures.js";
@@ -258,6 +258,19 @@ async function logins(pool: Pool) {
   assert.ok(four.ok);
   await endSessions(pool, id);
   assert.equal(await fresh.session(four.token), null);
+
+  // The admin flag: off by default, read on every request, never on a key.
+  const five = await fresh.logIn("lamp", "another-password");
+  assert.ok(five.ok);
+  assert.equal((await findAccount(pool, "lamp"))!.admin, false);
+  await setAdmin(pool, id, true);
+  assert.deepEqual(await fresh.session(five.token), { account: "Lamp", admin: true }, "granted at once, no new login");
+  assert.equal((await findAccount(pool, "lamp"))!.admin, true);
+  const key = await issueKey(pool, id);
+  assert.deepEqual(await identityForKey(pool, key), { account: "Lamp" }, "a key never carries the admin flag");
+  await setAdmin(pool, id, false);
+  assert.deepEqual(await fresh.session(five.token), { account: "Lamp" }, "removed at once");
+  await revokeKeys(pool, id);
 }
 
 async function seats(pool: Pool) {

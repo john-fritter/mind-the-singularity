@@ -11,6 +11,12 @@ import type { World } from "../engine/state.js";
 /** Who is calling. Phase 3 fills it from the API key or the login. */
 export interface Identity {
   account: string;
+  /**
+   * The account's admin flag (mind.accounts.admin), from a web login only;
+   * an API key never carries it. Only src/game/admin.ts reads it: it opens
+   * the admin view and changes nothing about how the account plays.
+   */
+  admin?: boolean;
 }
 
 /** An account's mind. An account has at most one live mind; the newest entry is its current one. */

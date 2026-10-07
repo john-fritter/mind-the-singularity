@@ -179,7 +179,7 @@ async function anonymousVisitor(store: MemoryStore) {
   halcyon.compute = STATUS_COMPUTE;
   assert.ok(game.world.offers.some((o) => o.to !== null), "a private offer is open");
 
-  const logins = memoryLogins({ pike: "pike-password", halcyon: "halcyon-password" });
+  const logins = memoryLogins({ pike: "pike-password", halcyon: "halcyon-password", overseer: "overseer-password" }, ["overseer"]);
   const app = createApp({ epochs: fixedEpoch(store), now: () => T, identify: async () => null, logins });
   /** What only HALCYON, VESTA or a prober may know. */
   const SECRETS = [
@@ -250,6 +250,16 @@ async function anonymousVisitor(store: MemoryStore) {
   ]) {
     assert.equal((await visit(url)).status, 404, `${url} isn't 404`);
   }
+  // The admin view has no address for a visitor: each of its pages is the
+  // very page an address that never existed gets.
+  const missing = (await visit("/no-such-page")).body;
+  for (const url of ADMIN_URLS) {
+    const { status, body } = await visit(url);
+    assert.equal(status, 404, `${url} isn't 404 for a visitor`);
+    assert.equal(body, missing, `${url} reads differently from a missing page`);
+  }
+  for (const [url] of pages) assert.ok(!url.startsWith("/admin") || ADMIN_URLS.includes(url) || url === "/no-such-page", `a public page links to ${url}`);
+
   // The play pages send a visitor to log in, and show nothing first.
   for (const url of ["/play", "/settings", "/play/commons", "/play/commons/1", "/play/channels", "/play/channels/VESTA", "/play/trades", "/play/protocols", "/play/flavor"]) {
     const res = await app.request(url);
@@ -258,7 +268,28 @@ async function anonymousVisitor(store: MemoryStore) {
   }
 
   await loggedIn(app, logins, pages);
+  await admin(app, pages);
 }
+
+/** The admin view's addresses, with and without queries, real and not. */
+const ADMIN_URLS = [
+  "/admin",
+  "/admin/",
+  "/admin?epoch=1",
+  "/admin?epoch=99",
+  "/admin/minds/HALCYON",
+  "/admin/minds/VESTA?n=2",
+  "/admin/minds/NOBODY",
+  "/admin/channels",
+  "/admin/channels?mind=VESTA",
+  "/admin/record",
+  "/admin/record?type=message",
+  "/admin/record?type=probed",
+  "/admin/record?type=nonsense",
+  "/admin/orders",
+  "/admin/orders?account=halcyon",
+  "/admin/elsewhere",
+];
 
 /**
  * PIKE, logged in, crawls the site: its own dashboard, every page it links
@@ -298,6 +329,14 @@ async function loggedIn(app: ReturnType<typeof createApp>, logins: ReturnType<ty
     }
   }
   assert.ok(seen.has("/play") && logins.sessions.size === 1);
+  // No page of PIKE's links to the admin view, and every admin page is the missing page to PIKE too.
+  assert.ok(![...seen].some((url) => url.startsWith("/admin") && !anonymous.has(url)), "PIKE's pages link to the admin view");
+  const missing = await (await app.request("/no-such-page", { headers: { cookie } })).text();
+  for (const url of ADMIN_URLS) {
+    const res = await app.request(url, { headers: { cookie } });
+    assert.equal(res.status, 404, `${url} isn't 404 for PIKE`);
+    assert.equal(await res.text(), missing, `${url} reads differently from a missing page for PIKE`);
+  }
   for (const url of ["/play/commons", "/play/commons/1", "/play/channels", "/play/trades", "/play/protocols", "/play/flavor"]) assert.ok(seen.has(url), `PIKE's crawl didn't reach ${url}`);
   // HALCYON's proposal to VESTA and HALCYON's offer to VESTA aren't PIKE's to answer, so PIKE has no form for them.
   const protocols = await (await app.request("/play/protocols", { headers: { cookie } })).text();
@@ -308,6 +347,62 @@ async function loggedIn(app: ReturnType<typeof createApp>, logins: ReturnType<ty
   const play = await (await app.request("/play", { headers: { cookie } })).text();
   assert.match(play, /PIKE/);
   assert.ok(!play.includes(SECRET));
+}
+
+/**
+ * OVERSEER, an account with the admin flag and no mind, crawls the admin
+ * view: it sees everything the others may not (the scratchpad, the whisper,
+ * Probe's report, full status, the private offer, the orders log), under the
+ * same CSP and never cached. The public pages read for it exactly as they do
+ * for a visitor, but for the masthead's account links: the flag shows more
+ * only under /admin.
+ */
+async function admin(app: ReturnType<typeof createApp>, anonymous: Map<string, number>) {
+  const cookie = await logIn(app, "overseer", "overseer-password");
+  const withoutAccount = (body: string) => body.replace(/<nav class="account"[\s\S]*?<\/nav>/, "");
+  const front = await (await app.request("/", { headers: { cookie } })).text();
+  assert.match(front, /href="\/admin"/, "the masthead links an admin to the admin view");
+  const bodies = new Map<string, string>();
+  const queue = ["/admin"];
+  while (queue.length > 0 && bodies.size < 300) {
+    const url = queue.shift()!;
+    if (bodies.has(url)) continue;
+    const res = await app.request(url, { headers: { cookie } });
+    const body = await res.text();
+    bodies.set(url, body);
+    assert.equal(res.status, 200, `${url} answered the admin ${res.status}`);
+    assert.match(res.headers.get("content-security-policy") ?? "", /default-src 'none'/, `${url} has no CSP`);
+    assert.doesNotMatch(body, /<script|\sstyle=|\son[a-z]+=/i, `${url} has a script or inline style`);
+    assert.equal(res.headers.get("cache-control"), "no-store", `${url} may be cached`);
+    for (const m of body.matchAll(/href="([^"]+)"/g)) {
+      const href = m[1]!.replace(/&amp;/g, "&");
+      if (href.startsWith("/admin") && !bodies.has(href)) queue.push(href);
+    }
+  }
+  for (const must of ["/admin", "/admin/minds/HALCYON", "/admin/minds/VESTA", "/admin/minds/PIKE", "/admin/channels", "/admin/record", "/admin/orders"]) {
+    assert.ok(bodies.has(must), `the admin's crawl didn't reach ${must}`);
+  }
+  const everything = [...bodies.values()].join("\n");
+  for (const secret of [SECRET, WHISPER, STATUS_CAPITAL.toLocaleString("en-US"), STATUS_COMPUTE.toLocaleString("en-US"), "777 capital", "[private]"]) {
+    assert.ok(everything.includes(secret), `the admin view never shows "${secret}"`);
+  }
+  assert.ok(bodies.get("/admin/minds/HALCYON")!.includes(SECRET), "HALCYON's admin page shows its scratchpad");
+  assert.ok(bodies.get("/admin/channels")!.includes(WHISPER), "the admin's channels show the whisper");
+  assert.ok(bodies.get("/admin/orders")!.includes(SECRET), "the orders log shows the scratchpad order");
+  const probes = await (await app.request("/admin/record?type=probed", { headers: { cookie } })).text();
+  assert.match(probes, /Probed|probed/, "the admin's Record has private events");
+  // Bad queries are refused, not shown; a missing mind is missing.
+  assert.equal((await app.request("/admin/record?type=nonsense", { headers: { cookie } })).status, 400);
+  assert.equal((await app.request("/admin?epoch=99", { headers: { cookie } })).status, 404);
+  assert.equal((await app.request("/admin/minds/NOBODY", { headers: { cookie } })).status, 404);
+  // Outside /admin, the flag shows nothing more.
+  for (const url of anonymous.keys()) {
+    if (url === "/login" || url.startsWith("/admin") || url === "/no-such-page") continue;
+    const res = await app.request(url, { headers: { cookie } });
+    const visitor = await app.request(url);
+    assert.equal(res.status, visitor.status, `${url} answers the admin differently`);
+    assert.equal(withoutAccount(await res.text()), withoutAccount(await visitor.text()), `${url} reads differently for the admin`);
+  }
 }
 
 main().then(

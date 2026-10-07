@@ -2,10 +2,11 @@ import { randomBytes } from "node:crypto";
 import type { Logins } from "../src/web/app.js";
 
 // A stand-in for src/auth/logins.ts in the web suites: accounts and
-// passwords in memory, sessions as plain tokens. The real one, against
-// Postgres, is tests/postgres.test.ts's.
+// passwords in memory, sessions as plain tokens, and the accounts in
+// `admins` logged in with the admin flag. The real one, against Postgres,
+// is tests/postgres.test.ts's.
 
-export function memoryLogins(passwords: Record<string, string>): Logins & { sessions: Map<string, string> } {
+export function memoryLogins(passwords: Record<string, string>, admins: string[] = []): Logins & { sessions: Map<string, string> } {
   const sessions = new Map<string, string>();
   return {
     sessions,
@@ -18,7 +19,8 @@ export function memoryLogins(passwords: Record<string, string>): Logins & { sess
     },
     async session(token) {
       const account = sessions.get(token);
-      return account === undefined ? null : { account };
+      if (account === undefined) return null;
+      return admins.includes(account) ? { account, admin: true } : { account };
     },
     async logOut(token) {
       sessions.delete(token);
