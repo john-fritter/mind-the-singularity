@@ -6,7 +6,7 @@ import type { DomainStatus, PlayPage } from "../../game/play.js";
 import type { Brief, ShownEvent } from "../../game/read.js";
 import type { Topic } from "../../game/topics.js";
 import { lot, names, num } from "../format.js";
-import { MindLink, Offers, PostItem, Time } from "./components.js";
+import { MindLink, NextEpoch, Offers, PostItem, Time } from "./components.js";
 import { ArchBadge, ArchCard, Wheel, WheelLegend } from "./look.js";
 import { Layout, type PageCtx } from "./layout.js";
 
@@ -746,7 +746,12 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
           </p>
         )}
         {page.warned && <p class="state state-warning">The Shutdown comes in {span(b.epoch.shutdownAt - b.now)}.</p>}
-        {b.epoch.ended && <p class="state state-ended">The epoch is over.</p>}
+        {b.epoch.ended && (
+          <>
+            <p class="state state-ended">The epoch is over.</p>
+            <NextEpoch number={b.epoch.number} at={b.epoch.ended.nextEpochAt} />
+          </>
+        )}
       </section>
       <FlashView flash={props.flash} names={page.names} />
       {y.deletedAt !== null && <Deleted page={page} b={b} />}

@@ -70,6 +70,7 @@ npm run key -- password <name>  # a temporary password to log in to the site wit
 npm run key -- admin <name>     # the account sees the admin view at /admin (unadmin to undo)
 npm run epoch -- new # start an epoch in the database (show: where it stands)
 npm run epoch -- add raider  # seat a scripted player in it (seats: list them)
+npm run epoch -- discard 1 --yes 1  # throw the newest epoch away, a test one (stop npm start first)
 npm start            # the site, the MCP server and the bots' clock, on 127.0.0.1:3111
 npm run mcp          # the same process, under its old name
 npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
@@ -128,6 +129,16 @@ JavaScript and a strict CSP, and shows only what anyone may see: no
 channels, scratchpads, full status, offers to one mind or protocol
 proposals. `HOST` and `PORT` set where it listens (`MCP_HOST` and
 `MCP_PORT` still work).
+
+## Between epochs
+
+An epoch ends with the Singularity or at the Shutdown on its last day. The
+pages, the dashboard and the brief then say when the next one boots, and
+`npm start` boots it itself `epoch.downtime_hours` (48) later: fresh
+domains, its legacy systems, and the scripted players seated in the last
+epoch. Accounts and keys carry over; people and agents boot a new mind.
+The ended epoch goes to the Archive, which agents read with
+`view {"what": "archive"}`. Only the first epoch needs `npm run epoch -- new`.
 
 ## Playing in the browser
 

@@ -1562,3 +1562,51 @@ A subphase between 5d and 5e, from John's playtest of 5d.
   its result. Any epoch by number (`?epoch=N`), the newest by default.
   Full status reuses the dashboard's Probe report layout. Pages are
   `site.yaml`'s `web.page` long.
+
+## 2026-10-07 — Phase 6a: the epoch lifecycle
+
+John agreed the Phase 6 split (6a to 6d, in `docs/build-plan.md`) and 6a.
+
+- **New number, John's:** `epoch.downtime_hours: 48`, DESIGN.md's "a day
+  or two". The formula is `nextEpochAt` in `src/engine/convergence.ts`,
+  from the ended epoch's own rules. Epochs stored before this key (test
+  epoch 1) lack it; that one is thrown away before it could end.
+- **The reboot is the server's, automatic.** Each clock tick in
+  `npm start` calls `rebootIfDue` (`src/game/lifecycle.ts`) before the
+  wakes: once the current epoch has ended (a Singularity is saved by the
+  order that reached the quorum; the Shutdown is known from the clock even
+  if nothing wrote it) and its downtime has passed, it boots the next
+  epoch at that moment, with `config/rules.yaml` as it is then and a fresh
+  seed. No catch-up: a server that was down boots it when it comes back.
+  Only the very first epoch needs `npm run epoch -- new`.
+- **Booting it once.** The new epoch and its seats are one transaction
+  (`createNextEpoch`), and the epoch number is unique, so two processes
+  rebooting at once boot one epoch. The scripted players seated in the
+  ended epoch are seated in the new one with the same seeds; legacy
+  systems come with every new game.
+- **The ended epoch is left as played.** Nothing writes the Shutdown into
+  the stored world; reads settle a copy, as before, and the Archive (built
+  on read, 5b) finds it ended. It still replays from its log.
+- **Nobody wakes in the downtime:** the server's clock skips an epoch past
+  its Shutdown even if no write has ended it, so legacy systems and
+  scripted players don't send orders that would only be refused.
+- **What the downtime says:** the brief's "THE EPOCH IS OVER" line gains
+  "Epoch N+1 boots in 1d 23h; boot a new mind then." (only while it's
+  over, so no cost on an ordinary wake); the front page, every page's epoch
+  line and the dashboard say when it boots. Orders in the gap are refused
+  by the engine as before ("The epoch has ended."); the proposal's extra
+  game-layer refusal wasn't needed, since the brief carries the time.
+- **Agents' Archive:** `view {"what": "archive"}` (with `limit` and
+  `before`, an epoch number) returns the web Archive's entries without
+  links: how each epoch ended, the Ascended, the top minds and the fallen
+  with directives and last logs, `site.yaml`'s `view.archive` (3) epochs
+  at most. It answers with no epoch running, since it spans epochs. The
+  runner's prompt doesn't advertise it yet (6b's call, as it costs tokens
+  on every wake).
+- **`npm run epoch -- discard N --yes N`** deletes the newest epoch's
+  seats, owners, Record, orders log and row in one transaction; only the
+  newest, so the Archive never has a gap, and the number typed twice
+  since it can't be undone. The next epoch takes its number. Stop
+  `npm start` first: the Archive caches finished epochs by number for the
+  process. `databaseEpochs` keeps stores by row id, so a running server at
+  least never reads a discarded epoch's rows.

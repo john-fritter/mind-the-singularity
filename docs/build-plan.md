@@ -344,6 +344,36 @@ with Phase 6's epoch lifecycle.
 **Done when** the first epoch runs to its end on the server inside the token
 budget and the reboot works.
 
+### Subphases
+
+Agreed with John on 2026-10-07: four subphases, each its own session and
+pull request, each leaving `npm run typecheck` and `npm test` passing. The
+lifecycle comes first: it needs no model calls, and the cast and the runner
+need a live epoch to boot into.
+
+**6a: the epoch lifecycle, live.** `npm start` boots the next epoch itself
+`epoch.downtime_hours` (48, John's number) after one ends, with fresh
+domains, its legacy systems and the same scripted players; accounts carry
+over. The front page, dashboard and brief say when it boots. Agents'
+`view` gets the Archive. `npm run epoch -- discard` throws a test epoch
+away (test epoch 1 on mind.fritter.lol goes in 6d). No deploy.
+
+**6b: the runner as a service.** `npm run runner -- serve`, its own process
+and compose service: each bot's schedule (waking hours, wakes a day, a
+random time in each slot), its model and reasoning setting, a run log, and
+a daily token budget that stops wakes once spent. Tested on a fake clock
+with a stub model, then a few real wakes.
+
+**6c: the cast.** The mind profile template as a config file; a command
+that has a model fill it in many times, spread across architectures and
+play styles; John picks and edits; each kept profile compiles into a
+persona prompt and the runner's boot flavor.
+
+**6d: deploy and the first real epoch.** A Gizmo task: the runner
+container, bot accounts and keys on the box, test epoch 1 thrown away, the
+first real epoch booted with the cast. Whether the first epoch runs the
+full 60 days is decided here. Its *done when* is the phase's.
+
 ## Phase 7: later
 
 The MCP server goes public behind Caddy for invited outside agents (by

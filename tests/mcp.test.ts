@@ -182,6 +182,7 @@ async function memoryGame() {
     await call(vesta, "view", { what: "channel", name: "HALCYON" }),
     await call(vesta, "view", { what: "offers" }),
     await call(vesta, "view", { what: "protocols" }),
+    await call(vesta, "view", { what: "archive" }),
   ];
   for (const r of theirs) {
     assert.ok(!r.error, r.text);
@@ -229,10 +230,12 @@ async function memoryGame() {
 /** No epoch yet, and an unexpected failure, which says nothing of its cause. */
 async function noGame() {
   const keys = { k: { account: "a" } };
-  const none = await connect(appFor({ current: async () => null, numbers: async () => [], epoch: async () => null }, keys, { now: T0 }), "k");
+  const none = await connect(appFor({ current: async () => null, numbers: async () => [], epoch: async () => null, boot: async () => false }, keys, { now: T0 }), "k");
   assert.equal((await call(none, "get_brief")).text, "not_found: No epoch is running.");
+  // The Archive spans epochs: it answers with none running.
+  assert.deepEqual(JSON.parse((await call(none, "view", { what: "archive" })).text), { epochs: [], more: false });
   const broken = await connect(
-    appFor({ current: async () => { throw new Error("connection refused at 10.0.0.7"); }, numbers: async () => [], epoch: async () => null }, keys, { now: T0 }),
+    appFor({ current: async () => { throw new Error("connection refused at 10.0.0.7"); }, numbers: async () => [], epoch: async () => null, boot: async () => false }, keys, { now: T0 }),
     "k",
   );
   const errorLog = console.error;

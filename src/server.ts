@@ -3,10 +3,12 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { identityForKey } from "./auth/keys.js";
 import { databaseLogins } from "./auth/logins.js";
-import { loadPlayers, loadSite } from "./config.js";
+import { randomInt } from "node:crypto";
+import { loadPlayers, loadRules, loadSite } from "./config.js";
 import { getPool } from "./db/index.js";
 import { ARCHITECTURES } from "./engine/architectures.js";
 import { databaseEpochs } from "./game/epochs.js";
+import { rebootIfDue } from "./game/lifecycle.js";
 import { ServerClock, type SeatRow } from "./players/clock.js";
 import { STRATEGIES } from "./players/settings.js";
 import { listSeats, type SeatRecord } from "./store/postgres.js";
@@ -19,8 +21,12 @@ import { listSeats, type SeatRecord } from "./store/postgres.js";
  * people reach it at: form posts must come from it.
  *
  * It also keeps the server's clock: every clock.every_seconds (site.yaml)
- * it wakes the legacy systems and seated scripted players that are due.
+ * it boots the next epoch once the last one's downtime is over, and wakes
+ * the legacy systems and seated scripted players that are due.
  */
+
+/** Seeds are drawn below 2^31, as `npm run epoch -- new` draws them. */
+const SEED_LIMIT = 2 ** 31;
 
 /** A seat as the database keeps it, if it's one this server can play. */
 function seatRow(r: SeatRecord): SeatRow | null {
@@ -57,12 +63,19 @@ function main() {
     },
     Date.now(),
   );
+  // Each tick: boot the next epoch if the last one's downtime is over, then wake whoever is due.
+  const tick = async () => {
+    const now = Date.now();
+    const booted = await rebootIfDue(epochs, loadRules(), randomInt(SEED_LIMIT), now);
+    if (booted !== null) console.log(`Epoch ${booted} booted at ${new Date(now).toISOString()}.`);
+    return clock.pass(now);
+  };
   const timer = setInterval(() => {
-    clock.pass(Date.now()).then(
+    tick().then(
       (logs) => {
         for (const l of logs) if (l.error) console.error(`${l.account}'s wake was refused: ${l.error}`);
       },
-      (err) => console.error("The clock's pass failed:", err),
+      (err) => console.error("The clock's tick failed:", err),
     );
   }, site.clock.every_seconds * 1000);
 

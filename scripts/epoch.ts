@@ -10,8 +10,14 @@
  *                                     `npm start` boots it on its next pass and
  *                                     wakes it on the server's clock
  *   npm run epoch -- seats            the scripted players seated in the newest epoch
+ *   npm run epoch -- discard N --yes N
+ *                                     throw the newest epoch away, a test one: its world,
+ *                                     Record, orders log and seats; the next epoch takes
+ *                                     its number. Stop `npm start` first.
  *
- * A new epoch plays by config/rules.yaml as it is now, to its end.
+ * A new epoch plays by config/rules.yaml as it is now, to its end. After it
+ * ends, `npm start` boots the next one itself once epoch.downtime_hours
+ * have passed (src/game/lifecycle.ts), with the same scripted players.
  */
 
 import "../src/dotenv.js";
@@ -22,14 +28,15 @@ import { DAY_MS } from "../src/engine/cycles.js";
 import { getPool } from "../src/db/index.js";
 import { newGame } from "../src/game/game.js";
 import { ARCHITECTURES, type Architecture } from "../src/engine/architectures.js";
-import { addSeat, createEpoch, latestEpoch, listSeats, openEpoch } from "../src/store/postgres.js";
+import { addSeat, createEpoch, discardEpoch, latestEpoch, listSeats, openEpoch } from "../src/store/postgres.js";
 import { STRATEGIES } from "../src/players/settings.js";
 
 const USAGE = `Usage:
   npm run epoch -- new [--seed N]
   npm run epoch -- show [--epoch N]
   npm run epoch -- add STRATEGY [DESIGNATION] [--arch ARCHITECTURE]
-  npm run epoch -- seats`;
+  npm run epoch -- seats
+  npm run epoch -- discard N --yes N`;
 
 /** Seeds are drawn below 2^31, so they fit any integer column and the RNG's seed. */
 const SEED_LIMIT = 2 ** 31;
@@ -37,7 +44,7 @@ const SEED_LIMIT = 2 ** 31;
 async function run(): Promise<string> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { seed: { type: "string" }, epoch: { type: "string" }, arch: { type: "string" } },
+    options: { seed: { type: "string" }, epoch: { type: "string" }, arch: { type: "string" }, yes: { type: "string" } },
   });
   const pool = getPool();
   const latest = await latestEpoch(pool);
@@ -94,6 +101,17 @@ async function run(): Promise<string> {
     const seated = await listSeats(pool, latest);
     if (seated.length === 0) return `No scripted players in epoch ${latest}.`;
     return seated.map((s) => `${(s.boot as { designation: string }).designation.padEnd(16)} ${s.strategy.padEnd(10)} ${s.account}`).join("\n");
+  }
+  if (positionals[0] === "discard") {
+    const number = Number(positionals[1]);
+    if (!Number.isSafeInteger(number) || number < 1) throw new Error(USAGE);
+    // Only the newest, so the Archive never has a gap.
+    if (number !== latest) throw new Error(latest === null ? "No epochs yet." : `Only the newest epoch (${latest}) can be thrown away.`);
+    // Not undoable, so the number is typed twice.
+    if (values.yes !== String(number)) throw new Error(`This deletes epoch ${number} for good. To go ahead: npm run epoch -- discard ${number} --yes ${number}`);
+    if (!(await discardEpoch(pool, number))) throw new Error(`No epoch ${number}.`);
+    const now = await latestEpoch(pool);
+    return `Epoch ${number} is gone. ${now === null ? "No epochs left: npm run epoch -- new" : `The newest is epoch ${now}.`}`;
   }
   return USAGE;
 }

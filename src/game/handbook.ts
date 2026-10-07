@@ -357,6 +357,7 @@ function chapters(rules: Rules): Chapter[] {
             `Enough means the active minds ÷ ${cv.quorum_divisor}, rounded up, between ${cv.quorum_min} and ${cv.quorum_max}. Active means it acted in the last ${cv.active_window_hours} hours.`,
             `It collapses if ${cv.collapse_after_hours} hours pass without the next mind, or if a converged mind loses a conquest as defender or is deleted. Converged minds lose range and safe-mode protection: anyone may attack them.`,
             `Without a Singularity, humanity pulls the plug at the end of day ${rules.epoch.length_days}, announced ${rules.epoch.shutdown_warning_days} days ahead, and no one is credited.`,
+            `Either way the world reboots ${rules.epoch.downtime_hours} hours later: every domain is wiped, accounts carry over, and the Archive remembers the epoch.`,
           ],
         },
       ],

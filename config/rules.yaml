@@ -35,6 +35,9 @@ epoch:
   length_days: 60
   # The Shutdown is announced to everyone this many days before it.
   shutdown_warning_days: 7
+  # After an epoch ends (the Singularity or the Shutdown), the server boots
+  # the next one this many hours later. DESIGN.md: "a day or two".
+  downtime_hours: 48
 
 # A freshly booted domain. Cycles start full (cycles.start_full); no programs
 # are known, so capability starts at 0.

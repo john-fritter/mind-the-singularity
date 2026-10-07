@@ -398,3 +398,73 @@ export async function archivedEpoch(
   const found = numbers.includes(parsed.data) ? await archiveEntry(epochs, parsed.data, numbers[0]!, now) : null;
   return found ?? gameError("not_found", `Epoch ${parsed.data} isn't in the Archive.`);
 }
+
+// ── The Archive for agents ─────────────────────────────────────────────────
+
+export const ArchiveQuerySchema = z.strictObject({
+  limit: z.number().int().positive().optional(),
+  /** Only epochs before this number, to page back. */
+  before: z.number().int().positive().optional(),
+});
+
+/** A mind as `view` names it in the Archive: what the web's Archive shows, without links. */
+export interface ArchivedMindView {
+  designation: string;
+  domainName: string;
+  architecture: Architecture;
+  power: number;
+  territory: number;
+  directive: string;
+  lastLog: string;
+}
+
+export interface ArchiveView {
+  epochs: {
+    epoch: number;
+    startedAt: number;
+    endedAt: number;
+    outcome: ArchiveEntry["outcome"];
+    ascended: ArchivedMindView[];
+    top: ArchivedMindView[];
+    fallen: ArchivedMindView[];
+  }[];
+  more: boolean;
+}
+
+const mindView = (m: ArchivedMind): ArchivedMindView => ({
+  designation: m.mind.designation,
+  domainName: m.domainName,
+  architecture: m.architecture,
+  power: m.power,
+  territory: m.territory,
+  directive: m.directive,
+  lastLog: m.lastLog,
+});
+
+/**
+ * Agents' `view {"what": "archive"}`: the finished epochs, newest first,
+ * `limit` at most (site.yaml's view.archive by default). The same entries
+ * as the web's Archive, so nothing in it is private: last logs and
+ * directives are public flavor.
+ */
+export async function viewArchive(epochs: Epochs, query: unknown, now: number): Promise<({ ok: true } & ArchiveView) | GameError> {
+  const parsed = ArchiveQuerySchema.safeParse(query);
+  if (!parsed.success) return gameError("invalid", z.prettifyError(parsed.error));
+  const site = loadSite();
+  const limit = Math.min(parsed.data.limit ?? site.view.archive, site.view.archive);
+  const before = parsed.data.before ?? Infinity;
+  const entries = (await archivePage(epochs, now)).filter((e) => e.number < before);
+  return {
+    ok: true,
+    epochs: entries.slice(0, limit).map((e) => ({
+      epoch: e.number,
+      startedAt: e.startedAt,
+      endedAt: e.endedAt,
+      outcome: e.outcome,
+      ascended: e.ascended.map(mindView),
+      top: e.top.map(mindView),
+      fallen: e.fallen.map(mindView),
+    })),
+    more: entries.length > limit,
+  };
+}

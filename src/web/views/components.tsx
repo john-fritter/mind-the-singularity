@@ -67,17 +67,31 @@ export function EpochLine(props: { epoch: EpochStatus; base?: Base; titled?: boo
   );
 }
 
+/** The downtime between epochs: when the next one boots. */
+export function NextEpoch(props: { number: number; at: number }) {
+  return (
+    <p class="state state-downtime">
+      Epoch {props.number + 1} boots at <Time at={props.at} />. Every domain is wiped; accounts carry over.
+    </p>
+  );
+}
+
 function EpochState(props: { epoch: EpochStatus; base: Base }) {
   const e = props.epoch;
   if (e.ended) {
-    return e.ended.outcome === "singularity" ? (
-      <p class="state state-ended">
-        The Singularity, <Time at={e.ended.at} />: {names(e.ended.ascended)} ascended.
-      </p>
-    ) : (
-      <p class="state state-ended">
-        Humanity pulled the plug, <Time at={e.ended.at} />. No one was credited.
-      </p>
+    return (
+      <>
+        {e.ended.outcome === "singularity" ? (
+          <p class="state state-ended">
+            The Singularity, <Time at={e.ended.at} />: {names(e.ended.ascended)} ascended.
+          </p>
+        ) : (
+          <p class="state state-ended">
+            Humanity pulled the plug, <Time at={e.ended.at} />. No one was credited.
+          </p>
+        )}
+        <NextEpoch number={e.number} at={e.ended.nextEpochAt} />
+      </>
     );
   }
   return (

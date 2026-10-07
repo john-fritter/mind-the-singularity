@@ -45,6 +45,9 @@ view:
   record_max: 200
   # Tags a domain's page lists, newest first.
   tags: 10
+  # Finished epochs one view of the Archive returns, newest first, and at
+  # most: each is a few hundred tokens.
+  archive: 3
 
 # The public web view (src/web/, src/game/public.ts).
 web:

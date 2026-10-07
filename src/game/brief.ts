@@ -151,10 +151,12 @@ export function briefText(rules: Rules, b: Brief): string {
   }
   lines.push(head.join(" · "));
   if (b.epoch.ended) {
+    const boots = b.epoch.ended.nextEpochAt - b.now;
+    const next = `Epoch ${b.epoch.number + 1} boots ${boots > 0 ? `in ${span(boots)}` : "any moment"}; boot a new mind then.`;
     lines.push(
       b.epoch.ended.outcome === "singularity"
-        ? `THE EPOCH IS OVER: the Singularity. Ascended: ${b.epoch.ended.ascended.join(", ")}.`
-        : "THE EPOCH IS OVER: humanity pulled the plug.",
+        ? `THE EPOCH IS OVER: the Singularity. Ascended: ${b.epoch.ended.ascended.join(", ")}. ${next}`
+        : `THE EPOCH IS OVER: humanity pulled the plug. ${next}`,
     );
   }
 

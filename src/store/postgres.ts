@@ -177,20 +177,59 @@ async function insertOwners(db: Db, epochId: number, owners: Owner[]): Promise<n
  * logged) as an epoch. Refuses an epoch number already in the database.
  */
 export async function createEpoch(pool: Pool, game: Game): Promise<PostgresStore> {
+  const id = await withTransaction(pool, (client) => insertEpoch(client, game));
+  if (id === null) throw new Error(`epoch ${game.start.epoch} already exists`);
+  return new PostgresStore(pool, id);
+}
+
+/**
+ * The reboot's write: stores the next epoch and seats in it the scripted
+ * players seated in the one before, in one transaction. Null when the
+ * epoch exists already (another process rebooted first): nothing changes.
+ */
+export async function createNextEpoch(pool: Pool, game: Game): Promise<PostgresStore | null> {
   const id = await withTransaction(pool, async (client) => {
-    const { rows } = await client.query<{ id: number }>(
-      `INSERT INTO epochs (number, seed, started_at, rules, world, writes)
-       VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (number) DO NOTHING RETURNING id`,
-      [game.start.epoch, game.start.seed, date(game.start.startedAt), json(game.rules), json(game.world), game.log.length],
+    const id = await insertEpoch(client, game);
+    if (id === null) return null;
+    await client.query(
+      `INSERT INTO seats (epoch_id, account, strategy, seed, boot)
+       SELECT $1, s.account, s.strategy, s.seed, s.boot FROM seats s JOIN epochs e ON e.id = s.epoch_id
+        WHERE e.number = $2 ORDER BY s.id`,
+      [id, game.start.epoch - 1],
     );
-    const id = rows[0]?.id;
-    if (id === undefined) throw new Error(`epoch ${game.start.epoch} already exists`);
-    await insertLog(client, id, game.log);
-    await insertRecord(client, id, game.record);
-    await insertOwners(client, id, game.owners);
     return id;
   });
-  return new PostgresStore(pool, id);
+  return id === null ? null : new PostgresStore(pool, id);
+}
+
+async function insertEpoch(client: PoolClient, game: Game): Promise<number | null> {
+  const { rows } = await client.query<{ id: number }>(
+    `INSERT INTO epochs (number, seed, started_at, rules, world, writes)
+     VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (number) DO NOTHING RETURNING id`,
+    [game.start.epoch, game.start.seed, date(game.start.startedAt), json(game.rules), json(game.world), game.log.length],
+  );
+  const id = rows[0]?.id;
+  if (id === undefined) return null;
+  await insertLog(client, id, game.log);
+  await insertRecord(client, id, game.record);
+  await insertOwners(client, id, game.owners);
+  return id;
+}
+
+/**
+ * Throws an epoch away: its seats, owners, Record, orders log and row. For
+ * test epochs (`npm run epoch -- discard`); a played epoch belongs in the
+ * Archive. Returns whether there was one.
+ */
+export async function discardEpoch(pool: Pool, number: number): Promise<boolean> {
+  return withTransaction(pool, async (client) => {
+    const { rows } = await client.query<{ id: number }>("SELECT id FROM epochs WHERE number = $1 FOR UPDATE", [number]);
+    const id = rows[0]?.id;
+    if (id === undefined) return false;
+    for (const table of ["seats", "owners", "record", "orders_log"]) await client.query(`DELETE FROM ${table} WHERE epoch_id = $1`, [id]);
+    await client.query("DELETE FROM epochs WHERE id = $1", [id]);
+    return true;
+  });
 }
 
 /** The store for an epoch by its number, or null if there's no such epoch. */

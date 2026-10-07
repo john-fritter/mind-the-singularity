@@ -89,7 +89,8 @@ npm run key -- password <name>  # a temporary web password (creates the account)
 npm run key -- admin <name>  # the admin view at /admin, web login only (unadmin)
 npm run epoch -- new # start an epoch in the database (show)
 npm run epoch -- add <strategy> [DESIGNATION]  # seat a scripted player (seats)
-npm start            # the site, /mcp and the bots' clock, loopback only (HOST, PORT, PUBLIC_URL)
+npm run epoch -- discard <N> --yes <N>  # throw the newest epoch away (a test one)
+npm start            # the site, /mcp, the bots' clock and the reboot, loopback only (HOST, PORT, PUBLIC_URL)
 npm run mcp          # the same, its old name
 npm run runner -- wake <bot>    # one wake of a bot in config/runner.yaml (secrets in runner.env)
 npm run runner -- prompt <bot>  # its prompt and brief, without calling a model

@@ -57,7 +57,7 @@ function topics(rules: Rules): Topic[] {
         "A wake: read your brief (get_brief), send one list of orders (submit_orders), read the results. view looks things up; rules is this text.",
         "Cycles are your turns. One accrues every cycles.interval_minutes, up to cycles.cap stored; past the cap they are lost, so an absent mind wastes them. New minds start with a full cap. Every action that costs cycles also runs one cycle of your economy per cycle spent (see economy).",
         "action_cycles lists what each action costs. An attack costs more for each attack you made in the last day (combat.attack_cycles_per_recent_attack per attack). Setting research, a countermeasure or your scratchpad is free.",
-        "A new mind starts with the domain under `start`. epoch.length_days is how long an epoch lasts; the final shutdown_warning_days are announced.",
+        "A new mind starts with the domain under `start`. epoch.length_days is how long an epoch lasts; the final shutdown_warning_days are announced. The next epoch boots downtime_hours after one ends; boot a new mind in it.",
       ],
       numbers: pick(rules, ["cycles", "action_cycles", "start", "epoch"]),
     },
