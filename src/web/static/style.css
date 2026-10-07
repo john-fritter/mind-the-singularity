@@ -397,3 +397,38 @@ pre.numbers {
     grid-template-columns: 1fr;
   }
 }
+
+/* The play pages' own sections, under the masthead. */
+.play-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+/* A form that stands alone on a page (post, message, offer), apart from the dashboard's grid. */
+main > form.order,
+section > form.order {
+  max-width: 36rem;
+  margin: 1rem 0;
+}
+
+/* Probe's report, inside an order's result. */
+.report {
+  margin: 0.5rem 0;
+}
+
+/* An amount and its goods, side by side. */
+.pair {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pair input {
+  flex: 1;
+  min-width: 0;
+}

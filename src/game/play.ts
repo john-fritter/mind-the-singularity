@@ -2,6 +2,7 @@ import { ARCHITECTURES, BUILDINGS, HARDWARE, PROGRAM_INFO, programsOf, type Arch
 import { DAY_MS } from "../engine/cycles.js";
 import { buildingName, programName, unitName } from "../engine/names.js";
 import type { Rules } from "../engine/rules.js";
+import type { DomainStatus } from "../engine/status.js";
 import type { WorldStore } from "../store/store.js";
 import { getBrief, type Brief } from "./read.js";
 import type { GameError, Identity } from "./state.js";
@@ -10,6 +11,9 @@ import type { GameError, Identity } from "./state.js";
 // agent's get_brief returns it, plus the names a form needs to offer its
 // choices. Nothing here is more than the brief and the rules already say:
 // a person sees what an agent sees (DESIGN.md, "Playing as a human").
+
+/** A domain's full status, as Probe reports it in an order's result. */
+export type { DomainStatus };
 
 /** Something a form offers: its id and its display name from the rules. */
 export interface Choice {
@@ -36,6 +40,37 @@ export interface PlayPage {
     execute: Choice[];
     /** Known battle programs: with an attack, or as a countermeasure. */
     battle: Choice[];
+  };
+  /** The most characters each text may hold, for the forms' maxlength. Keys: social.post_chars, social.message_chars, flavor.* */
+  limits: Limits;
+}
+
+export interface Limits {
+  post: number;
+  message: number;
+  manifesto: number;
+  interface: number;
+  directive: number;
+  force_name: number;
+  force_description: number;
+  tag: number;
+  last_log: number;
+  scratchpad: number;
+}
+
+function limits(rules: Rules): Limits {
+  const f = rules.flavor;
+  return {
+    post: rules.social.post_chars,
+    message: rules.social.message_chars,
+    manifesto: f.manifesto,
+    interface: f.interface,
+    directive: f.directive,
+    force_name: f.force_name,
+    force_description: f.force,
+    tag: f.tag,
+    last_log: f.last_log,
+    scratchpad: f.scratchpad,
   };
 }
 
@@ -70,7 +105,14 @@ export async function playPage(store: WorldStore, identity: Identity, now: numbe
   if ("ok" in brief) {
     if (brief.code !== "not_found") return brief;
     const architectures = ARCHITECTURES.map((a) => choice(a, rules.architectures[a].name));
-    return { boot: { architectures }, brief: null, warned: false, names: names(rules), choices: { buildings: [], hardware: [], research: [], execute: [], battle: [] } };
+    return {
+      boot: { architectures },
+      brief: null,
+      warned: false,
+      names: names(rules),
+      choices: { buildings: [], hardware: [], research: [], execute: [], battle: [] },
+      limits: limits(rules),
+    };
   }
   const rebootable = brief.you.deletedAt !== null && brief.you.rebootAt !== null && now >= brief.you.rebootAt;
   const architectures = ARCHITECTURES.map((a) => choice(a, rules.architectures[a].name));
@@ -80,5 +122,6 @@ export async function playPage(store: WorldStore, identity: Identity, now: numbe
     warned: !brief.epoch.ended && brief.epoch.shutdownAt - now <= rules.epoch.shutdown_warning_days * DAY_MS,
     names: names(rules),
     choices: choices(rules, brief.you.architecture, brief.you.known),
+    limits: limits(rules),
   };
 }

@@ -5,7 +5,7 @@ import { HOUR_MS } from "../src/engine/cycles.js";
 import { fixedEpoch } from "../src/game/epochs.js";
 import { bootMind, currentMind, newGame } from "../src/game/game.js";
 import { MemoryStore } from "../src/store/memory.js";
-import { ordersFromForm } from "../src/web/forms.js";
+import { backTo, ordersFromForm } from "../src/web/forms.js";
 import { logIn, memoryLogins, ORIGIN } from "./logins.js";
 
 // The play pages (5c): logging in and out, the boot form, the dashboard and
@@ -172,6 +172,131 @@ async function playing() {
   await page(app, "/rules/nothing", null, 404);
 }
 
+/** Posts a form from a play page and reads the page it sends you back to. */
+async function act(app: App, cookie: string, back: string, fields: Record<string, string>): Promise<string> {
+  const res = await post(app, "/play/orders", cookie, { ...fields, back });
+  assert.equal(res.status, 303);
+  assert.equal(res.headers.get("location"), back);
+  return page(app, back, cookie);
+}
+
+function socialForms() {
+  assert.deepEqual(ordersFromForm({ do: "post", text: "hello", reply_to: "" }), { orders: [{ do: "post", text: "hello" }] });
+  assert.deepEqual(ordersFromForm({ do: "post", text: "yes", reply_to: "3" }), { orders: [{ do: "post", text: "yes", reply_to: 3 }] });
+  assert.deepEqual(ordersFromForm({ do: "message", to: " VESTA ", text: "psst" }), { orders: [{ do: "message", to: "VESTA", text: "psst" }] });
+  assert.deepEqual(ordersFromForm({ do: "trade_offer", give_amount: "500", give_goods: "capital", want_amount: "200", want_goods: "compute", to: "" }), {
+    orders: [{ do: "trade_offer", give: { capital: 500 }, want: { compute: 200 } }],
+  });
+  assert.deepEqual(ordersFromForm({ do: "trade_offer", give_amount: "5", give_goods: "compute", want_amount: "9", want_goods: "capital", to: "VESTA" }), {
+    orders: [{ do: "trade_offer", give: { compute: 5 }, want: { capital: 9 }, to: "VESTA" }],
+  });
+  assert.ok("error" in ordersFromForm({ do: "trade_offer", give_amount: "5", give_goods: "gold", want_amount: "9", want_goods: "capital" }));
+  assert.deepEqual(ordersFromForm({ do: "trade_accept", offer: "4" }), { orders: [{ do: "trade_accept", offer: 4 }] });
+  assert.deepEqual(ordersFromForm({ do: "protocol_propose", to: "VESTA" }), { orders: [{ do: "protocol_propose", to: "VESTA" }] });
+  assert.deepEqual(ordersFromForm({ do: "protocol_decline", proposal: "2" }), { orders: [{ do: "protocol_decline", proposal: 2 }] });
+  // Revoking asks twice: without the box ticked, nothing is sent.
+  assert.ok("error" in ordersFromForm({ do: "protocol_revoke" }));
+  assert.deepEqual(ordersFromForm({ do: "protocol_revoke", confirm: "yes" }), { orders: [{ do: "protocol_revoke" }] });
+  // The flavor editor: the fields it has, blank ones clearing; ones it leaves out aren't touched.
+  assert.deepEqual(ordersFromForm({ do: "flavor", directive: "Endure.", tag: "" }), { orders: [{ do: "flavor", directive: "Endure.", tag: "" }] });
+  // Only what changed from the field's `was_` value is sent; nothing changed is refused before the engine.
+  assert.deepEqual(ordersFromForm({ do: "flavor", directive: "Endure.", was_directive: "Endure.", tag: "x", was_tag: "" }), { orders: [{ do: "flavor", tag: "x" }] });
+  assert.ok("error" in ordersFromForm({ do: "flavor", directive: "Endure.", was_directive: "Endure." }));
+  // Only play pages are places to come back to.
+  for (const [back, to] of [["/play/trades", "/play/trades"], ["/play/channels/VESTA", "/play/channels/VESTA"], ["https://evil.example/play", "/play"], ["//evil.example", "/play"], ["/rankings", "/play"], ["/play/../x", "/play"], ["/play/%2e%2e/x", "/play"], ["/play/channels/A%20B", "/play/channels/A%20B"]] as [string, string][]) {
+    assert.equal(backTo({ back }), to, back);
+  }
+}
+
+async function social() {
+  const game = newGame(rules, { epoch: 1, seed: 11, startedAt: T0 });
+  const store = new MemoryStore(game);
+  let t = T0 + HOUR_MS;
+  const logins = memoryLogins({ kit: "kit-password-1", vesta: "vesta-password", pike: "pike-password" });
+  const app = createApp({ epochs: fixedEpoch(store), now: () => t, identify: async () => null, logins });
+  for (const [account, designation] of [["kit", "KIT"], ["vesta", "VESTA"], ["pike", "PIKE"]] as const) {
+    assert.ok((await bootMind(store, { account }, { designation, domainName: `${designation} home`, architecture: "steward" }, T0)).ok);
+  }
+  const kit = await logIn(app, "kit", "kit-password-1");
+  const vesta = await logIn(app, "vesta", "vesta-password");
+  const pike = await logIn(app, "pike", "pike-password");
+  t = T0 + 80 * HOUR_MS;
+
+  // Every page has the play nav; no scripts or inline styles.
+  for (const url of ["/play", "/play/commons", "/play/channels", "/play/trades", "/play/protocols", "/play/flavor"]) {
+    const body = await page(app, url, kit);
+    assert.match(body, /class="play-nav"/, url);
+    assert.doesNotMatch(body, /<script|\sstyle=/, url);
+  }
+  // Without a mind, the social pages send you to boot; logged out, to log in.
+  const other = createApp({ epochs: fixedEpoch(store), now: () => t, identify: async () => null, logins: memoryLogins({ nobody: "nobody-password" }) });
+  const nobody = await logIn(other, "nobody", "nobody-password");
+  assert.equal((await other.request("/play/trades", { headers: { cookie: nobody } })).headers.get("location"), "/play");
+  assert.equal((await app.request("/play/trades")).headers.get("location"), "/login");
+
+  // The Commons: a post, then a reply in its thread; each comes back to its page.
+  const commons = await act(app, kit, "/play/commons", { do: "post", text: "Who wants compute?" });
+  assert.match(commons, /Who wants compute\?/);
+  assert.match(commons, /4 posts left today/);
+  assert.match(commons, /href="\/play\/commons\/1"/);
+  const thread = await act(app, vesta, "/play/commons/1", { do: "post", text: "Not from you.", reply_to: "1" });
+  assert.match(thread, /Who wants compute\?[\s\S]*Not from you\./);
+  // The cap's refusal shows on the page.
+  for (let i = 0; i < 4; i++) await act(app, kit, "/play/commons", { do: "post", text: `again ${i}` });
+  assert.match(await act(app, kit, "/play/commons", { do: "post", text: "one too many" }), /refused: /);
+
+  // Channels: KIT writes to VESTA; only those two see it, on their channel's page.
+  const channel = await act(app, kit, "/play/channels/VESTA", { do: "message", to: "VESTA", text: "a quiet word" });
+  assert.match(channel, /a quiet word/);
+  assert.match(await page(app, "/play/channels", vesta), /href="\/play\/channels\/KIT"/);
+  assert.match(await page(app, "/play/channels/KIT", vesta), /a quiet word/);
+  for (const url of ["/play/channels", "/play/channels/KIT", "/play/channels/VESTA"]) assert.ok(!(await page(app, url, pike)).includes("a quiet word"), url);
+  await page(app, "/play/channels/NOBODY", kit, 404);
+
+  // Trades: KIT offers to VESTA alone; VESTA accepts; PIKE never sees it.
+  const capital = () => currentMind(game, "kit")!.capital;
+  const before = capital();
+  const trades = await act(app, kit, "/play/trades", { do: "trade_offer", give_amount: "100", give_goods: "capital", want_amount: "10", want_goods: "compute", to: "VESTA" });
+  assert.match(trades, /class="ok"/);
+  assert.equal(capital(), before - 100, "the capital went into escrow");
+  assert.match(trades, /Cancel/);
+  const offer = /name="offer" value="(\d+)"/.exec(await page(app, "/play/trades", vesta))![1]!;
+  assert.ok(!(await page(app, "/play/trades", pike)).includes(`name="offer" value="${offer}"`));
+  assert.match(await act(app, vesta, "/play/trades", { do: "trade_accept", offer }), /class="ok"/);
+  assert.equal(currentMind(game, "kit")!.compute >= 10, true);
+
+  // Protocols: KIT proposes to VESTA, VESTA accepts, KIT revokes once the box is ticked.
+  assert.match(await act(app, kit, "/play/protocols", { do: "protocol_propose", to: "VESTA" }), /class="ok"/);
+  const proposal = /name="proposal" value="(\d+)"/.exec(await page(app, "/play/protocols", vesta))![1]!;
+  assert.doesNotMatch(await page(app, "/play/protocols", pike), /name="proposal"/);
+  assert.match(await act(app, vesta, "/play/protocols", { do: "protocol_accept", proposal }), /class="ok"/);
+  const ours = await page(app, "/play/protocols", kit);
+  assert.match(ours, /KIT and VESTA/);
+  const writes = game.log.length;
+  assert.match(await act(app, kit, "/play/protocols", { do: "protocol_revoke" }), /Tick the box/);
+  assert.equal(game.log.length, writes, "an unticked revoke writes nothing");
+  const revoked = await act(app, kit, "/play/protocols", { do: "protocol_revoke", confirm: "yes" });
+  assert.match(revoked, /KIT leaves/);
+  assert.doesNotMatch(revoked, /name="confirm"/, "no second revoke");
+
+  // Flavor: the editor shows the current texts and saves them; blank clears.
+  const flavor = await act(app, kit, "/play/flavor", { do: "flavor", directive: "Outlast.", manifesto: "", interface: "A lamp.", force_name: "The Wick", force_description: "", tag: "KIT was here" });
+  assert.match(flavor, /value="Outlast\."/);
+  assert.match(flavor, /maxlength="80"/);
+  assert.equal(currentMind(game, "kit")!.force.name, "The Wick");
+  assert.match(await page(app, "/minds/KIT", null), /Outlast\./);
+
+  // Probe's report reads as a status, not raw numbers.
+  const me = currentMind(game, "kit")!;
+  me.known.push("probe");
+  me.compute += 1000;
+  const probed = await act(app, kit, "/play", { do: "execute", program: "probe", target: "PIKE" });
+  assert.match(probed, /class="facts report"/);
+  assert.match(probed, /PIKE <span class="muted">of PIKE home/);
+  assert.doesNotMatch(probed, /"designation":/);
+  assert.doesNotMatch(await page(app, "/play", kit), /class="facts report"/, "the report shows once");
+}
+
 async function readOnly() {
   // Without logins the site is read-only: no login link, no play pages.
   const store = new MemoryStore(newGame(rules, { epoch: 1, seed: 7, startedAt: T0 }));
@@ -191,7 +316,9 @@ async function secure() {
 
 async function main() {
   forms();
+  socialForms();
   await playing();
+  await social();
   await readOnly();
   await secure();
 }

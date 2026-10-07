@@ -308,7 +308,10 @@ and legacy systems run on the server's clock.
 
 **5d: social and flavor pages.** Commons posts and replies, channels,
 trades, protocols and the flavor editor; then John's browser playtest
-against scripted players, which is the phase's *done when*.
+against scripted players, which is the phase's *done when*. The playtest
+runs at mind.fritter.lol, deployed ahead of Phase 6 through
+`docs/gizmo-5d-deploy-prompt.md` (agreed with John on 2026-10-07): the site
+only, `/mcp` closed, its epoch a test to be thrown away.
 
 **5e: the admin view.** John's account sees everything (channels,
 scratchpads, full status, the orders log) behind an admin flag; tests that

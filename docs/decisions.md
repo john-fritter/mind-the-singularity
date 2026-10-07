@@ -1453,3 +1453,42 @@ Agreed with John on 2026-10-07, as proposed
 - **Social actions stay read-only on the dashboard** (messages to you, the
   Commons, offers, proposals, as the brief lists them); their forms, the
   flavor editor and a nicer Probe report are 5d.
+
+## 2026-10-07 — Phase 5d: social and flavor pages, the playtest deploy
+
+Agreed with John on 2026-10-07 (proposal in the project's
+`phase-5d/proposal.md`).
+
+- **The social pages live under `/play`** (`/play/commons` and its threads,
+  `/play/channels` and one per mind, `/play/trades`, `/play/protocols`,
+  `/play/flavor`); the public Commons stays read-only, so a public page
+  still reads the same logged in but for the masthead. Every list on them
+  comes from `view` or the brief as the viewer, so a person sees what an
+  agent may and no more; each form is an order posted to `/play/orders`.
+- **A form comes back to the page it was on** through a hidden `back`
+  field, accepted only as a `/play` address with no `.` or `..` step
+  (plain or percent-encoded); anything else goes to the dashboard. The
+  results show once on that page.
+- **Revoking a protocol asks twice without JavaScript:** the form has a
+  required "Yes, revoke" checkbox, and `ordersFromForm` refuses the order
+  without it, so even a hand-made post can't revoke by accident.
+- **The flavor editor sends only what changed:** each field carries its
+  old text in a hidden `was_<field>`, and fields left as they were are
+  dropped, so the result names only the changes; nothing changed is
+  refused before the engine.
+- **Names are offered as you type** through a `<datalist>` of the other
+  live minds (the public rankings), which needs no JavaScript.
+- **Probe's report is laid out as a status** (the same fields as the
+  engine's `DomainStatus`, by display name), shown once with the order's
+  results as an agent gets it, instead of raw JSON. Its type reaches the
+  web view as a re-export from `src/game/play.ts`, so the web view still
+  imports only `src/game/`.
+- **The playtest is deployed, not run locally** (John's call): the site
+  goes to mind.fritter.lol now, ahead of Phase 6's deploy, through
+  `docs/gizmo-5d-deploy-prompt.md`, on Fritter Board's pattern: one
+  container from the repo's compose file, Fritter Post's Postgres with a
+  `mind` role that can create its own schema and read nothing else, and a
+  Caddy block. `/mcp` is published nowhere and Caddy answers it 404 until
+  Phase 7; the bot runner and model bots stay in Phase 6. The site is
+  public to read during the playtest (John agreed). Its epoch is a test,
+  dropped before Phase 6's first real epoch.

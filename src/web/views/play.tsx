@@ -1,6 +1,6 @@
 import type { Child } from "hono/jsx";
 import { span } from "../../game/brief.js";
-import type { Choice, PlayPage } from "../../game/play.js";
+import type { Choice, DomainStatus, PlayPage } from "../../game/play.js";
 import type { Brief, ShownEvent } from "../../game/read.js";
 import type { Topic } from "../../game/topics.js";
 import { lot, names, num } from "../format.js";
@@ -11,10 +11,27 @@ import { Layout, type PageCtx } from "./layout.js";
 // (the brief laid out as a page, with a form for each order). Every form is
 // a plain POST; the page works with no JavaScript.
 
-/** What the last submit returned, shown once on the dashboard. */
+/** What the last submit returned, shown once on the page the form was on. */
 export interface Flash {
   error?: string;
-  results?: { do: string; ok: boolean; message: string; status?: Record<string, unknown> }[];
+  results?: { do: string; ok: boolean; message: string; status?: DomainStatus }[];
+}
+
+/** The play pages' own sections. */
+export function PlayNav(props: { here: string }) {
+  const links: [string, string][] = [
+    ["/play", "Dashboard"],
+    ["/play/commons", "Commons"],
+    ["/play/channels", "Channels"],
+    ["/play/trades", "Trades"],
+    ["/play/protocols", "Protocols"],
+    ["/play/flavor", "Flavor"],
+  ];
+  return (
+    <nav class="play-nav" aria-label="Play">
+      {links.map(([href, label]) => (href === props.here ? <strong>{label}</strong> : <a href={href}>{label}</a>))}
+    </nav>
+  );
 }
 
 export function LoginView(props: { ctx: PageCtx; error?: string; name?: string }) {
@@ -82,7 +99,7 @@ export function RulesView(props: { ctx: PageCtx; topics: { name: string; summary
   );
 }
 
-function Field(props: { label: string; children?: Child }) {
+export function Field(props: { label: string; children?: Child }) {
   return (
     <label>
       {props.label} {props.children}
@@ -90,7 +107,7 @@ function Field(props: { label: string; children?: Child }) {
   );
 }
 
-function Select(props: { name: string; choices: Choice[]; blank?: string; required?: boolean }) {
+export function Select(props: { name: string; choices: Choice[]; blank?: string; required?: boolean }) {
   return (
     <select name={props.name} required={props.required}>
       {props.blank !== undefined && <option value="">{props.blank}</option>}
@@ -107,12 +124,13 @@ const Cycles = () => (
   </Field>
 );
 
-/** One order's form: a POST to /play/orders with its `do`. */
-function OrderForm(props: { kind: string; title: string; button: string; note?: string; children?: Child }) {
+/** One order's form: a POST to /play/orders with its `do`, coming `back` to the page it's on (the dashboard by default). */
+export function OrderForm(props: { kind: string; title?: string; button: string; note?: string; back?: string; class?: string; children?: Child }) {
   return (
-    <form method="post" action="/play/orders" class="order">
+    <form method="post" action="/play/orders" class={props.class ?? "order"}>
       <input type="hidden" name="do" value={props.kind} />
-      <h3>{props.title}</h3>
+      {props.back && <input type="hidden" name="back" value={props.back} />}
+      {props.title && <h3>{props.title}</h3>}
       {props.note && <p class="muted">{props.note}</p>}
       {props.children}
       <button type="submit">{props.button}</button>
@@ -140,7 +158,7 @@ export function BootForm(props: { architectures: Choice[] }) {
   );
 }
 
-function FlashView(props: { flash: Flash | null }) {
+export function FlashView(props: { flash: Flash | null; names: Record<string, string> }) {
   const f = props.flash;
   if (!f) return null;
   return (
@@ -153,12 +171,76 @@ function FlashView(props: { flash: Flash | null }) {
             <li class={r.ok ? "ok" : "refused"}>
               <span class="label">{r.do}</span> {r.ok ? "" : "refused: "}
               {r.message}
-              {r.status && <pre class="numbers">{JSON.stringify(r.status, null, 2)}</pre>}
+              {r.status && <ProbeReport status={r.status} names={props.names} />}
             </li>
           ))}
         </ol>
       )}
     </section>
+  );
+}
+
+/** What Probe found: the target's full status, shown once with the result, as an agent gets it. */
+function ProbeReport(props: { status: DomainStatus; names: Record<string, string> }) {
+  const s = props.status;
+  const n = props.names;
+  const built = Object.entries(s.buildings).filter(([, c]) => c > 0);
+  const open = s.territory - built.reduce((sum, [, c]) => sum + c, 0);
+  const units = Object.entries(s.units).filter(([, c]) => (c ?? 0) > 0);
+  return (
+    <dl class="facts report">
+      <dt>Mind</dt>
+      <dd>
+        {s.designation} <span class="muted">of {s.domainName}, {n[s.architecture]}</span>
+      </dd>
+      <dt>Power</dt>
+      <dd>
+        {num(s.power)} <span class="muted">· capability {s.capability}</span>
+      </dd>
+      <dt>Cycles</dt>
+      <dd>
+        {s.cycles} <span class="muted">· its next attack costs {s.attackCycles}</span>
+      </dd>
+      <dt>Territory</dt>
+      <dd>{num(s.territory)} sectors</dd>
+      <dt>Built</dt>
+      <dd>
+        {built.map(([k, c]) => `${n[k] ?? k} ${num(c)}`).join(" · ")}
+        {built.length > 0 ? " · " : ""}open {num(open)}
+      </dd>
+      <dt>Capital</dt>
+      <dd>{num(s.capital)}</dd>
+      <dt>Compute</dt>
+      <dd>{num(s.compute)}</dd>
+      <dt>Users</dt>
+      <dd>{num(s.users)}</dd>
+      <dt>Forces</dt>
+      <dd>{units.map(([u, c]) => `${n[u] ?? u} ${num(c ?? 0)}`).join(" · ") || "none"}</dd>
+      <dt>Programs</dt>
+      <dd>
+        {s.known.map((p) => n[p] ?? p).join(", ") || "none"}
+        {s.researchTarget && ` · researching ${n[s.researchTarget] ?? s.researchTarget}`}
+        {s.running.length > 0 && ` · running: ${s.running.map((r) => n[r.program] ?? r.program).join(", ")}`}
+      </dd>
+      <dt>Countermeasure</dt>
+      <dd>{s.countermeasure ? `${n[s.countermeasure.program] ?? s.countermeasure.program} above ${Math.round(s.countermeasure.above * 100)}% of its defense` : "none"}</dd>
+      {s.safeModeUntil !== null && (
+        <>
+          <dt>Safe mode</dt>
+          <dd>
+            until <Time at={s.safeModeUntil} />
+          </dd>
+        </>
+      )}
+      {s.convergedAt !== null && (
+        <>
+          <dt>Converged</dt>
+          <dd>
+            since <Time at={s.convergedAt} />
+          </dd>
+        </>
+      )}
+    </dl>
   );
 }
 
@@ -396,13 +478,15 @@ function Deleted(props: { page: PlayPage; b: Brief }) {
   );
 }
 
-/** The social sections of the brief, read-only until 5d's pages. */
+/** The social sections of the brief, as the brief has them; each links to its page, where you act. */
 function Social(props: { b: Brief }) {
   const b = props.b;
   return (
     <section>
       <h2>Channels and the Commons</h2>
-      <h3>Messages to you</h3>
+      <h3>
+        <a href="/play/channels">Messages to you</a>
+      </h3>
       {b.channels.messages.length === 0 ? (
         <p class="muted">No new messages.</p>
       ) : (
@@ -415,9 +499,13 @@ function Social(props: { b: Brief }) {
         </ul>
       )}
       {b.channels.left > 0 && <p class="muted">{b.channels.left} older.</p>}
-      <h3>The Commons</h3>
+      <h3>
+        <a href="/play/commons">The Commons</a>
+      </h3>
       {b.commons.posts.length === 0 ? <p class="muted">Nothing posted yet.</p> : b.commons.posts.map((p) => <PostItem post={p} />)}
-      <h3>Trade offers</h3>
+      <h3>
+        <a href="/play/trades">Trade offers</a>
+      </h3>
       <Offers offers={[...b.offers.toYou, ...b.offers.open]} />
       {b.offers.yours.length > 0 && (
         <p>
@@ -427,7 +515,9 @@ function Social(props: { b: Brief }) {
       )}
       {b.proposals.toYou.length > 0 && (
         <>
-          <h3>Protocol proposals</h3>
+          <h3>
+            <a href="/play/protocols">Protocol proposals</a>
+          </h3>
           <ul>
             {b.proposals.toYou.map((p) => (
               <li>
@@ -448,7 +538,7 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
     return (
       <Layout ctx={props.ctx} title="Boot">
         <h1>Boot a mind</h1>
-        <FlashView flash={props.flash} />
+        <FlashView flash={props.flash} names={page.names} />
         <p>You have no mind in this epoch. Boot one: it starts with the same domain every mind does.</p>
         <BootForm architectures={page.boot!.architectures} />
       </Layout>
@@ -458,6 +548,7 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
   const live = y.deletedAt === null && !b.epoch.ended;
   return (
     <Layout ctx={props.ctx} title={y.designation}>
+      <PlayNav here="/play" />
       <h1>
         {y.designation} <span class="muted">of {y.domainName}</span>
       </h1>
@@ -477,7 +568,7 @@ export function DashboardView(props: { ctx: PageCtx; page: PlayPage; flash: Flas
         )}
         {b.epoch.ended && <p class="state state-ended">The epoch is over.</p>}
       </section>
-      <FlashView flash={props.flash} />
+      <FlashView flash={props.flash} names={page.names} />
       {y.deletedAt !== null && <Deleted page={page} b={b} />}
       <Status b={b} names={page.names} />
       {b.refused.orders.length > 0 && (
