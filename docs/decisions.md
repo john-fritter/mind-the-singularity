@@ -1386,3 +1386,70 @@ Agreed with John on 2026-10-07, as proposed:
   The site has no JavaScript at all; the Record's filter is a GET form.
 - **All times are UTC**, written out ("5 Oct 2026, 14:30 UTC"), since the
   game runs on one clock for everyone.
+
+## 2026-10-07 — Phase 5c: logging in, the play pages, the server's clock
+
+Agreed with John on 2026-10-07, as proposed
+(`/mnt/project-files/phase-5c/proposal.md`):
+
+- **One account for keys and passwords.** `mind.accounts` gains
+  `password_hash`; an account may hold an API key, a password or both, and
+  either way plays its one mind. Migration 002 adds it, `mind.sessions` and
+  `mind.seats`.
+- **No sign-up page.** `npm run key -- password <name>` sets a random
+  temporary password (creating the account if need be), prints it once and
+  ends the account's sessions; the person changes it at Settings, as with
+  Fritter Board's admin account.
+- **Fritter Board's auth, carried over:** argon2id (`@node-rs/argon2`, the
+  one new dependency), a random 256-bit session token in an HttpOnly,
+  SameSite=Lax cookie (`mind_session`, Secure when `PUBLIC_URL` is https)
+  whose SHA-256 alone is stored, a password change ending the other
+  sessions, failed logins capped per name in memory, Hono's `csrf` against
+  `PUBLIC_URL`'s origin (Origin or `Sec-Fetch-Site: same-origin`). Numbers
+  in `site.yaml`'s new `sessions:` and `login:` blocks (Fritter Board's
+  60 days, 60 s touch, 10 failures in 15 minutes; passwords 10–200).
+- **Wakes run when the clock's pass runs**, not at their due minute: a
+  person's orders may have moved the game's clock past it, and the game
+  never runs backward (a wake runs at the later of the pass and the
+  game's clock). Each due seat wakes once a pass. **No catch-up**: the
+  clock starts when the server does, so a scripted player misses a
+  downtime's wakes; legacy systems count wakes from the epoch's start, so
+  their growth catches up. Passes every `clock.every_seconds` (60).
+- **One form per order, plus a JSON box** that takes exactly what an
+  agent sends.
+
+**Smaller calls, made here:**
+
+- **Scripted seats use the CLI's `bot:<designation>` accounts**, not the
+  proposal's `scripted:`: the CLI already reserves `bot:` for the same
+  players, and no account name can hold a colon either way. `npm run
+  epoch -- add` only records the seat; the clock's next pass boots it (and
+  sends its flavor), so booting goes through the same wake() as always.
+- **The web view still imports only `src/game/`.** Logging in is passed in
+  as a `Logins` object (src/auth/logins.ts against the database, a fake in
+  tests), as `identify` is for /mcp. The dashboard reads through
+  `src/game/play.ts`: the brief as get_brief returns it, plus display names
+  and each form's choices (known programs, buildings, hardware), nothing
+  the brief and the rules don't already say. Forms are shaped into orders
+  in `src/web/forms.ts`; the engine parses and checks them, so a refusal
+  on the page is the engine's reason.
+- **Results show once, after a redirect** (post, redirect, get): each
+  session's last results are kept in memory, at most 1,000 sessions', and
+  shown on the next dashboard. A restart loses unread results, never
+  orders. Probe's revealed status shows there as raw numbers for now.
+- **A page shown to someone logged in is `Cache-Control: no-store`**, and
+  the public pages read the same for them but for the masthead's account
+  links; the privacy test checks exactly that by crawling the site again
+  logged in as a third mind. The visitor's crawl now also reaches `/login`
+  and the Rules pages, and `/play` sends a visitor to `/login` (303).
+- **The rules are a public page** (`/rules`, `/rules/<topic>`), the same
+  topics the agents' `rules` tool serves, so a person has what an agent
+  has. The privacy test's word checks ("proposal", "scratchpad") skip
+  them, since the rules explain those words; the secret values are still
+  checked there.
+- **A post from another site is a 403 page**, before routing, so the
+  public pages' POSTs (always 404 before) are now 403 without a matching
+  origin.
+- **Social actions stay read-only on the dashboard** (messages to you, the
+  Commons, offers, proposals, as the brief lists them); their forms, the
+  flavor editor and a nicer Probe report are 5d.

@@ -6,21 +6,27 @@
  *   npm run key -- rotate <name>   a new key (the old one stops working)
  *   npm run key -- revoke <name>   no key at all
  *   npm run key -- list
+ *   npm run key -- password <name>  a temporary password for the web view
+ *                                    (the account is created if need be)
  *
  * A key is printed once and never stored in the clear; losing it means
  * issuing a new one. An account plays one mind at a time, so one key plays
- * one domain.
+ * one domain. A password is how a person logs in to the web view instead;
+ * it's printed once too, to be changed at Settings, and setting one ends
+ * the account's sessions.
  */
 
 import "../src/dotenv.js";
 import { createAccount, findAccount, issueKey, listAccounts, revokeKeys } from "../src/auth/keys.js";
+import { endSessions, setPassword, temporaryPassword } from "../src/auth/logins.js";
 import { getPool, withTransaction } from "../src/db/index.js";
 
 const USAGE = `Usage:
   npm run key -- add <name>
   npm run key -- rotate <name>
   npm run key -- revoke <name>
-  npm run key -- list`;
+  npm run key -- list
+  npm run key -- password <name>`;
 
 async function run(command: string | undefined, name: string | undefined): Promise<string> {
   const pool = getPool();
@@ -31,7 +37,18 @@ async function run(command: string | undefined, name: string | undefined): Promi
       .map((a) => `${a.name.padEnd(24)} ${a.keyLive ? `key live, last used ${a.keyLastUsedAt?.toISOString() ?? "never"}` : "no key"}`)
       .join("\n");
   }
-  if (!name || !["add", "rotate", "revoke"].includes(command ?? "")) return USAGE;
+  if (!name || !["add", "rotate", "revoke", "password"].includes(command ?? "")) return USAGE;
+  if (command === "password") {
+    const password = temporaryPassword();
+    const created = await withTransaction(pool, async (client) => {
+      const found = await findAccount(client, name);
+      const id = found?.id ?? (await createAccount(client, name));
+      await setPassword(client, id, password);
+      await endSessions(client, id);
+      return found === null;
+    });
+    return `${created ? `Account ${name} created. Its` : `A new password for ${name}; any old one no longer works, and every session has ended. The`} temporary password, shown once (change it at Settings):\n${password}`;
+  }
   if (command === "add") {
     const key = await withTransaction(pool, async (client) => issueKey(client, await createAccount(client, name)));
     return `Account ${name} created. Its key, shown once:\n${key}`;

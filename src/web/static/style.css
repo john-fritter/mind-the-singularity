@@ -294,6 +294,94 @@ button {
   margin: 1rem 0;
 }
 
+/* ── The play pages ───────────────────────────────────────────────────── */
+
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+}
+
+form.inline {
+  display: inline;
+  margin: 0;
+}
+
+textarea {
+  font: inherit;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.stack {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 30rem;
+  margin: 1rem 0;
+}
+
+.stack label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.orders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.order {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.order h3 {
+  margin: 0;
+}
+
+.order p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.order label {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.error,
+.refused {
+  color: var(--danger);
+}
+
+.ok {
+  color: var(--accent);
+}
+
+.flash {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+}
+
+pre.numbers {
+  overflow-x: auto;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
 @media (max-width: 40rem) {
   table {
     font-size: 0.85rem;

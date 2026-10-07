@@ -7,12 +7,15 @@ import { getBrief, view, type Brief } from "../src/game/read.js";
 import { MemoryStore } from "../src/store/memory.js";
 import { createApp } from "../src/app.js";
 import { fixedEpoch } from "../src/game/epochs.js";
+import { logIn, memoryLogins } from "./logins.js";
 
 // Private stays private (CLAUDE.md): another mind's scratchpad, full status,
 // private events, channels, offers made to one mind and protocol proposals never reach `view` or another mind's brief,
 // and what can't be seen is "not found". Extend this for every new read.
 // The web view is checked by crawling it as an anonymous visitor, so a page
-// added later is checked without changing this file.
+// added later is checked without changing this file, and again logged in as
+// a third mind, whose pages must show nothing of the others' secrets and
+// whose public pages must be the anonymous visitor's but for the header.
 
 const rules = loadRules();
 const T0 = Date.UTC(2026, 9, 5, 12);
@@ -176,8 +179,10 @@ async function anonymousVisitor(store: MemoryStore) {
   halcyon.compute = STATUS_COMPUTE;
   assert.ok(game.world.offers.some((o) => o.to !== null), "a private offer is open");
 
-  const app = createApp({ epochs: fixedEpoch(store), now: () => T, identify: async () => null });
-  const LEAKS = [
+  const logins = memoryLogins({ pike: "pike-password", halcyon: "halcyon-password" });
+  const app = createApp({ epochs: fixedEpoch(store), now: () => T, identify: async () => null, logins });
+  /** What only HALCYON, VESTA or a prober may know. */
+  const SECRETS = [
     SECRET,
     WHISPER,
     "Probed",
@@ -187,16 +192,17 @@ async function anonymousVisitor(store: MemoryStore) {
     STATUS_CAPITAL.toLocaleString("en-US"),
     String(STATUS_COMPUTE),
     STATUS_COMPUTE.toLocaleString("en-US"),
-    "proposal",
-    "scratchpad",
   ];
+  // Words no public page has cause to say; the rules text explains them, so it may.
+  const WORDS = ["proposal", "scratchpad"];
   const pages = new Map<string, number>();
 
   async function visit(url: string): Promise<{ status: number; body: string }> {
     const res = await app.request(url);
     const body = await res.text();
     pages.set(url, res.status);
-    for (const leak of LEAKS) assert.ok(!body.includes(leak), `${url} shows "${leak}"`);
+    for (const leak of SECRETS) assert.ok(!body.includes(leak), `${url} shows "${leak}"`);
+    if (!url.startsWith("/rules")) for (const word of WORDS) assert.ok(!body.includes(word), `${url} shows "${word}"`);
     if (res.headers.get("content-type")?.startsWith("text/html")) {
       assert.match(res.headers.get("content-security-policy") ?? "", /default-src 'none'/, `${url} has no CSP`);
       assert.doesNotMatch(body, /<script|\sstyle=|\son[a-z]+=/i, `${url} has a script or inline style`);
@@ -212,13 +218,13 @@ async function anonymousVisitor(store: MemoryStore) {
     const url = queue.shift()!;
     if (pages.has(url)) continue;
     const { status, body } = await visit(url);
-    assert.ok([200, 400, 404].includes(status), `${url} answered ${status}`);
+    assert.ok([200, 303, 400, 404].includes(status), `${url} answered ${status}`);
     for (const m of body.matchAll(/href="([^"]+)"/g)) {
       const href = m[1]!.replace(/&amp;/g, "&");
       if (href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/static/") && !pages.has(href)) queue.push(href);
     }
   }
-  for (const must of ["/", "/rankings", "/record", "/commons", "/archive", "/minds/HALCYON", "/minds/VESTA", "/minds/PIKE", "/commons/1"]) {
+  for (const must of ["/", "/rankings", "/record", "/commons", "/archive", "/minds/HALCYON", "/minds/VESTA", "/minds/PIKE", "/commons/1", "/login", "/rules", "/rules/orders"]) {
     assert.equal(pages.get(must), 200, `the crawl didn't reach ${must}`);
   }
   // Private event types aren't a filter: refused, and nothing shown.
@@ -244,6 +250,57 @@ async function anonymousVisitor(store: MemoryStore) {
   ]) {
     assert.equal((await visit(url)).status, 404, `${url} isn't 404`);
   }
+  // The play pages send a visitor to log in, and show nothing first.
+  for (const url of ["/play", "/settings"]) {
+    const res = await app.request(url);
+    assert.equal(res.status, 303, `${url} for a visitor`);
+    assert.equal(res.headers.get("location"), "/login");
+  }
+
+  await loggedIn(app, logins, pages);
+}
+
+/**
+ * PIKE, logged in, crawls the site: its own dashboard, every page it links
+ * to and every page the visitor saw. None shows another mind's secrets, and
+ * a public page reads exactly as it did for the visitor, but for the
+ * masthead's account links.
+ */
+async function loggedIn(app: ReturnType<typeof createApp>, logins: ReturnType<typeof memoryLogins>, anonymous: Map<string, number>) {
+  const cookie = await logIn(app, "pike", "pike-password");
+  const SECRETS = [SECRET, WHISPER, "Probed", "Strength", "777 capital", String(STATUS_CAPITAL), STATUS_CAPITAL.toLocaleString("en-US"), String(STATUS_COMPUTE), STATUS_COMPUTE.toLocaleString("en-US")];
+  const withoutAccount = (body: string) => body.replace(/<nav class="account"[\s\S]*?<\/nav>/, "");
+  const seen = new Set<string>();
+  const queue = ["/play", "/settings", ...anonymous.keys()];
+  while (queue.length > 0 && seen.size < 600) {
+    const url = queue.shift()!;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const res = await app.request(url, { headers: { cookie } });
+    const body = await res.text();
+    assert.ok([200, 303, 400, 404].includes(res.status), `${url} answered PIKE ${res.status}`);
+    for (const leak of SECRETS) assert.ok(!body.includes(leak), `${url}, logged in as PIKE, shows "${leak}"`);
+    if (res.headers.get("content-type")?.startsWith("text/html")) {
+      assert.match(res.headers.get("content-security-policy") ?? "", /default-src 'none'/, `${url} has no CSP`);
+      assert.doesNotMatch(body, /<script|\sstyle=|\son[a-z]+=/i, `${url} has a script or inline style`);
+      assert.equal(res.headers.get("cache-control"), "no-store", `${url} may be cached though it was shown to PIKE`);
+    }
+    // The public pages; /login sends someone logged in on to /play.
+    if (anonymous.has(url) && url !== "/login") {
+      const visitor = await app.request(url);
+      assert.equal(res.status, visitor.status, `${url} answers PIKE differently`);
+      assert.equal(withoutAccount(body), withoutAccount(await visitor.text()), `${url} reads differently for PIKE`);
+    }
+    for (const m of body.matchAll(/href="([^"]+)"/g)) {
+      const href = m[1]!.replace(/&amp;/g, "&");
+      if (href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/static/") && !seen.has(href)) queue.push(href);
+    }
+  }
+  assert.ok(seen.has("/play") && logins.sessions.size === 1);
+  // PIKE's dashboard is its own: its designation, not HALCYON's scratchpad.
+  const play = await (await app.request("/play", { headers: { cookie } })).text();
+  assert.match(play, /PIKE/);
+  assert.ok(!play.includes(SECRET));
 }
 
 main().then(

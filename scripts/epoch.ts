@@ -5,6 +5,11 @@
  *   npm run epoch -- new [--seed N]   start the next epoch now, with its legacy systems,
  *                                     once the last one has ended
  *   npm run epoch -- show [--epoch N] the newest epoch (or epoch N) at a glance
+ *   npm run epoch -- add STRATEGY [DESIGNATION] [--arch A]
+ *                                     seat a scripted player in the newest epoch;
+ *                                     `npm start` boots it on its next pass and
+ *                                     wakes it on the server's clock
+ *   npm run epoch -- seats            the scripted players seated in the newest epoch
  *
  * A new epoch plays by config/rules.yaml as it is now, to its end.
  */
@@ -16,11 +21,15 @@ import { loadRules } from "../src/config.js";
 import { DAY_MS } from "../src/engine/cycles.js";
 import { getPool } from "../src/db/index.js";
 import { newGame } from "../src/game/game.js";
-import { createEpoch, latestEpoch, openEpoch } from "../src/store/postgres.js";
+import { ARCHITECTURES, type Architecture } from "../src/engine/architectures.js";
+import { addSeat, createEpoch, latestEpoch, listSeats, openEpoch } from "../src/store/postgres.js";
+import { STRATEGIES } from "../src/players/settings.js";
 
 const USAGE = `Usage:
   npm run epoch -- new [--seed N]
-  npm run epoch -- show [--epoch N]`;
+  npm run epoch -- show [--epoch N]
+  npm run epoch -- add STRATEGY [DESIGNATION] [--arch ARCHITECTURE]
+  npm run epoch -- seats`;
 
 /** Seeds are drawn below 2^31, so they fit any integer column and the RNG's seed. */
 const SEED_LIMIT = 2 ** 31;
@@ -28,7 +37,7 @@ const SEED_LIMIT = 2 ** 31;
 async function run(): Promise<string> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { seed: { type: "string" }, epoch: { type: "string" } },
+    options: { seed: { type: "string" }, epoch: { type: "string" }, arch: { type: "string" } },
   });
   const pool = getPool();
   const latest = await latestEpoch(pool);
@@ -59,6 +68,32 @@ async function run(): Promise<string> {
       `Day ${day} as last written${game.world.ended ? ", ended" : ""}; ${live} live minds of ${game.world.domains.length}`,
       `${game.log.length} writes logged, ${game.record.length} events`,
     ].join("\n");
+  }
+  if (positionals[0] === "add") {
+    const strategy = positionals[1]?.toLowerCase();
+    const strategies: string[] = [...STRATEGIES, "random"];
+    if (!strategy || !strategies.includes(strategy)) throw new Error(`Strategies: ${strategies.join(", ")}.\n${USAGE}`);
+    if (latest === null) throw new Error("No epochs yet: npm run epoch -- new");
+    const game = await (await openEpoch(pool, latest))!.read();
+    const seated = await listSeats(pool, latest);
+    const seed = randomInt(SEED_LIMIT);
+    const designation = positionals[2] ?? `${strategy.toUpperCase()}-${seated.length + 1}`;
+    const arch = values.arch?.toLowerCase() ?? ARCHITECTURES[seed % ARCHITECTURES.length]!;
+    if (!(ARCHITECTURES as readonly string[]).includes(arch)) throw new Error(`Architectures: ${ARCHITECTURES.join(", ")}.`);
+    if (game.world.domains.some((d) => d.deletedAt === null && d.designation.toLowerCase() === designation.toLowerCase())) {
+      throw new Error(`A mind called ${designation} is already online.`);
+    }
+    // Reserved: no account name has a colon, so no person or agent can be one.
+    const account = `bot:${designation.toLowerCase()}`;
+    const boot = { designation, domainName: `The ${strategy} domain`, architecture: arch as Architecture };
+    await addSeat(pool, latest, { account, strategy, seed, boot });
+    return `${designation} (${strategy}, ${arch}) is seated in epoch ${latest}; npm start boots it on its next pass.`;
+  }
+  if (positionals[0] === "seats") {
+    if (latest === null) return "No epochs yet: npm run epoch -- new";
+    const seated = await listSeats(pool, latest);
+    if (seated.length === 0) return `No scripted players in epoch ${latest}.`;
+    return seated.map((s) => `${(s.boot as { designation: string }).designation.padEnd(16)} ${s.strategy.padEnd(10)} ${s.account}`).join("\n");
   }
   return USAGE;
 }
