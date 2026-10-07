@@ -8,6 +8,9 @@
  *   npm run key -- list
  *   npm run key -- password <name>  a temporary password for the web view
  *                                    (the account is created if need be)
+ *   npm run key -- admin <name>     the account sees the admin view at /admin,
+ *                                    logged in on the web (an API key never does)
+ *   npm run key -- unadmin <name>   it no longer does
  *
  * A key is printed once and never stored in the clear; losing it means
  * issuing a new one. An account plays one mind at a time, so one key plays
@@ -17,7 +20,7 @@
  */
 
 import "../src/dotenv.js";
-import { createAccount, findAccount, issueKey, listAccounts, revokeKeys } from "../src/auth/keys.js";
+import { createAccount, findAccount, issueKey, listAccounts, revokeKeys, setAdmin } from "../src/auth/keys.js";
 import { endSessions, setPassword, temporaryPassword } from "../src/auth/logins.js";
 import { getPool, withTransaction } from "../src/db/index.js";
 
@@ -26,7 +29,9 @@ const USAGE = `Usage:
   npm run key -- rotate <name>
   npm run key -- revoke <name>
   npm run key -- list
-  npm run key -- password <name>`;
+  npm run key -- password <name>
+  npm run key -- admin <name>
+  npm run key -- unadmin <name>`;
 
 async function run(command: string | undefined, name: string | undefined): Promise<string> {
   const pool = getPool();
@@ -34,10 +39,10 @@ async function run(command: string | undefined, name: string | undefined): Promi
     const accounts = await listAccounts(pool);
     if (accounts.length === 0) return "No accounts yet.";
     return accounts
-      .map((a) => `${a.name.padEnd(24)} ${a.keyLive ? `key live, last used ${a.keyLastUsedAt?.toISOString() ?? "never"}` : "no key"}`)
+      .map((a) => `${a.name.padEnd(24)} ${a.keyLive ? `key live, last used ${a.keyLastUsedAt?.toISOString() ?? "never"}` : "no key"}${a.admin ? ", admin" : ""}`)
       .join("\n");
   }
-  if (!name || !["add", "rotate", "revoke", "password"].includes(command ?? "")) return USAGE;
+  if (!name || !["add", "rotate", "revoke", "password", "admin", "unadmin"].includes(command ?? "")) return USAGE;
   if (command === "password") {
     const password = temporaryPassword();
     const created = await withTransaction(pool, async (client) => {
@@ -58,6 +63,12 @@ async function run(command: string | undefined, name: string | undefined): Promi
   if (command === "rotate") {
     const key = await withTransaction(pool, (client) => issueKey(client, account.id));
     return `A new key for ${account.name}; the old one no longer works. Shown once:\n${key}`;
+  }
+  if (command === "admin" || command === "unadmin") {
+    await setAdmin(pool, account.id, command === "admin");
+    return command === "admin"
+      ? `${account.name} sees the admin view at /admin when logged in on the web.`
+      : `${account.name} no longer sees the admin view.`;
   }
   const revoked = await revokeKeys(pool, account.id);
   return revoked ? `${account.name}'s key is revoked.` : `${account.name} had no live key.`;

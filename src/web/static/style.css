@@ -959,3 +959,28 @@ fieldset.archcards {
   color: var(--accent);
   text-decoration: underline;
 }
+
+/* The admin view: long texts wrap, and the orders log reads as a list of calls. */
+pre.wrapped {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.adminlog {
+  list-style: none;
+  padding: 0;
+}
+
+.adminlog > li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.adminlog code {
+  overflow-wrap: anywhere;
+}
+
+/* A table wider than the page scrolls on its own. */
+.scroll {
+  overflow-x: auto;
+}

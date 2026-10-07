@@ -22,6 +22,7 @@ import {
   threadPage,
   type RecordFilter,
 } from "../game/public.js";
+import { ADMIN_RECORD_TYPES, adminChannels, adminMind, adminOrders, adminOverview, adminRecord } from "../game/admin.js";
 import { bootMind, submitOrders } from "../game/game.js";
 import { architectureMarks } from "../game/look.js";
 import { playPage } from "../game/play.js";
@@ -45,6 +46,7 @@ import {
 } from "./views/pages.js";
 import { DashboardView, LoginView, RulesView, SettingsView, type Flash } from "./views/play.js";
 import { HandbookView } from "./views/rules.js";
+import { AdminChannelsView, AdminMindView, AdminOrdersView, AdminOverviewView, AdminRecordView, adminHref } from "./views/admin.js";
 import { ChannelsView, ChannelView, FlavorView, PlayCommonsView, PlayThreadView, ProtocolsView, TradesView, type PlayCtx } from "./views/social.js";
 
 /**
@@ -115,7 +117,10 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
   const logins = deps.logins;
   const origin = deps.origin ?? "http://127.0.0.1:3111";
   const looks = architectureMarks();
-  const pageCtx = (c: Context): PageCtx => ({ cssHref, viewer: (c.get("viewer") as Identity | null | undefined)?.account ?? null, logins: logins !== undefined, looks });
+  const pageCtx = (c: Context): PageCtx => {
+    const viewer = c.get("viewer") as Identity | null | undefined;
+    return { cssHref, viewer: viewer?.account ?? null, admin: viewer?.admin === true, logins: logins !== undefined, looks };
+  };
   /** What each session's last submit returned, until the dashboard shows it. */
   const flashes = new Map<string, Flash>();
 
@@ -502,6 +507,70 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
       return render(c, <FlavorView p={p} domain={out.domain} />);
     }),
   );
+
+  // ── The admin view ───────────────────────────────────────────────────────
+  // src/game/admin.ts decides who sees it: to anyone without the admin flag,
+  // logged in or not, every page here is the same "not found" as an address
+  // that doesn't exist.
+
+  const viewerOrNobody = (c: Context): Identity => viewerOf(c) ?? { account: "" };
+
+  app.get("/admin", async (c) => {
+    const page = await adminOverview(deps.epochs, viewerOrNobody(c), given(c, ["epoch"]), deps.now());
+    if (isError(page)) return refuse(c, page);
+    return render(c, <AdminOverviewView ctx={pageCtx(c)} page={page} />);
+  });
+
+  app.get("/admin/minds/:name", async (c) => {
+    const name = c.req.param("name");
+    const query = given(c, ["epoch", "n", "before"]);
+    const page = await adminMind(deps.epochs, viewerOrNobody(c), { ...query, name }, deps.now());
+    if (isError(page)) return refuse(c, page);
+    const older = page.record.more
+      ? adminHref(page, `/admin/minds/${encodeURIComponent(name)}`, { n: query["n"], before: page.record.entries.at(-1)?.seq })
+      : null;
+    return render(c, <AdminMindView ctx={pageCtx(c)} page={page} olderHref={older} />);
+  });
+
+  app.get("/admin/channels", async (c) => {
+    const query = given(c, ["epoch", "mind", "before"]);
+    const page = await adminChannels(deps.epochs, viewerOrNobody(c), query, deps.now());
+    if (isError(page)) return refuse(c, page);
+    const older = page.more ? adminHref(page, "/admin/channels", { mind: query["mind"], before: page.entries.at(-1)?.seq }) : null;
+    return render(c, <AdminChannelsView ctx={pageCtx(c)} page={page} mind={query["mind"] ?? ""} olderHref={older} />);
+  });
+
+  app.get("/admin/record", async (c) => {
+    const query = given(c, ["epoch", "mind", "n", "type", "before"]);
+    const page = await adminRecord(deps.epochs, viewerOrNobody(c), query, deps.now());
+    if (isError(page)) return refuse(c, page);
+    const older = page.more
+      ? adminHref(page, "/admin/record", { mind: query["mind"], n: query["n"], type: query["type"], before: page.entries.at(-1)?.seq })
+      : null;
+    return render(
+      c,
+      <AdminRecordView
+        ctx={pageCtx(c)}
+        page={page}
+        types={ADMIN_RECORD_TYPES}
+        filter={{ mind: query["mind"] ?? "", type: query["type"] ?? "" }}
+        olderHref={older}
+      />,
+    );
+  });
+
+  app.get("/admin/orders", async (c) => {
+    const query = given(c, ["epoch", "account", "mind", "before"]);
+    const page = await adminOrders(deps.epochs, viewerOrNobody(c), query, deps.now());
+    if (isError(page)) return refuse(c, page);
+    const older = page.more
+      ? adminHref(page, "/admin/orders", { account: query["account"], mind: query["mind"], before: page.entries.at(-1)?.index })
+      : null;
+    return render(
+      c,
+      <AdminOrdersView ctx={pageCtx(c)} page={page} filter={{ account: query["account"] ?? "", mind: query["mind"] ?? "" }} olderHref={older} />,
+    );
+  });
 
   app.notFound(notFound);
   app.onError((err, c) => {

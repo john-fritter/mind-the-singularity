@@ -73,7 +73,7 @@ function limits(rules: Rules): Limits {
 const choice = (id: string, name: string): Choice => ({ id, name });
 
 /** Every name a page may show, by id. Keys: buildings.*.name, units, programs' names */
-function names(rules: Rules): Record<string, string> {
+export function names(rules: Rules): Record<string, string> {
   const out: Record<string, string> = {};
   for (const b of BUILDINGS) out[b] = buildingName(rules, b);
   for (const h of HARDWARE) out[h] = unitName(rules, h);

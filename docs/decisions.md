@@ -1528,3 +1528,37 @@ A subphase between 5d and 5e, from John's playtest of 5d.
   units and programs. It says the same facts as the agents' rules tool,
   from the same epoch's rules, and tests check no chapter names a config
   key. The agents' text stays, word for word, at `/rules/agents`.
+
+## 2026-10-07 — Phase 5e: the admin view
+
+- **The flag goes on an account of its own** (John's call): `admin`, not
+  `john`, so the account John plays with sees no more than any mind
+  ("humans get no extra information"). Migration 003 adds
+  `mind.accounts.admin`, default false; only `npm run key -- admin|unadmin`
+  sets it. Sessions read it on every request, so granting or removing it
+  needs no new login.
+- **Only a web login carries it.** `identityForKey` never sets it, and the
+  MCP server rebuilds the identity from the account name alone, so an agent
+  can't act as an admin even with an admin's key. There are no admin tools;
+  a boundaries test checks nothing but `src/web/` imports
+  `src/game/admin.ts`.
+- **The game layer checks, the routes don't** (CLAUDE.md's one path):
+  `src/game/admin.ts` takes the identity and answers "not found" to anyone
+  without the flag, before it parses the query or opens an epoch, so the
+  answer can't say whether a mind, an epoch or a filter exists. The web
+  view renders that as its ordinary 404; the privacy test checks every
+  `/admin` address is byte for byte the page a missing address gets, for
+  a visitor and for a logged-in mind. `Identity.admin` is read nowhere
+  else: the engine, `submitOrders` and the players never see it.
+- **Read only.** Ending, resetting or throwing away an epoch, removing a
+  mind or editing state would be writes outside `submitOrders`; the test
+  epoch on mind.fritter.lol is thrown away by Phase 6's epoch lifecycle,
+  as a command, not from a page.
+- **What it shows:** every mind of an epoch (deleted and legacy ones too)
+  with its owner account and full status; one mind's full status,
+  scratchpad, messages, open offers and proposals, and its Record with
+  private entries marked; every channel; the whole Record, filterable by
+  every event type; the orders log as it was written, each order beside
+  its result. Any epoch by number (`?epoch=N`), the newest by default.
+  Full status reuses the dashboard's Probe report layout. Pages are
+  `site.yaml`'s `web.page` long.

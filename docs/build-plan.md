@@ -325,7 +325,10 @@ mind.fritter.lol and is happy to merge.
 
 **5e: the admin view.** John's account sees everything (channels,
 scratchpads, full status, the orders log) behind an admin flag; tests that
-no other account or visitor reaches it.
+no other account or visitor reaches it. As built (agreed with John on
+2026-10-07): the flag is on an `admin` account of its own, not the one John
+plays as; `/admin` is read only, and ending or throwing away an epoch stays
+with Phase 6's epoch lifecycle.
 
 ## Phase 6: first real epoch
 

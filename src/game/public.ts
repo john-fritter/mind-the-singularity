@@ -97,8 +97,8 @@ export const RecordFilterSchema = z.strictObject({
 });
 export type RecordFilter = z.input<typeof RecordFilterSchema>;
 
-/** A game settled to now, with what every page needs. */
-interface Read {
+/** A game settled to now, with what every page needs. The admin view (admin.ts) reads through it too. */
+export interface Read {
   game: Game;
   rules: Rules;
   world: World;
@@ -107,13 +107,13 @@ interface Read {
   order: Domain[];
 }
 
-async function read(store: WorldStore, now: number): Promise<Read> {
+export async function read(store: WorldStore, now: number): Promise<Read> {
   const game = await store.read();
   const { world, record, now: t } = settledAt(game, now);
   return { game, rules: game.rules, world, record, now: t, order: ranked(game.rules, world) };
 }
 
-function mindRef(world: World, id: number): MindRef {
+export function mindRef(world: World, id: number): MindRef {
   const d = world.domains.find((x) => x.id === id);
   if (!d) return { designation: "?", n: null };
   const key = d.designation.toLowerCase();
@@ -126,7 +126,7 @@ function entry(r: Read, e: GameEvent): RecordEntry {
   return { seq: e.seq, at: e.at, type: e.type, text, minds: e.domains.map((id) => mindRef(r.world, id)) };
 }
 
-function status(r: Read): EpochStatus {
+export function status(r: Read): EpochStatus {
   const epoch = epochOf(r.rules, r.world, r.now);
   return {
     number: epoch.number,

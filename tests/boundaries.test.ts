@@ -16,7 +16,9 @@ import path from "node:path";
 //   every write goes through its checks and its log;
 // - scripted players see what an agent sees: src/players/ reaches the game
 //   through src/game/, and takes from the engine only ids, types and pure
-//   formulas, never the world, its state or the order code.
+//   formulas, never the world, its state or the order code;
+// - the admin view is the web's alone: nothing but src/web/ imports
+//   src/game/admin.ts, so no agent, player or bot can reach it.
 // A directory that doesn't exist yet passes trivially.
 
 const SRC = path.join(import.meta.dirname, "..", "src");
@@ -150,6 +152,15 @@ async function main() {
   // The web view reads through src/game/ alone: no engine, no store, no auth.
   for (const { file, target } of await importsOf("web")) {
     assert.ok(target.startsWith("web/") || target.startsWith("game/"), `${file} imports ${target}: the web view goes through src/game/`);
+  }
+
+  for (const dir of ["cli", "mcp", "store", "db", "players", "sim", "auth", "runner", "week", "engine"]) {
+    for (const { file, target } of await importsOf(dir)) {
+      assert.ok(target !== "game/admin.js", `${file} imports game/admin.js: the admin view is the web's alone`);
+    }
+  }
+  for (const { file, target } of await importsOf("game")) {
+    assert.ok(target !== "game/admin.js", `${file} imports game/admin.js: nothing in the game layer leans on the admin view`);
   }
 
   for (const dir of ["mcp", "web"]) {

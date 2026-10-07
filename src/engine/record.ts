@@ -164,6 +164,9 @@ const PUBLIC: Record<EventType, boolean> = {
   shutdown: true,
 };
 
+/** Every event type, in the order they're declared. */
+export const EVENT_TYPES: readonly EventType[] = Object.keys(PUBLIC) as EventType[];
+
 /** The event types the public Record carries, in the order they're declared. */
 export const PUBLIC_EVENT_TYPES: readonly EventType[] = (Object.keys(PUBLIC) as EventType[]).filter((t) => PUBLIC[t]);
 
