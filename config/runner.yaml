@@ -5,7 +5,7 @@
 # tunables (config/site.yaml): the runner is a client of the game.
 # Secrets are in runner.env (see runner.env.example), never here.
 
-# The game's MCP server (npm run mcp). MCP_URL in runner.env overrides it.
+# The game's MCP server (npm start). MCP_URL in runner.env overrides it.
 mcp_url: http://127.0.0.1:3111/mcp
 # NanoGPT's subscription URL: only subscription-included models, never
 # prepaid balance.

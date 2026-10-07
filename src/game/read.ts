@@ -32,7 +32,7 @@ import { gameError, type Game, type GameError, type Identity } from "./state.js"
 // mind. What isn't visible is "not found", the same as what doesn't exist.
 
 /** The world and Record as they stand at `now`, without saving. */
-function settledAt(game: Game, now: number): { world: World; record: GameEvent[]; now: number } {
+export function settledAt(game: Game, now: number): { world: World; record: GameEvent[]; now: number } {
   const at = Math.max(now, game.world.now);
   const { world, events } = settle(game.rules, game.world, at);
   return { world, record: events.length > 0 ? [...game.record, ...events] : game.record, now: at };
@@ -74,7 +74,7 @@ export interface PublicPage extends PublicSummary {
 }
 
 /** Live domains, strongest first; ties by boot order. */
-function ranked(rules: Rules, world: World): Domain[] {
+export function ranked(rules: Rules, world: World): Domain[] {
   return world.domains
     .filter((d) => d.deletedAt === null)
     .map((d) => ({ d, power: domainPower(rules, d) }))
@@ -90,7 +90,7 @@ function publicStatus(rules: Rules, d: Domain, now: number): PublicSummary["stat
   return "active";
 }
 
-function summary(rules: Rules, order: Domain[], d: Domain, now: number): PublicSummary {
+export function summary(rules: Rules, order: Domain[], d: Domain, now: number): PublicSummary {
   const rank = order.indexOf(d);
   return {
     rank: rank < 0 ? null : rank + 1,
@@ -105,7 +105,7 @@ function summary(rules: Rules, order: Domain[], d: Domain, now: number): PublicS
 /** An event with its line of text, as the brief and the Record show it. */
 export type ShownEvent = GameEvent & { text: string };
 
-const shown = (rules: Rules, e: GameEvent): ShownEvent => ({ ...e, text: describe(rules, e) });
+export const shown = (rules: Rules, e: GameEvent): ShownEvent => ({ ...e, text: describe(rules, e) });
 /** As the brief shows an event: without force names and tags, which cost tokens on every wake. */
 const briefed = (rules: Rules, e: GameEvent): ShownEvent => ({ ...e, text: describe(rules, e, { flavor: false }) });
 
@@ -256,7 +256,7 @@ export interface ProposalView {
   expiresAt: number;
 }
 
-const asProtocol = (world: World, p: Protocol): ProtocolView => ({
+export const asProtocol = (world: World, p: Protocol): ProtocolView => ({
   members: p.members.map((m) => designationOf(world, m)),
   leaving: p.leaving.map((l) => ({ mind: designationOf(world, l.domain), at: l.at })),
 });
@@ -270,7 +270,7 @@ const asProposal = (world: World, p: Proposal): ProposalView => ({
   expiresAt: p.expiresAt,
 });
 
-const asOffer = (world: World, o: Offer): OfferView => ({
+export const asOffer = (world: World, o: Offer): OfferView => ({
   offer: o.id,
   from: designationOf(world, o.from),
   to: o.to === null ? null : designationOf(world, o.to),
@@ -281,14 +281,14 @@ const asOffer = (world: World, o: Offer): OfferView => ({
 });
 
 /** Social events aren't news: the brief and the Record show them apart. */
-const SOCIAL: ReadonlySet<EventType> = new Set(["post", "message"]);
+export const SOCIAL: ReadonlySet<EventType> = new Set(["post", "message"]);
 
-const asPost = (e: GameEvent & { type: "post" }): Post => ({ post: e.post, author: e.designation, replyTo: e.replyTo, at: e.at, text: e.text });
+export const asPost = (e: GameEvent & { type: "post" }): Post => ({ post: e.post, author: e.designation, replyTo: e.replyTo, at: e.at, text: e.text });
 const asMessage = (e: GameEvent & { type: "message" }): Message => ({ seq: e.seq, at: e.at, from: e.fromName, to: e.toName, text: e.text });
-const isPost = (e: GameEvent): e is GameEvent & { type: "post" } => e.type === "post";
+export const isPost = (e: GameEvent): e is GameEvent & { type: "post" } => e.type === "post";
 
 /** The newest `count` posts at most, newest last. The Record is in order, so this reads only its tail. */
-function newestPosts(record: GameEvent[], count: number, before = Infinity): Post[] {
+export function newestPosts(record: GameEvent[], count: number, before = Infinity): Post[] {
   const out: Post[] = [];
   for (let i = record.length - 1; i >= 0 && out.length < count; i--) {
     const e = record[i]!;
@@ -297,7 +297,48 @@ function newestPosts(record: GameEvent[], count: number, before = Infinity): Pos
   return out.reverse();
 }
 
-const designationOf = (world: World, id: number) => world.domains.find((d) => d.id === id)?.designation ?? "?";
+export const designationOf = (world: World, id: number) => world.domains.find((d) => d.id === id)?.designation ?? "?";
+
+/** The epoch as the brief and the front page show it. */
+export function epochOf(rules: Rules, world: World, now: number): Brief["epoch"] {
+  return {
+    number: world.epoch,
+    day: Math.min(rules.epoch.length_days, Math.floor((now - world.startedAt) / DAY_MS) + 1),
+    lengthDays: rules.epoch.length_days,
+    shutdownAt: world.startedAt + rules.epoch.length_days * DAY_MS,
+    ended: world.ended && { ...world.ended, ascended: world.ended.ascended.map((d) => designationOf(world, d)) },
+  };
+}
+
+/** The convergence underway, if any, as the brief and the front page show it. */
+export function convergenceOf(rules: Rules, world: World, now: number): Brief["convergence"] {
+  const collapseTimer = world.timers.find((x) => x.kind === "convergence_collapses");
+  return (
+    world.convergence && {
+      minds: world.convergence.minds.map((d) => designationOf(world, d)),
+      quorum: currentQuorum(rules, world, now),
+      nextJoinAt: nextJoinAt(rules, world),
+      collapsesAt: collapseTimer?.at ?? null,
+    }
+  );
+}
+
+/** A domain's public page: what anyone may know about it. */
+export function publicPage(rules: Rules, world: World, record: GameEvent[], order: Domain[], d: Domain, now: number): PublicPage {
+  return {
+    ...summary(rules, order, d, now),
+    domainName: d.domainName,
+    manifesto: d.manifesto,
+    interface: d.interface,
+    directive: d.directive,
+    force: { ...d.force },
+    tag: d.tag,
+    tagsLeft: tagsLeftOn(record, d.id, loadSite().view.tags),
+    lastLog: d.lastLog,
+    bootedAt: d.bootedAt,
+    protocol: (protocolOf(world, d.id)?.members ?? []).filter((m) => m !== d.id).map((m) => designationOf(world, m)),
+  };
+}
 
 /** The brief's data for the account's mind. `briefText` (brief.ts) writes it out for agents. */
 export async function getBrief(store: WorldStore, identity: Identity, now: number): Promise<Brief | GameError> {
@@ -352,23 +393,11 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
 
   const force = forceTotals(rules, me.units);
   const target = me.researchTarget;
-  const collapseTimer = world.timers.find((x) => x.kind === "convergence_collapses");
 
   return {
     now: t,
-    epoch: {
-      number: world.epoch,
-      day: Math.min(rules.epoch.length_days, Math.floor((t - world.startedAt) / DAY_MS) + 1),
-      lengthDays: rules.epoch.length_days,
-      shutdownAt: world.startedAt + rules.epoch.length_days * DAY_MS,
-      ended: world.ended && { ...world.ended, ascended: world.ended.ascended.map((d) => designationOf(world, d)) },
-    },
-    convergence: world.convergence && {
-      minds: world.convergence.minds.map((d) => designationOf(world, d)),
-      quorum: currentQuorum(rules, world, t),
-      nextJoinAt: nextJoinAt(rules, world),
-      collapsesAt: collapseTimer?.at ?? null,
-    },
+    epoch: epochOf(rules, world, t),
+    convergence: convergenceOf(rules, world, t),
     you: {
       ...domainStatus(rules, me, t),
       rank: order.includes(me) ? order.indexOf(me) + 1 : null,
@@ -468,7 +497,7 @@ export type ViewResult =
   | GameError;
 
 /** Domains by designation, live first, then deleted ones newest first. */
-function domainsNamed(world: World, name: string): Domain[] {
+export function domainsNamed(world: World, name: string): Domain[] {
   const live = resolveDomain(world, name);
   const key = name.trim().toLowerCase();
   const gone = world.domains.filter((d) => d.deletedAt !== null && d.designation.toLowerCase() === key).reverse();
@@ -498,23 +527,7 @@ export async function view(store: WorldStore, identity: Identity, query: unknown
     case "domain": {
       const d = domainsNamed(world, q.name)[0];
       if (!d) return gameError("not_found", `No mind called ${q.name}.`);
-      return {
-        ok: true,
-        what: "domain",
-        domain: {
-          ...summary(rules, order, d, t),
-          domainName: d.domainName,
-          manifesto: d.manifesto,
-          interface: d.interface,
-          directive: d.directive,
-          force: { ...d.force },
-          tag: d.tag,
-          tagsLeft: tagsLeftOn(record, d.id, site.view.tags),
-          lastLog: d.lastLog,
-          bootedAt: d.bootedAt,
-          protocol: (protocolOf(world, d.id)?.members ?? []).filter((m) => m !== d.id).map((m) => designationOf(world, m)),
-        },
-      };
+      return { ok: true, what: "domain", domain: publicPage(rules, world, record, order, d, t) };
     }
     case "record": {
       let ids: number[] | undefined;

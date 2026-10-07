@@ -45,3 +45,13 @@ view:
   record_max: 200
   # Tags a domain's page lists, newest first.
   tags: 10
+
+# The public web view (src/web/, src/game/public.ts).
+web:
+  # The front page: the top of the rankings and the newest Record entries.
+  front_rankings: 10
+  front_record: 10
+  # Record entries or Commons posts on one page.
+  page: 50
+  # Minds the Archive lists for each finished epoch, strongest first.
+  archive_top: 5

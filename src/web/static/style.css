@@ -1,0 +1,311 @@
+/* Mind: the Singularity: the public web view. One hand-written file, light
+   and dark following the system. The look is a terminal left on overnight:
+   cold, plain, monospace headings, nothing that moves. */
+
+:root {
+  --page: #f3f4f2;
+  --surface: #ffffff;
+  --text: #1c1f22;
+  --muted: #6b7076;
+  --border: #d3d6d9;
+  --accent: #0f6b74;
+  --link: #0f5c8f;
+  --warning: #9a5b00;
+  --danger: #9b2c2c;
+  --row: #f7f8f7;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d1013;
+    --surface: #14181c;
+    --text: #d7dbdf;
+    --muted: #8a9198;
+    --border: #2a3036;
+    --accent: #5cc4cc;
+    --link: #7fb8e6;
+    --warning: #e0a648;
+    --danger: #e07a7a;
+    --row: #181d22;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.wrap {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+}
+
+a {
+  color: var(--link);
+}
+
+h1,
+h2,
+h3,
+.site-name {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 1.5rem 0 0.25rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 2rem 0 0.75rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding: 1rem 0;
+  border-bottom: 2px solid var(--accent);
+}
+
+.site-name {
+  color: var(--accent);
+  font-size: 1.2rem;
+  text-decoration: none;
+}
+
+.sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+
+.footer {
+  margin-top: 3rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.epoch p {
+  margin: 0.25rem 0;
+}
+
+.epoch-day {
+  color: var(--muted);
+}
+
+.state-converging {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.state-warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.state-ended {
+  font-weight: 600;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+  background: var(--row);
+}
+
+tr.legacy td {
+  color: var(--muted);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.record {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.record li {
+  padding: 0.35rem 0 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+}
+
+.record time {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-right: 0.5rem;
+}
+
+.event-battle,
+.event-hostile {
+  border-left-color: var(--danger);
+}
+
+.event-deleted,
+.event-last_log {
+  border-left-color: var(--muted);
+}
+
+.event-converged,
+.event-singularity {
+  border-left-color: var(--accent);
+}
+
+.event-shutdown_warning,
+.event-shutdown {
+  border-left-color: var(--warning);
+}
+
+dl.facts,
+dl.flavor {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+}
+
+dl.flavor {
+  margin-top: 1rem;
+}
+
+dt {
+  color: var(--muted);
+}
+
+dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.post {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.5rem;
+}
+
+.post.reply {
+  margin-left: 1.5rem;
+}
+
+.post header {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.post p {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.offers,
+.tags,
+.archived {
+  padding-left: 1.25rem;
+}
+
+.archived p {
+  margin: 0.15rem 0 0.5rem;
+}
+
+.label {
+  color: var(--muted);
+}
+
+.filter {
+  margin: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  padding: 0.2rem 0.4rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+button {
+  cursor: pointer;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pager {
+  margin: 1rem 0;
+}
+
+@media (max-width: 40rem) {
+  table {
+    font-size: 0.85rem;
+  }
+
+  th,
+  td {
+    padding: 0.3rem 0.35rem;
+  }
+
+  dl.facts,
+  dl.flavor {
+    grid-template-columns: 1fr;
+  }
+}
