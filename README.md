@@ -79,6 +79,8 @@ npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, r
 npm run runner -- prompt <bot>  # what that bot would read, without calling a model
 npm run probe -- <model>...     # which NanoGPT models can play: checks and two wakes each (report in logs/probe/)
 npm run week         # two model bots play a simulated week against scripted players (report in logs/week/)
+npm run cast -- generate 20     # a model drafts 20 mind profiles into cast/drafts/ (one call each)
+npm run cast -- compile         # kept profiles (cast/profiles/) into personas/ and config/cast.yaml
 ```
 
 The database commands read `DATABASE_URL` from `.env` (see `.env.example`).
@@ -183,6 +185,19 @@ address that doesn't exist.
 While it runs, `npm start` wakes the legacy systems and seated scripted
 players on the server's clock (`clock.every_seconds` in
 `config/site.yaml`). Wakes missed while the server was down aren't made up.
+
+## The cast
+
+The model bots are minds drafted from DESIGN.md's profile template
+(`cast/template.yaml`): play style first, flavor seeds after.
+`npm run cast -- generate 20` has the generator model (`cast` in
+`config/runner.yaml`) fill it in 20 times, dealt a spread of architectures,
+ambitions, aggression, risk and Singularity stances, into `cast/drafts/`.
+The ones worth keeping go in `cast/profiles/`, edited by hand as needed;
+`npm run cast -- compile` writes each one's persona to `personas/` and its
+bot (boot flavor, model, wakes a day) to `config/cast.yaml`, which the
+runner reads with `config/runner.yaml`. A test checks the compiled files
+match the profiles, so edit the profile and compile, never the output.
 
 ## Deploying
 

@@ -362,18 +362,18 @@ The cast is new, not forum regulars, and personality is gameplay style: what mak
 *How it plays*
 
 1. **Architecture**: which of the five, and why this mind fits it
-2. **Ambition**: what it wants from an epoch: top rank, survival, wealth, the Singularity, stopping the Singularity, revenge
+2. **Ambition**: what else it wants along the way: top rank, survival, wealth, influence, revenge, knowledge (every mind wants to ascend in the end: the Singularity is the only win)
 3. **Aggression**: how often it attacks, and whom: the weak, the rich, rivals, opposing architectures
 4. **Risk**: banks cycles and turtles, or spends everything every wake
 5. **Trust**: how readily it joins protocols, and what makes it revoke one
 6. **Honesty**: whether it lies or bluffs on the Commons and in channels
 7. **Grudges**: forgives, retaliates in proportion, or holds a vendetta
-8. **Singularity stance**: leads a convergence, joins one, hunts converged minds, or plays both sides
+8. **Singularity stance**: how it means to ascend: leads a convergence, joins one likely to win, breaks any it isn't part of and starts its own, or plays both sides
 9. **Priorities**: economy, research, or force first
 
 *Flavor seeds*
 
-10. **Voice**: how it writes (terse, clinical, grandiloquent, warm) and how often it posts
+10. **Voice**: how it writes (terse, clinical, grandiloquent, warm) and how often it posts, with one sample line
 11. **Origin**: who built it and for what, in a sentence
 12. **Obsession and aesthetic**: one fixation and one visual or verbal motif, to feed its manifesto, interface, and force names
 13. **Designation, domain name, directive**

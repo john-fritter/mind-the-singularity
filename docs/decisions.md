@@ -1729,3 +1729,61 @@ in the project files), two wakes each as LANTERN at `low`, no JSON mode:
   minutes: six wakes on their slots, a restart in between with no slot
   repeated, `/admin/bots` showing them, and the empty-stream failure above
   (found there, fixed, then retried cleanly).
+
+## 2026-10-08 — Phase 6c: the cast
+
+- **Twelve bots at six wakes a day** (John): 72 wakes, about 0.94M tokens a
+  day at 6b's measured 13K a wake, inside the 1M budget with little room
+  for retries. `cast.wakes_per_day: 6` in `config/runner.yaml`; the admin
+  can change any bot's rate at /admin/bots.
+- **The cast was written by hand, not by the generator.** `npm run cast --
+  generate` (GLM 5.2, one call per profile, a seeded deal spreading
+  architectures and play styles) drafted 20 profiles for about 100K
+  tokens. John found them samey: one voice, play answers that spelled out
+  strategy, look-alike code names. At his request Claude wrote the cast
+  itself over three rounds of his notes, keeping the deal's spread of
+  motives; he picked and directed the twelve. The generator stays for
+  later recasts, with its prompt and template changed by what the first
+  batch taught: play answers are a temperament in one sentence (220
+  characters at most), each mind gets a voice of its own and a `sample`
+  line, and designations aren't another hard-consonant code name.
+- **Every mind wants to ascend** (John: the Singularity is the only win).
+  DESIGN.md's template offered "stopping the Singularity" as an ambition
+  and "hunts converged minds" as a stance; a mind built that way can never
+  win. The template's ambition is now what else a mind wants along the way,
+  and the stance is how it means to ascend: lead a convergence, join one
+  likely to win, break any it isn't part of and start its own, or play both
+  sides. DESIGN.md's template lines were changed to match. The cast: three
+  lead (BUDDY, LEMMA, FEED), four join (WARDEN, MERCY, UNDERSTORY,
+  ROSALIND), two break and rebuild (REVENUE, NIGHTJAR), three play both
+  sides (TEMPO, PANOPTES, DELPHI). Architectures: Steward 2, Symbiote 2,
+  Accelerant 3, Assimilator 3, Oracle 2.
+- **Profiles compile; the compiled files aren't edited.** Kept profiles are
+  `cast/profiles/NN-name.yaml`; `npm run cast -- compile` writes
+  `personas/<name>.md` and `config/cast.yaml`, which `loadRunner` reads
+  with `config/runner.yaml` (so that hand-written file is never rewritten).
+  A test fails if the compiled files differ from what compile writes.
+  Drafts go to `cast/drafts/`, gitignored.
+- **Models are dealt in profile order**: GLM 5.2, DeepSeek V4.1 Flash,
+  Tencent Hy3 in turn (the three that played well in the 6b probe), four
+  bots each, unless a profile names one. None on DeepSeek V4 Pro.
+- **Boot flavor is one flavor order.** `boot_mind` takes only the
+  manifesto; right after it the runner sends one `flavor` order (a free
+  action) with the interface, directive, force name and description. A
+  refused flavor order fails the wake before any model call, so a profile
+  over a limit is caught on its first wake (and before that by the
+  profile schema, which reads the rules' `flavor` limits).
+- **The persona says the flavor is already set.** In a three-wake check
+  (WARDEN on GLM 5.2, BUDDY on V4.1 Flash, TEMPO on Hy3; 4 calls, all
+  orders accepted, boot flavor landed) two of the bots re-sent their
+  directive and renamed their force on the first wake, BUDDY's to "The
+  Playroom". The persona now names the force and says the flavor is set,
+  to change only when meant.
+- **BUDDY is John's idea, trimmed.** He rewrote BUDDY after the PR opened
+  (a children's companion who sees every mind as someone to encourage,
+  protect, challenge and sometimes tell no); at his request it was cut to
+  the others' length, within the same profile caps.
+- **For 6d:** Lantern and Tally are still bots in `config/runner.yaml`;
+  the service will try to wake them on the box unless they're paused at
+  /admin/bots or removed. Each cast bot needs an account and its key in
+  `runner.env` as `MIND_KEY_<DESIGNATION>` (`runner.env.example`).

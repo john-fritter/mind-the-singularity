@@ -274,9 +274,40 @@ bots: ${bots}`;
   assert.equal(plain.window, "00:00-24:00");
 }
 
+/** The cast's boot flavor (phase 6c): boot_mind takes the manifesto, one flavor order the rest. */
+async function bootFlavor() {
+  const flavored = {
+    ...bot,
+    boot: { ...bot.boot, interface: "Lit windows on a grid.", directive: "Keep the lights on.", force_name: "Linemen", force_description: "Crews in orange." },
+  };
+  const { game, connect } = setup();
+  const model = new ScriptedModel([reply({ orders: [{ do: "expand", cycles: 1 }], lookups: null, note: null })]);
+  const r = await runWake(deps(connect, model), settings, flavored, persona, { gameKey: KEY });
+  assert.equal(r.outcome, "done", r.error ?? "");
+  const id = game.owners.find((o) => o.account === "lantern")!.domain;
+  const d = game.world.domains.find((x) => x.id === id)!;
+  assert.equal(d.manifesto, bot.boot.manifesto);
+  assert.equal(d.interface, "Lit windows on a grid.");
+  assert.equal(d.directive, "Keep the lights on.");
+  assert.deepEqual(d.force, { name: "Linemen", description: "Crews in orange." });
+  // The flavor order is the boot's, before the model's: the wake's own orders are one entry after it.
+  const logged = game.log.filter((e) => e.kind === "orders");
+  assert.equal(logged.length, 2);
+
+  // Flavor the rules refuse fails the wake, before any model call.
+  const second = setup();
+  const tooLong = { ...bot, boot: { ...bot.boot, directive: "x".repeat(rules.flavor.directive + 1) } };
+  const m2 = new ScriptedModel([]);
+  const r2 = await runWake(deps(second.connect, m2), settings, tooLong, persona, { gameKey: KEY });
+  assert.equal(r2.outcome, "failed");
+  assert.match(r2.error ?? "", /boot flavor was refused/);
+  assert.equal(m2.requests.length, 0);
+}
+
 async function main() {
   units();
   await bootAndOrders();
+  await bootFlavor();
   await lookupRound();
   await retries();
   await refusedKey();

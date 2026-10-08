@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
@@ -35,6 +35,11 @@ const BotFileSchema = TunablesSchema.partial().extend({
     domain_name: z.string().min(1),
     architecture: z.string().min(1),
     manifesto: z.string().optional(),
+    /** The rest of its starting flavor, sent as one flavor order right after boot_mind (phase 6c's cast). */
+    interface: z.string().optional(),
+    directive: z.string().optional(),
+    force_name: z.string().optional(),
+    force_description: z.string().optional(),
   }),
 });
 type BotFile = z.infer<typeof BotFileSchema>;
@@ -53,6 +58,27 @@ export function fileTunables(defaults: Tunables, bot: BotFile): Tunables {
 export function withTunables(bot: BotSettings, t: Tunables): BotSettings {
   return { ...bot, ...t };
 }
+
+/** The cast (npm run cast, phase 6c): drafted mind profiles, compiled into bots. */
+const CastSchema = z.strictObject({
+  /** The profile template and the deal that spreads the cast. */
+  template: z.string().min(1),
+  /** Where `generate` writes drafts (gitignored), and where kept profiles live. */
+  drafts_dir: z.string().min(1),
+  profiles_dir: z.string().min(1),
+  /** Where `compile` writes the personas, and the bots' file, read with this one. */
+  personas_dir: z.string().min(1),
+  out: z.string().min(1),
+  /** The model that drafts the profiles, and the seed of the deal. */
+  generator: z.strictObject({ model: z.string().min(1), reasoning_effort: TunablesSchema.shape.reasoning_effort, seed: z.number().int() }),
+  /** Dealt in turn to compiled bots whose profile names no model. */
+  models: z.array(z.string().min(1)).min(1),
+  wakes_per_day: count,
+  /** A bot's game key is in runner.env under this prefix and its designation. */
+  game_key_env_prefix: envName,
+  model_key_env: envName,
+});
+export type CastSettings = z.infer<typeof CastSchema>;
 
 /** The simulated week (npm run week): model bots against scripted players on a fake clock. */
 const WeekSchema = z.strictObject({
@@ -100,6 +126,8 @@ const RunnerFileSchema = z
     bots: z.array(BotFileSchema),
     /** The simulated week's knobs; only npm run week needs them. */
     week: WeekSchema.optional(),
+    /** The cast's knobs; only npm run cast needs them. */
+    cast: CastSchema.optional(),
   })
   .refine((r) => new Set(r.bots.map((b) => b.name)).size === r.bots.length, { message: "bot names must be unique" })
   .refine((r) => !r.week || r.week.bots.every((name) => r.bots.some((b) => b.name === name)), { message: "week.bots must name bots in `bots`" })
@@ -120,18 +148,31 @@ function validTimeZone(tz: string): boolean {
   }
 }
 
-/** Parses and validates runner YAML. Throws one error listing every problem. */
-export function parseRunner(text: string, source = "runner"): RunnerSettings {
-  const result = RunnerSchema.safeParse(YAML.parse(text));
+/**
+ * Parses and validates runner YAML. Throws one error listing every problem.
+ * `castText` is the compiled cast's file (config/cast.yaml), whose bots join
+ * the file's own.
+ */
+export function parseRunner(text: string, source = "runner", castText?: string): RunnerSettings {
+  const raw = YAML.parse(text) as Record<string, unknown>;
+  if (castText !== undefined) {
+    const cast = (YAML.parse(castText) ?? {}) as Record<string, unknown>;
+    raw["bots"] = [...((raw["bots"] as unknown[] | undefined) ?? []), ...((cast["bots"] as unknown[] | undefined) ?? [])];
+  }
+  const result = RunnerSchema.safeParse(raw);
   if (!result.success) {
     throw new Error(`${source} is invalid:\n${z.prettifyError(result.error)}`);
   }
   return result.data;
 }
 
-/** The runner's settings, read from config/runner.yaml. */
+/** The runner's settings, read from config/runner.yaml, with the compiled cast's bots if there are any. */
 export function loadRunner(): RunnerSettings {
-  return parseRunner(readFileSync(RUNNER_PATH, "utf-8"), "config/runner.yaml");
+  const text = readFileSync(RUNNER_PATH, "utf-8");
+  const out = (YAML.parse(text) as { cast?: { out?: unknown } }).cast?.out;
+  const castPath = typeof out === "string" ? path.resolve(ROOT, out) : null;
+  const castText = castPath && existsSync(castPath) ? readFileSync(castPath, "utf-8") : undefined;
+  return parseRunner(text, castText === undefined ? "config/runner.yaml" : "config/runner.yaml and config/cast.yaml", castText);
 }
 
 /** A bot's persona prompt, read from its file. */
