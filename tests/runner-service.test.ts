@@ -24,8 +24,9 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const T0 = Date.UTC(2026, 9, 5);
 const base = loadRunner();
-const lantern = base.bots.find((b) => b.name === "lantern")!;
-const tally = base.bots.find((b) => b.name === "tally")!;
+// The test bots, awake here though the file pauses them for the real epochs.
+const lantern = { ...base.bots.find((b) => b.name === "lantern")!, paused: false };
+const tally = { ...base.bots.find((b) => b.name === "tally")!, paused: false };
 
 /** Answers every wake with one cheap order, and remembers which model it was asked for. */
 class Model implements ChatModel {

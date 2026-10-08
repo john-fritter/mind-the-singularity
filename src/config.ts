@@ -24,6 +24,19 @@ export function loadRules(): Rules {
   return cached;
 }
 
+/**
+ * These rules with epoch.length_days set to `days`, for one epoch started
+ * shorter or longer by hand (`npm run epoch -- new --days N`, phase 6d). An
+ * epoch keeps its own copy of the rules, so only that epoch changes; the
+ * next boots by config/rules.yaml. Validated again, so `days` must still
+ * be more than epoch.shutdown_warning_days.
+ */
+export function epochOfDays(rules: Rules, days: number): Rules {
+  const result = RulesSchema.safeParse({ ...rules, epoch: { ...rules.epoch, length_days: days } });
+  if (!result.success) throw new Error(`--days ${days} is invalid:\n${z.prettifyError(result.error)}`);
+  return result.data;
+}
+
 export const SITE_PATH = path.join(import.meta.dirname, "..", "config", "site.yaml");
 
 const count = z.number().int().positive();

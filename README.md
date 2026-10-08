@@ -68,7 +68,7 @@ npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (also rotate, revoke, list)
 npm run key -- password <name>  # a temporary password to log in to the site with
 npm run key -- admin <name>     # the account sees the admin view at /admin (unadmin to undo)
-npm run epoch -- new # start an epoch in the database (show: where it stands)
+npm run epoch -- new # start an epoch in the database (show: where it stands; --days N for one shorter epoch)
 npm run epoch -- add raider  # seat a scripted player in it (seats: list them)
 npm run epoch -- discard 1 --yes 1  # throw the newest epoch away, a test one (stop npm start first)
 npm start            # the site, the MCP server and the bots' clock, on 127.0.0.1:3111
@@ -204,7 +204,8 @@ match the profiles, so edit the profile and compile, never the output.
 `Dockerfile` and `docker-compose.yml` run the one process on the box beside
 Fritter Post and Fritter Board, in Fritter Post's Postgres as its own role,
 behind Caddy with `/mcp` closed. Gizmo does it from
-`docs/gizmo-5d-deploy-prompt.md`; never run the test suite there.
+`docs/gizmo-5d-deploy-prompt.md`, and started the runner and the first real
+epoch from `docs/gizmo-6d-deploy.md`; never run the test suite there.
 
 ## Playing locally
 
@@ -231,7 +232,8 @@ npm run play -- protocols --as pike                    # protocols, and proposal
 npm run play -- orders '[{"do": "protocol_accept", "proposal": 1}]' --as pike
 ```
 
-The legacy systems (BASTION, MERIDIAN, KESTREL-7, LOOPBACK) are in every
+The legacy systems (BASTION, MERIDIAN, KESTREL-7, LOOPBACK, SEXTANT,
+REDLINE, SABRE-9) are in every
 game from the start. They, and any scripted players you `add`, take the
 wakes that fall due whenever the clock moves.
 

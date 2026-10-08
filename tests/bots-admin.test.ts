@@ -20,7 +20,8 @@ import { logIn, memoryLogins, ORIGIN } from "./logins.js";
 const T = Date.UTC(2026, 9, 7, 12);
 const ADMIN = { account: "overseer", admin: true };
 const runner = loadRunner();
-const lantern = runner.bots.find((b) => b.name === "lantern")!;
+// The test bot, awake here though the file pauses it for the real epochs.
+const lantern = { ...runner.bots.find((b) => b.name === "lantern")!, paused: false };
 
 function done(day: string, slot: number, tokens: number): RunRecord {
   const r = skipped("lantern", T - 60_000, "");
