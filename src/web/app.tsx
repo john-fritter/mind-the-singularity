@@ -46,6 +46,8 @@ import {
 } from "./views/pages.js";
 import { DashboardView, LoginView, RulesView, SettingsView, type Flash } from "./views/play.js";
 import { HandbookView } from "./views/rules.js";
+import { botPage, botsOverview, changeBot, undoChange, type BotTables } from "../game/bots.js";
+import { BotsOverviewView, BotView } from "./views/bots.js";
 import { AdminChannelsView, AdminMindView, AdminOrdersView, AdminOverviewView, AdminRecordView, adminHref } from "./views/admin.js";
 import { ChannelsView, ChannelView, FlavorView, PlayCommonsView, PlayThreadView, ProtocolsView, TradesView, type PlayCtx } from "./views/social.js";
 
@@ -80,6 +82,8 @@ export interface WebDeps {
   logins?: Logins;
   /** The site's origin (PUBLIC_URL), which form posts must come from; an https one makes the cookie Secure. */
   origin?: string;
+  /** The bot runner's tables, for /admin/bots; without them those pages are 404 like any other. */
+  bots?: BotTables;
 }
 
 const SESSION_COOKIE = "mind_session";
@@ -570,6 +574,39 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
       c,
       <AdminOrdersView ctx={pageCtx(c)} page={page} filter={{ account: query["account"] ?? "", mind: query["mind"] ?? "" }} olderHref={older} />,
     );
+  });
+
+  // The bot runner's settings and wakes (src/game/bots.ts decides who sees them).
+  app.get("/admin/bots", async (c) => {
+    const page = await botsOverview(deps.bots, viewerOrNobody(c), deps.now());
+    if (isError(page)) return refuse(c, page);
+    return render(c, <BotsOverviewView ctx={pageCtx(c)} page={page} />);
+  });
+
+  app.get("/admin/bots/:name", async (c) => {
+    const page = await botPage(deps.bots, viewerOrNobody(c), c.req.param("name"), deps.now());
+    if (isError(page)) return refuse(c, page);
+    return render(c, <BotView ctx={pageCtx(c)} page={page} saved={c.req.query("saved") !== undefined} />);
+  });
+
+  /** After a change: back to the bot's page, or the page again with what was wrong. */
+  const afterChange = async (c: Context, name: string, out: Awaited<ReturnType<typeof changeBot>>) => {
+    if (isError(out) && out.code === "not_found") return refuse(c, out);
+    if (!isError(out)) return c.redirect(`/admin/bots/${encodeURIComponent(name)}?saved`, 303);
+    const page = await botPage(deps.bots, viewerOrNobody(c), name, deps.now());
+    if (isError(page)) return refuse(c, page);
+    return render(c, <BotView ctx={pageCtx(c)} page={page} error={out.error} />, 400);
+  };
+
+  app.post("/admin/bots/:name", async (c) => {
+    const name = c.req.param("name");
+    return afterChange(c, name, await changeBot(deps.bots, viewerOrNobody(c), name, await form(c)));
+  });
+
+  app.post("/admin/bots/:name/undo", async (c) => {
+    const name = c.req.param("name");
+    const id = Number((await form(c))["change"]);
+    return afterChange(c, name, await undoChange(deps.bots, viewerOrNobody(c), name, Number.isInteger(id) ? id : -1));
   });
 
   app.notFound(notFound);

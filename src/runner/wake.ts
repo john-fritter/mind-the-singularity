@@ -36,6 +36,10 @@ export interface WakeResult {
   /** Booted (or rebooted) the mind this wake. */
   booted: boolean;
   modelCalls: number;
+  /** The model that answered last: the bot's own, or the fallback that took over; null if none answered. */
+  model: string | null;
+  /** The wake stopped on NanoGPT's daily cap for the bot's key: nothing will answer on it until the reset. */
+  dailyCap: boolean;
   usage: Usage;
   /** The brief's length in characters, as read this wake. */
   briefChars: number | null;
@@ -75,8 +79,10 @@ export function extractJson(text: string): unknown {
 }
 
 /** The reply, or what's wrong with it, in words for the model. */
-export function parseReply(content: string | null): { reply: Reply } | { problem: string } {
-  if (!content?.trim()) return { problem: "The reply was empty." };
+export function parseReply(content: string | null, finishReason: string | null = null): { reply: Reply } | { problem: string } {
+  if (!content?.trim()) {
+    return { problem: finishReason === "length" ? "The reply was empty: your thinking used up the whole output allowance. Think less and answer." : "The reply was empty." };
+  }
   let raw: unknown;
   try {
     raw = extractJson(content);
@@ -104,10 +110,20 @@ const noMind = (r: ToolResult) => !r.ok && /^not_found: You have no mind/.test(r
 
 class WakeFailed extends Error {}
 
-/** Counts the wake's model calls and tokens, and retries a passing failure once. */
+/**
+ * Counts the wake's model calls and tokens. A failure that may pass is
+ * retried once on the same model; if that fails too, each of the bot's
+ * fallback models is tried once in turn, and the first to answer serves the
+ * rest of the wake, so the bot keeps one voice within it (Fritter Board's
+ * rule).
+ */
 class Metered {
   calls = 0;
   usage: Usage = { promptTokens: 0, completionTokens: 0, reasoningTokens: 0, cachedTokens: 0 };
+  /** Which of the bot's models is in use: 0 its own, then its fallbacks. */
+  private current = 0;
+  answered: string | null = null;
+  dailyCap = false;
 
   constructor(
     private readonly deps: WakeDeps,
@@ -115,21 +131,46 @@ class Metered {
     private readonly settings: RunnerSettings,
   ) {}
 
+  private get models(): string[] {
+    return [this.bot.model, ...this.bot.fallback_models];
+  }
+
+  private async call(model: string, messages: ChatMessage[]): Promise<ChatResponse> {
+    this.calls++;
+    try {
+      const res = await this.deps.model.complete({ model, messages, reasoningEffort: this.bot.reasoning_effort, json: this.bot.json_mode });
+      for (const k of Object.keys(this.usage) as (keyof Usage)[]) this.usage[k] += res.usage[k];
+      this.answered = model;
+      return res;
+    } catch (err) {
+      if (err instanceof ModelError && err.isDailyCap) this.dailyCap = true;
+      throw err;
+    }
+  }
+
   async complete(messages: ChatMessage[]): Promise<ChatResponse> {
-    for (let retried = false; ; retried = true) {
-      try {
-        this.calls++;
-        const res = await this.deps.model.complete({
-          model: this.bot.model,
-          messages,
-          reasoningEffort: this.bot.reasoning_effort,
-          json: this.bot.json_mode,
-        });
-        for (const k of Object.keys(this.usage) as (keyof Usage)[]) this.usage[k] += res.usage[k];
-        return res;
-      } catch (err) {
-        if (retried || !(err instanceof ModelError && err.isTransient)) throw err;
-        await this.deps.sleep(this.settings.retry_wait_seconds * 1000);
+    const mayPass = (err: unknown) => err instanceof ModelError && err.isTransient;
+    const model = this.models[this.current]!;
+    try {
+      return await this.call(model, messages);
+    } catch (err) {
+      if (!mayPass(err)) throw err;
+    }
+    await this.deps.sleep(this.settings.retry_wait_seconds * 1000);
+    try {
+      return await this.call(model, messages);
+    } catch (err) {
+      if (!mayPass(err)) throw err;
+      // Each fallback once, in order; the first to answer stays.
+      for (;;) {
+        if (this.current + 1 >= this.models.length) throw err;
+        this.current++;
+        try {
+          return await this.call(this.models[this.current]!, messages);
+        } catch (next) {
+          if (!mayPass(next)) throw next;
+          err = next;
+        }
       }
     }
   }
@@ -195,6 +236,8 @@ export async function runWake(deps: WakeDeps, settings: RunnerSettings, bot: Bot
     error: null,
     booted: false,
     modelCalls: 0,
+    model: null,
+    dailyCap: false,
     usage: metered.usage,
     briefChars: null,
     lookups: [],
@@ -208,6 +251,8 @@ export async function runWake(deps: WakeDeps, settings: RunnerSettings, bot: Bot
     outcome,
     error,
     modelCalls: metered.calls,
+    model: metered.answered,
+    dailyCap: metered.dailyCap,
     usage: { ...metered.usage },
     transcript: messages.slice(1),
   });
@@ -238,8 +283,9 @@ export async function runWake(deps: WakeDeps, settings: RunnerSettings, bot: Bot
 
     for (;;) {
       const res = await metered.complete(messages);
-      messages.push({ role: "assistant", content: res.content });
-      const parsed = parseReply(res.content);
+      // An empty answer isn't sent back: NanoGPT refuses an assistant turn with no content.
+      if (res.content?.trim()) messages.push({ role: "assistant", content: res.content });
+      const parsed = parseReply(res.content, res.finishReason);
       if ("problem" in parsed) {
         retry(parsed.problem);
         continue;

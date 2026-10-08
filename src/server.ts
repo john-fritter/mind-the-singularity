@@ -11,7 +11,9 @@ import { databaseEpochs } from "./game/epochs.js";
 import { rebootIfDue } from "./game/lifecycle.js";
 import { ServerClock, type SeatRow } from "./players/clock.js";
 import { STRATEGIES } from "./players/settings.js";
+import { loadRunner } from "./runner/settings.js";
 import { listSeats, type SeatRecord } from "./store/postgres.js";
+import { postgresBotTables } from "./store/runner.js";
 
 /**
  * The game's one process: the web view and the MCP server at /mcp. Listens
@@ -44,7 +46,10 @@ function main() {
   const origin = new URL(process.env["PUBLIC_URL"] ?? `http://${host}:${port}`).origin;
   const epochs = databaseEpochs(pool);
   const logins = databaseLogins(pool, site);
+  // The admin's /admin/bots reads the runner's tables; the runner's timezone and budget are its file's.
+  const runner = loadRunner();
   const app = createApp({
+    bots: postgresBotTables(pool, { timezone: runner.timezone, budget: runner.daily_token_budget }),
     epochs,
     now: () => Date.now(),
     identify: (key) => identityForKey(pool, key),

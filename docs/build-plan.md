@@ -362,7 +362,10 @@ away (test epoch 1 on mind.fritter.lol goes in 6d). No deploy.
 and compose service: each bot's schedule (waking hours, wakes a day, a
 random time in each slot), its model and reasoning setting, a run log, and
 a daily token budget that stops wakes once spent. Tested on a fake clock
-with a stub model, then a few real wakes.
+with a stub model, then a few real wakes. Added with John on 2026-10-07:
+bots run on different models, chosen by a capability probe (`npm run
+probe`), with fallbacks; each bot's settings live in the database and the
+admin sees and changes them at `/admin/bots`, with a change log and undo.
 
 **6c: the cast.** The mind profile template as a config file; a command
 that has a model fill it in many times, spread across architectures and

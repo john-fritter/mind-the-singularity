@@ -21,6 +21,11 @@ import { freshDatabase } from "./db.js";
 import { createApp } from "../src/app.js";
 import { databaseEpochs } from "../src/game/epochs.js";
 import { archivePage } from "../src/game/public.js";
+import { changeBot, undoChange } from "../src/game/bots.js";
+import { skipped } from "../src/runner/service.js";
+import { loadRunner } from "../src/runner/settings.js";
+import { PostgresRunnerStore } from "../src/runner/store.js";
+import { postgresBotTables } from "../src/store/runner.js";
 
 // The Postgres store and the accounts (phase 3a): a game kept in the
 // database plays exactly as one in memory, from any number of processes,
@@ -291,10 +296,68 @@ async function seats(pool: Pool) {
   assert.equal(currentMind(await store.read(), "bot:turtle-1")?.designation, "TURTLE-1");
 }
 
+/**
+ * The runner's tables (phase 6b): the runner seeds its bots and records its
+ * wakes; the site reads them for /admin/bots, and the admin's change is what
+ * the runner reads next, logged and undoable.
+ */
+async function runnerTables(pool: Pool, url: string) {
+  const runner = loadRunner();
+  const store = new PostgresRunnerStore(createPool(url));
+  try {
+    assert.deepEqual(await store.seed(runner.bots), ["lantern", "tally"]);
+    assert.deepEqual(await store.seed(runner.bots), [], "seeding again adds nothing");
+    const lantern = runner.bots.find((b) => b.name === "lantern")!;
+    assert.equal((await store.tunables()).get("lantern")!.model, lantern.model);
+
+    const wake = (slot: number | null, tokens: number) => {
+      const r = skipped("lantern", Date.UTC(2026, 9, 7, 9), "");
+      return { ...r, outcome: "done" as const, error: null, model: lantern.model, usage: { promptTokens: tokens - 10, completionTokens: 10, reasoningTokens: 0, cachedTokens: 5 }, note: "kept" };
+    };
+    await store.record({ bot: "lantern", day: "2026-10-07", slot: 0, result: wake(0, 1000) });
+    await store.record({ bot: "lantern", day: "2026-10-07", slot: 0, result: wake(0, 999) }); // the same slot twice: once
+    await store.record({ bot: "lantern", day: "2026-10-07", slot: null, result: wake(null, 500) }); // by hand
+    await store.record({ bot: "tally", day: "2026-10-06", slot: 3, result: skipped("tally", Date.UTC(2026, 9, 6), "The epoch is over.") });
+    const t = await store.tally("2026-10-07");
+    assert.deepEqual([...t.slots.get("lantern")!], [0]);
+    assert.equal(t.spent.get("lantern"), 1500);
+    assert.equal(t.spent.get("tally"), undefined);
+
+    // The site's view of the same rows, and the admin's change reaching the runner.
+    const tables = postgresBotTables(pool, { timezone: "UTC", budget: runner.daily_token_budget });
+    assert.deepEqual((await tables.bots()).map((b) => b.name), ["lantern", "tally"]);
+    assert.equal((await tables.day("2026-10-07")).get("lantern")!.spent, 1500);
+    const runs = await tables.runs("lantern", 10);
+    assert.equal(runs.length, 2);
+    assert.equal(runs[1]!.detail?.note, "kept");
+    assert.equal(runs[0]!.slot, null);
+    assert.equal((await tables.runs(null, 10)).length, 3);
+
+    const admin = { account: "overseer", admin: true };
+    const form = { model: "minimax/minimax-m3", fallback_models: "tencent/hy3", reasoning_effort: "low", wakes_per_day: "6", window: "08:00-24:00", daily_tokens: "" };
+    const changed = await changeBot(tables, admin, "lantern", form);
+    assert.ok(changed.ok && changed.change);
+    const read = (await store.tunables()).get("lantern")!;
+    assert.equal(read.model, "minimax/minimax-m3");
+    assert.deepEqual(read.fallback_models, ["tencent/hy3"]);
+    assert.equal(read.wakes_per_day, 6);
+    assert.equal(read.json_mode, false);
+    const logged = await tables.changes("lantern", 5);
+    assert.equal(logged[0]!.by, "overseer");
+    assert.deepEqual(logged[0]!.changes.model, { from: lantern.model, to: "minimax/minimax-m3" });
+    const undone = await undoChange(tables, admin, "lantern", changed.change.id);
+    assert.ok(undone.ok && undone.change?.undoes === changed.change.id);
+    assert.equal((await store.tunables()).get("lantern")!.model, lantern.model);
+    assert.equal((await tables.changes("lantern", 5)).length, 2);
+  } finally {
+    await store.close();
+  }
+}
+
 async function migrations(pool: Pool) {
   assert.deepEqual(await migrate(pool, () => {}), [], "migrating again applies nothing");
   const { rows } = await pool.query<{ table_schema: string }>(
-    "SELECT DISTINCT table_schema FROM information_schema.tables WHERE table_name IN ('_migrations', 'epochs', 'accounts', 'api_keys', 'orders_log', 'record', 'owners', 'sessions', 'seats')",
+    "SELECT DISTINCT table_schema FROM information_schema.tables WHERE table_name IN ('_migrations', 'epochs', 'accounts', 'api_keys', 'orders_log', 'record', 'owners', 'sessions', 'seats', 'runner_bots', 'runner_runs', 'runner_config_log')",
   );
   assert.deepEqual(rows.map((r) => r.table_schema), ["mind"], "everything is in the mind schema");
 }
@@ -310,6 +373,7 @@ async function main() {
     await archive(pool);
     await logins(pool);
     await seats(pool);
+    await runnerTables(pool, url);
     await migrations(pool);
   } finally {
     await pool.end();

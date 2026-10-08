@@ -18,7 +18,11 @@ import path from "node:path";
 //   through src/game/, and takes from the engine only ids, types and pure
 //   formulas, never the world, its state or the order code;
 // - the admin view is the web's alone: nothing but src/web/ imports
-//   src/game/admin.ts, so no agent, player or bot can reach it.
+//   src/game/admin.ts, so no agent, player or bot can reach it; the same
+//   for the bot runner's admin pages, src/game/bots.ts, which the store's
+//   runner tables (src/store/runner.ts) implement;
+// - the game layer takes from the runner only its pure settings and
+//   schedule (for /admin/bots), never its model client or its wake.
 // A directory that doesn't exist yet passes trivially.
 
 const SRC = path.join(import.meta.dirname, "..", "src");
@@ -161,6 +165,12 @@ async function main() {
   }
   for (const { file, target } of await importsOf("game")) {
     assert.ok(target !== "game/admin.js", `${file} imports game/admin.js: nothing in the game layer leans on the admin view`);
+    assert.ok(!target.startsWith("runner/") || ["runner/tunables.js", "runner/schedule.js"].includes(target), `${file} imports ${target}: the game layer takes only the runner's settings and schedule`);
+  }
+  for (const dir of ["cli", "mcp", "players", "sim", "auth", "runner", "week", "engine", "game"]) {
+    for (const { file, target } of await importsOf(dir)) {
+      assert.ok(target !== "game/bots.js" || file === "game/bots.js", `${file} imports game/bots.js: the bot pages are the admin's alone`);
+    }
   }
 
   for (const dir of ["mcp", "web"]) {

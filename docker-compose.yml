@@ -21,7 +21,33 @@ services:
       - fritter-post_internal
       - seedbox_default
 
+  # The bot runner (phase 6b): wakes the model bots on their schedules and
+  # plays them through /mcp on the internal network, as any agent would.
+  # Same image. Its secrets (its database URL, the bots' game keys and
+  # NanoGPT keys) are in runner.env, never .env, so the site never holds
+  # them. It needs a way out to api.nano-gpt.com, so it's also on the
+  # project's default network. Behind a profile until phase 6d starts it:
+  # `docker compose --profile runner up -d`.
+  runner:
+    build: .
+    container_name: mind-the-singularity-runner-1
+    restart: unless-stopped
+    profiles: ["runner"]
+    command: ["node", "--import", "tsx", "src/runner/main.ts", "serve"]
+    env_file:
+      - runner.env
+    environment:
+      - NODE_ENV=production
+      - MCP_URL=http://mind-the-singularity-app-1:3111/mcp
+    mem_limit: 256m
+    depends_on:
+      - app
+    networks:
+      - fritter-post_internal
+      - default
+
 networks:
+  default: {}
   fritter-post_internal:
     external: true
   seedbox_default:

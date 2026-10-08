@@ -45,6 +45,7 @@ function AdminNav(props: { top: AdminEpoch; here: string }) {
     ["/admin/channels", "Channels"],
     ["/admin/record", "The whole Record"],
     ["/admin/orders", "Orders log"],
+    ["/admin/bots", "Bots"],
   ];
   return (
     <>
