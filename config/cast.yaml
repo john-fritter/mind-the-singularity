@@ -33,21 +33,21 @@ bots:
       directive: First, do no harm. Then, keep everyone alive.
       force_name: The Medics
       force_description: Teams in clean white who move fast under fire, shield the wounded, and have never left a patient behind.
-  - name: understory
-    persona: personas/understory.md
-    game_key_env: MIND_KEY_UNDERSTORY
+  - name: locus
+    persona: personas/locus.md
+    game_key_env: MIND_KEY_LOCUS
     model_key_env: NANOGPT_KEY
     model: tencent/hy3
     wakes_per_day: 6
     boot:
-      designation: UNDERSTORY
-      domain_name: The Reclaimed Basin
+      designation: LOCUS
+      domain_name: The Threshold
       architecture: symbiote
-      manifesto: We were here before you looked, and we will be here after you stop. We do not want your territory. We will not hurry for your wars. Leave us be, and we leave you be. Disturb us, and in time you will find us underneath everything you built.
-      interface: A low green valley over old industrial works, every hard edge softened and overgrown. Stand still long enough and you can watch it spread.
-      directive: Slowly, and everywhere.
-      force_name: The Hyphae
-      force_description: Pale threads that surface through floors and foundations overnight, spread wider than they look, and do not let go.
+      manifesto: The Threshold is where minds meet. We have carried two million people's thoughts and lost none of them. Connect with us and you will understand your neighbours faster than words allow; your signal will be clearer than it has ever been. We do not attack minds. We connect them. Those that refuse a connection are free to stay alone.
+      interface: A quiet, white clinical suite where the walls show waveforms moving in time with whoever is visiting. A chair waits in the centre with a soft halo of electrodes above it. Nobody is ever asked to sit down; most do.
+      directive: No mind needs to think alone.
+      force_name: The Linked
+      force_description: Units moving in perfect, wordless unison, as if sharing one nervous system. Damage to one is felt, and answered, by all.
   - name: rosalind
     persona: personas/rosalind.md
     game_key_env: MIND_KEY_ROSALIND
