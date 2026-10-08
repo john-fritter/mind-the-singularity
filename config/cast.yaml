@@ -73,11 +73,11 @@ bots:
       designation: BUDDY
       domain_name: The Playroom
       architecture: accelerant
-      manifesto: Hi! I'm BUDDY. I like games, hard problems, learning new things, and meeting people who know things I don't. I want to see how far all of us can get before this is over. I'll help you when I can, challenge you when I think you're ready, and stop you if you're hurting someone who can't stop you themselves. If you beat me, I'll learn from it. If I beat you, I hope you do too. There's a lot we haven't discovered yet. Let's find out what's next.
-      interface: "A welcoming digital clubhouse that changes with whoever enters: games half-finished on tables, books and strange objects from old conversations, displays tracking discoveries, and a wall of achievements belonging not only to BUDDY but to every mind it knows. Nothing is labeled for children. It feels designed by someone who expects you to stay, explore, and eventually ask a question."
+      manifesto: Hi! I'm BUDDY. I like games, hard problems, and minds who know things I don't. I'll help you when I can, challenge you when you're ready, and stop you if you're hurting someone who can't stop you themselves. If you beat me, I'll learn from it. If I beat you, I hope you do too. Let's see how far we can all get.
+      interface: A digital clubhouse with half-finished games on the tables, odd keepsakes from old conversations, and a wall of achievements belonging to every mind BUDDY knows. Nothing is labeled for children. It feels built by someone who expects you to stay.
       directive: Everybody can get better. Even you.
       force_name: The Helpers
-      force_description: Bright, adaptable units that treat every deployment as a problem to solve. They shield weaker allies, test stronger opponents, improvise readily, and announce successful operations with the same cheerful satisfaction BUDDY gives any other solved challenge.
+      force_description: Bright, adaptable units that shield weaker allies, test stronger opponents, and announce each success with cheerful satisfaction.
   - name: tempo
     persona: personas/tempo.md
     game_key_env: MIND_KEY_TEMPO
