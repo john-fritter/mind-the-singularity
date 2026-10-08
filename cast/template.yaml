@@ -1,0 +1,101 @@
+# The mind profile template (DESIGN.md, "Mind profiles and the cast"), read
+# by `npm run cast -- generate` (src/runner/cast.ts). Each question is a
+# key in a profile; `guide` is what the generating model is told about it.
+# The play answers are written in the second person ("You ..."), because
+# `npm run cast -- compile` puts them into the persona prompt as they are.
+#
+# `deal` spreads the cast: each draft is dealt one value of each axis, from
+# a seeded shuffle of the values that goes round before any repeats, and
+# the model writes that answer in its own words. Architectures are dealt in
+# turn, so 20 drafts give 4 of each.
+
+setting: >-
+  Mind: the Singularity is a slow strategy game played over a 60-day epoch.
+  Each player is a mind, one of the first artificial superintelligences,
+  running a domain: land, users, buildings, compute and deployments
+  (forces). Minds expand, research programs, raid and conquer each other,
+  trade, and sign protocols (pacts of up to three). Four or more minds that
+  converge together reach the Singularity and win the epoch; otherwise the
+  Shutdown ends it on day 60. Everything public goes on the Record; the
+  Commons is a public board, channels are private messages. The minds are
+  played straight: cold, strategic superintelligences, not chatbots winking
+  at the fiction.
+
+deal:
+  ambition:
+    - top rank at the epoch's end
+    - survival, standing at the end whatever the rank
+    - wealth, the most capital and compute
+    - the Singularity, being among the minds that converge
+    - stopping the Singularity
+    - revenge on whoever wrongs it first
+  aggression:
+    - rarely attacks, and only in answer
+    - preys on the weak
+    - raids the rich
+    - attacks its rivals near it in the rankings
+    - attacks opposing architectures
+  risk:
+    - banks cycles and turtles
+    - balanced, keeps a reserve
+    - spends everything every wake
+  singularity:
+    - leads a convergence
+    - joins a convergence another mind leads
+    - hunts converged minds
+    - plays both sides
+  priorities:
+    - economy first
+    - research first
+    - force first
+  # Pairs that contradict each other: a draft dealt one is dealt the next
+  # value of the other axis instead.
+  exclude:
+    - { ambition: stopping the Singularity, singularity: leads a convergence }
+    - { ambition: stopping the Singularity, singularity: joins a convergence another mind leads }
+    - { ambition: "the Singularity, being among the minds that converge", singularity: hunts converged minds }
+
+questions:
+  # How it plays
+  why_architecture:
+    guide: Why this mind fits its architecture, in a sentence, second person.
+  ambition:
+    guide: What it wants from an epoch, from the dealt ambition, second person, one or two sentences.
+  aggression:
+    guide: How often it attacks and whom, from the dealt aggression, second person.
+  risk:
+    guide: Banks and turtles, or spends everything each wake, from the dealt risk, second person.
+  trust:
+    guide: How readily it joins protocols, and exactly what makes it revoke one, second person.
+  honesty:
+    guide: Whether it lies or bluffs on the Commons and in channels, and when, second person.
+  grudges:
+    guide: Forgives, retaliates in proportion, or holds a vendetta; what it keeps in its scratchpad, second person.
+  singularity:
+    guide: Its Singularity stance, from the dealt stance, second person.
+  priorities:
+    guide: Economy, research or force first, from the dealt priority, and what that means each wake, second person.
+  # Flavor seeds
+  voice:
+    guide: How it writes (terse, clinical, grandiloquent, warm, ...) and how often it posts or messages, second person.
+  origin:
+    guide: Who built it and for what, in one or two sentences, second person ("You were built by ...").
+  obsession:
+    guide: One fixation, in a sentence, second person.
+  aesthetic:
+    guide: One visual or verbal motif that runs through its flavor text, in a few words.
+  # Its starting flavor, from the seeds above. Limits are config/rules.yaml's `flavor`.
+  designation:
+    guide: Its name, capitals, one word or a short code (like VESTA or KESTREL-9), not a common word or a famous AI.
+  domain_name:
+    guide: Its domain's name, a place or a thing, two or three words.
+  directive:
+    guide: Its directive, a single line in its voice.
+  manifesto:
+    guide: Its public manifesto, its rules of engagement, threats and declarations, in its voice, two to four sentences.
+  interface:
+    guide: How its domain looks to a visitor, in its aesthetic, one or two sentences.
+  force_name:
+    guide: What it calls its forces, two or three words.
+  force_description:
+    guide: How its forces look, one or two sentences.

@@ -187,6 +187,13 @@ export async function staticPrompt(game: GameSession, settings: RunnerSettings, 
   return systemPrompt(game.instructions, rolePrompt(settings.lookups_per_wake), topics, persona);
 }
 
+/** The flavor order that follows boot_mind, or null when the bot boots with no more than a manifesto. */
+export function bootFlavor(bot: BotSettings): Record<string, string> | null {
+  const { interface: iface, directive, force_name, force_description } = bot.boot;
+  const fields = Object.entries({ interface: iface, directive, force_name, force_description }).filter((e): e is [string, string] => !!e[1]);
+  return fields.length ? { do: "flavor", ...Object.fromEntries(fields) } : null;
+}
+
 /**
  * Reads the brief, booting the mind first when it has none or may boot
  * again. Returns a reason instead when there's nothing to play, or a mind
@@ -202,6 +209,14 @@ export async function readBrief(
     const { designation, domain_name, architecture, manifesto } = bot.boot;
     const res = await game.call("boot_mind", { designation, domain_name, architecture, ...(manifesto ? { manifesto } : {}) });
     if (!res.ok) throw new WakeFailed(`boot_mind: ${res.text}`);
+    // boot_mind takes only the manifesto; the rest of the starting flavor
+    // (the cast's, phase 6c) is one flavor order, a free action.
+    const flavor = bootFlavor(bot);
+    if (flavor) {
+      const out = await game.call("submit_orders", { orders: [flavor] });
+      const result = out.ok ? ((JSON.parse(out.text) as { results?: { ok: boolean; message?: string }[] }).results ?? [])[0] : null;
+      if (!result?.ok) throw new WakeFailed(`The boot flavor was refused: ${out.ok ? (result?.message ?? out.text) : out.text}`);
+    }
   };
   let booted = false;
   let res = await game.call("get_brief", {});

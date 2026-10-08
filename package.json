@@ -18,7 +18,8 @@
     "mcp": "tsx src/server.ts",
     "runner": "tsx src/runner/main.ts",
     "week": "tsx scripts/week.ts",
-    "probe": "tsx scripts/probe.ts"
+    "probe": "tsx scripts/probe.ts",
+    "cast": "tsx src/runner/cast-cli.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",

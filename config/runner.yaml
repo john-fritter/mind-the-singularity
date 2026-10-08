@@ -95,3 +95,27 @@ week:
   seed: 1
   brief_ceiling_tokens: 2000
   out_dir: logs/week
+
+# The cast (npm run cast, phase 6c; DESIGN.md's "Mind profiles and the
+# cast"). `generate N` has the generator fill in the template N times into
+# drafts_dir; John keeps the ones he wants in profiles_dir; `compile` writes
+# each kept profile's persona into personas_dir and its bot into `out`,
+# which the runner reads with this file. Compiled bots wake wakes_per_day
+# times (John, 2026-10-08: twelve bots at six, about 0.94M tokens of the
+# budget at 6b's measured 13K a wake) and are dealt `models` in turn unless
+# their profile names one; the admin can change either at /admin/bots.
+cast:
+  template: cast/template.yaml
+  drafts_dir: cast/drafts
+  profiles_dir: cast/profiles
+  personas_dir: personas
+  out: config/cast.yaml
+  generator:
+    model: z-ai/glm-5.2
+    reasoning_effort: low
+    seed: 6
+  # The three models that played well in the 6b probe.
+  models: [z-ai/glm-5.2, deepseek/deepseek-v4.1-flash, tencent/hy3]
+  wakes_per_day: 6
+  game_key_env_prefix: MIND_KEY_
+  model_key_env: NANOGPT_KEY

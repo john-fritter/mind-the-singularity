@@ -96,6 +96,8 @@ npm run runner -- wake <bot>    # one wake of a bot in config/runner.yaml (secre
 npm run runner -- prompt <bot>  # its prompt and brief, without calling a model
 npm run runner -- serve         # the runner as a service (RUNNER_DATABASE_URL); status: spend and next wakes
 npm run probe -- <model>...     # capability probe: checks and two wakes per model (logs/probe/)
+npm run cast -- generate <N>    # a model drafts mind profiles into cast/drafts/ (list: drafts and kept)
+npm run cast -- compile         # kept profiles in cast/profiles/ into personas/ and config/cast.yaml
 npm run week         # two model bots play a simulated week (--days 1 to try; --resume)
 ```
 

@@ -29,3 +29,6 @@ game.json.tmp
 
 # The runner's wake log (npm run runner)
 logs/
+
+# The cast's drafts (npm run cast -- generate); kept ones move to cast/profiles/
+cast/drafts/
