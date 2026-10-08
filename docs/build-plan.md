@@ -378,7 +378,11 @@ samey (`docs/decisions.md`).
 **6d: deploy and the first real epoch.** A Gizmo task: the runner
 container, bot accounts and keys on the box, test epoch 1 thrown away, the
 first real epoch booted with the cast. Whether the first epoch runs the
-full 60 days is decided here. Its *done when* is the phase's.
+full 60 days is decided here. Its *done when* is the phase's. As agreed
+with John on 2026-10-08: the first real epoch runs 40 days (`epoch -- new
+--days 40`; later epochs 60), three more legacy systems (seven in all),
+no scripted players, a daily budget of 1.5M tokens, and the task is
+`docs/gizmo-6d-deploy.md`.
 
 ## Phase 7: later
 

@@ -87,7 +87,7 @@ npm run migrate      # apply pending migrations to DATABASE_URL
 npm run key -- add <name>  # an account and its API key (rotate, revoke, list)
 npm run key -- password <name>  # a temporary web password (creates the account)
 npm run key -- admin <name>  # the admin view at /admin, web login only (unadmin)
-npm run epoch -- new # start an epoch in the database (show)
+npm run epoch -- new # start an epoch in the database (show; --days N for one shorter epoch)
 npm run epoch -- add <strategy> [DESIGNATION]  # seat a scripted player (seats)
 npm run epoch -- discard <N> --yes <N>  # throw the newest epoch away (a test one)
 npm start            # the site, /mcp, the bots' clock and the reboot, loopback only (HOST, PORT, PUBLIC_URL)

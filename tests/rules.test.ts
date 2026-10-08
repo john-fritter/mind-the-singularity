@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import YAML from "yaml";
-import { loadRules, parseRules, RULES_PATH } from "../src/config.js";
+import { epochOfDays, loadRules, parseRules, RULES_PATH } from "../src/config.js";
+import { DAY_MS } from "../src/engine/cycles.js";
+import { newGame } from "../src/game/game.js";
 
 // config/rules.yaml loads, and the schema refuses anything incomplete or
 // inconsistent, so a number can't go missing quietly.
@@ -81,6 +83,20 @@ function main() {
   rejects((d) => (d.legacy.systems[0].designation = "X".repeat(41)), "longer than flavor.designation");
   rejects((d) => (d.legacy.systems[0].architecture = "druid"), "architecture");
   rejects((d) => (d.legacy.raid_every_hours_min = 100), "raid_every_hours_min");
+
+  // One epoch started shorter by hand (epoch -- new --days, phase 6d): only
+  // its own copy of the rules changes, and it ends on its own day.
+  {
+    const rules = loadRules();
+    const short = epochOfDays(rules, 40);
+    assert.equal(short.epoch.length_days, 40);
+    assert.notEqual(rules.epoch.length_days, 40, "config/rules.yaml's rules are untouched");
+    const game = newGame(short, { epoch: 1, seed: 1, startedAt: 0 });
+    assert.equal(game.rules.epoch.length_days, 40, "the epoch keeps its length");
+    assert.equal(game.world.timers.find((t) => t.kind === "shutdown")!.at, 40 * DAY_MS, "the Shutdown on day 40");
+    assert.throws(() => epochOfDays(rules, rules.epoch.shutdown_warning_days), /shutdown_warning_days must be shorter/);
+    assert.throws(() => epochOfDays(rules, 0), /--days 0 is invalid/);
+  }
 
   // The error names the source.
   assert.throws(() => parseRules("cycles: {}", "test.yaml"), /test\.yaml is invalid/);

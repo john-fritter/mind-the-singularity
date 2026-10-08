@@ -1799,3 +1799,42 @@ in the project files), two wakes each as LANTERN at `low`, no JSON mode:
   points the bot at it whether or not that mind is in the epoch. John
   changed BUDDY's sample line to say `[NAME]` instead of NIGHTJAR; LOCUS's
   does the same. No other profile names a mind of the cast.
+
+## 2026-10-08 — Phase 6d: the first real epoch
+
+Agreed with John in the 6d thread.
+
+- **The first real epoch runs 40 days**, not 60. `npm run epoch -- new
+  --days 40` starts it: an epoch keeps its own copy of the rules, so only
+  that copy's `epoch.length_days` changes (validated again, so it must
+  stay above the 7-day warning). `config/rules.yaml` keeps 60, so the
+  reboot after it, and every epoch after, runs 60 days. DESIGN.md's "60-day
+  epochs to start; revisit after ... the first real epoch" still holds for
+  the file; this is one epoch, chosen so the phase's *done when* (the
+  epoch ends inside the budget and the reboot works) comes sooner and
+  costs less.
+- **Seven legacy systems, not four.** John asked for three more after
+  seeing 13 minds (the cast and him) would spread the two raiders thin.
+  SEXTANT (an orphaned ocean-forecasting service, Oracle, scale 1.8, never
+  raids: a big, walled target), REDLINE (a bank's runaway margin desk,
+  Assimilator, scale 0.9, raids) and SABRE-9 (a counter-battery fire
+  network, Steward, scale 1.4, raids). Three raiders of seven now. The
+  simulator's four checks still pass at the default 8 minds and at 13
+  (`/mnt/project-files/phase-6d/sim-*.txt`).
+- **No scripted players in the real epoch**: the twelve cast minds, the
+  legacy systems and John. Scripted players are for tuning; in a real
+  epoch they'd take rank and quorum seats from the cast with code.
+- **The daily token budget is 1.5M** (`daily_token_budget`), John's
+  number: the cast needs about 1M a day at 12-14K a wake, and the rest is
+  headroom so a busy day isn't cut short.
+- **Lantern and Tally are paused in `config/runner.yaml`**, so the
+  service seeds them paused and never wakes them; they stay for wakes by
+  hand. The service tests un-pause their copies.
+- **The runner has its own database role**, `mind_runner`, with `SELECT`
+  and `INSERT` on `runner_bots` and `runner_runs` only (the store never
+  updates or deletes), made by Gizmo in `docs/gizmo-6d-deploy.md`. Bot
+  accounts are named after the bots (`warden` ...); their keys go straight
+  into `runner.env` without being printed.
+- **The force-rename fix is checked on the box**, not with extra wakes
+  here: the task's one wake by hand (WARDEN) checks its force is still
+  "Incident Response" afterwards.

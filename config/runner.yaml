@@ -34,8 +34,10 @@ log_path: logs/runner.jsonl
 timezone: UTC
 # Tokens (prompt plus output, as NanoGPT reports them) all bots together may
 # spend in a day. Once spent, wakes are skipped until midnight. DESIGN.md's
-# "comfortable" row (12 bots, 10 wakes a day) is about 1M.
-daily_token_budget: 1000000
+# "comfortable" row (12 bots, 10 wakes a day) is about 1M; a wake with
+# reasoning costs 12-14K (6b's probe), so the cast's 72 wakes a day need
+# about 1M, and John raised it to 1.5M for headroom (phase 6d).
+daily_token_budget: 1500000
 # How often the service looks for due wakes.
 tick_seconds: 60
 
@@ -61,6 +63,8 @@ defaults:
 bots:
   # The test bot, for trying the runner and for phase 3e's simulated week.
   - name: lantern
+    # Paused for the real epochs (phase 6d): kept for wakes by hand.
+    paused: true
     persona: personas/lantern.md
     game_key_env: MIND_KEY_LANTERN
     model_key_env: NANOGPT_KEY
@@ -73,6 +77,8 @@ bots:
   # The second bot for phase 4e's week: a broker that trades, and signs and
   # breaks protocols as they pay.
   - name: tally
+    # Paused for the real epochs (phase 6d): kept for wakes by hand.
+    paused: true
     persona: personas/tally.md
     game_key_env: MIND_KEY_TALLY
     model_key_env: NANOGPT_KEY

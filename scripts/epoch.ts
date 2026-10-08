@@ -2,8 +2,10 @@
  * Epochs in DATABASE_URL.
  *
  * Usage:
- *   npm run epoch -- new [--seed N]   start the next epoch now, with its legacy systems,
- *                                     once the last one has ended
+ *   npm run epoch -- new [--seed N] [--days N]
+ *                                     start the next epoch now, with its legacy systems,
+ *                                     once the last one has ended; --days makes this one
+ *                                     epoch that many days long instead of epoch.length_days
  *   npm run epoch -- show [--epoch N] the newest epoch (or epoch N) at a glance
  *   npm run epoch -- add STRATEGY [DESIGNATION] [--arch A]
  *                                     seat a scripted player in the newest epoch;
@@ -23,7 +25,7 @@
 import "../src/dotenv.js";
 import { randomInt } from "node:crypto";
 import { parseArgs } from "node:util";
-import { loadRules } from "../src/config.js";
+import { epochOfDays, loadRules } from "../src/config.js";
 import { DAY_MS } from "../src/engine/cycles.js";
 import { getPool } from "../src/db/index.js";
 import { newGame } from "../src/game/game.js";
@@ -32,7 +34,7 @@ import { addSeat, createEpoch, discardEpoch, latestEpoch, listSeats, openEpoch }
 import { STRATEGIES } from "../src/players/settings.js";
 
 const USAGE = `Usage:
-  npm run epoch -- new [--seed N]
+  npm run epoch -- new [--seed N] [--days N]
   npm run epoch -- show [--epoch N]
   npm run epoch -- add STRATEGY [DESIGNATION] [--arch ARCHITECTURE]
   npm run epoch -- seats
@@ -44,7 +46,7 @@ const SEED_LIMIT = 2 ** 31;
 async function run(): Promise<string> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { seed: { type: "string" }, epoch: { type: "string" }, arch: { type: "string" }, yes: { type: "string" } },
+    options: { seed: { type: "string" }, days: { type: "string" }, epoch: { type: "string" }, arch: { type: "string" }, yes: { type: "string" } },
   });
   const pool = getPool();
   const latest = await latestEpoch(pool);
@@ -59,8 +61,9 @@ async function run(): Promise<string> {
       if (!last.world.ended && now < shutdownAt) throw new Error(`Epoch ${latest} is still running.`);
     }
     const epoch = (latest ?? 0) + 1;
-    await createEpoch(pool, newGame(loadRules(), { epoch, seed, startedAt: now }));
-    return `Epoch ${epoch} started at ${new Date(now).toISOString()}, seed ${seed}.`;
+    const rules = values.days === undefined ? loadRules() : epochOfDays(loadRules(), Number(values.days));
+    await createEpoch(pool, newGame(rules, { epoch, seed, startedAt: now }));
+    return `Epoch ${epoch} started at ${new Date(now).toISOString()}, seed ${seed}, ${rules.epoch.length_days} days long.`;
   }
   if (positionals[0] === "show") {
     const number = values.epoch === undefined ? latest : Number(values.epoch);

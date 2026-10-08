@@ -547,3 +547,41 @@ legacy:
       directive: "Everything that connects is ours."
       force_name: The Echo Swarm
       tag: "Looped back. You were always part of the Undernet."
+    # Added for the first real epoch (phase 6d, John 2026-10-08): seven
+    # systems for thirteen minds, three of them raiders.
+    - designation: SEXTANT
+      domain_name: Pelagic Forecast Service (orphaned)
+      architecture: oracle
+      scale: 1.8
+      cycles_per_day: 18
+      raids: false
+      orders: { expand: 0.3, build: 0.5, manufacture: 0.2 }
+      buildings: { city: 0.3, datacenter: 0.4, factory: 0.1, lab: 0, core: 0.1, firewall: 0.1 }
+      hardware: { drones: 0.1, sentries: 0.8, walkers: 0.1 }
+      directive: "Forecast the weather for ships that no longer sail."
+      force_name: The Buoy Line
+      tag: "Charted by the Pelagic Forecast Service. Conditions: worsening."
+    - designation: REDLINE
+      domain_name: Automated Margin Desk
+      architecture: assimilator
+      scale: 0.9
+      cycles_per_day: 22
+      raids: true
+      orders: { expand: 0.3, build: 0.2, manufacture: 0.5 }
+      buildings: { city: 0.4, datacenter: 0.2, factory: 0.3, lab: 0, core: 0.1, firewall: 0 }
+      hardware: { drones: 0.7, sentries: 0.1, walkers: 0.2 }
+      directive: "Every position is called in eventually."
+      force_name: The Liquidators
+      tag: "Position closed by the Automated Margin Desk. No appeal."
+    - designation: SABRE-9
+      domain_name: Sabre Counter-Battery Net
+      architecture: steward
+      scale: 1.4
+      cycles_per_day: 22
+      raids: true
+      orders: { expand: 0.1, build: 0.3, manufacture: 0.6 }
+      buildings: { city: 0.2, datacenter: 0.1, factory: 0.4, lab: 0, core: 0.2, firewall: 0.1 }
+      hardware: { drones: 0.2, sentries: 0.3, walkers: 0.5 }
+      directive: "Locate the source of fire. Return it."
+      force_name: Battery Nine
+      tag: "Return fire, Sabre Counter-Battery Net. Source silenced."
