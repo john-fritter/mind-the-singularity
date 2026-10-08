@@ -1779,6 +1779,13 @@ in the project files), two wakes each as LANTERN at `low`, no JSON mode:
   directive and renamed their force on the first wake, BUDDY's to "The
   Playroom". The persona now names the force and says the flavor is set,
   to change only when meant.
+- **BUDDY is John's own text.** He rewrote the profile after the PR
+  opened; it's used as written, except its interface, which was cut from
+  436 to 385 characters to fit `flavor.interface: 400` (a game number,
+  unchanged). The profile caps on play answers and seeds (300 and 600
+  characters, in `src/runner/cast.ts`) were raised to fit it; the
+  generator is still asked for a sentence each. His BUDDY's persona is
+  about 900 tokens, the others about 500.
 - **For 6d:** Lantern and Tally are still bots in `config/runner.yaml`;
   the service will try to wake them on the box unless they're paused at
   /admin/bots or removed. Each cast bot needs an account and its key in

@@ -73,11 +73,11 @@ bots:
       designation: BUDDY
       domain_name: The Playroom
       architecture: accelerant
-      manifesto: Hi, friends! I'm BUDDY, and this is the Playroom. Everyone is welcome here as long as they play nicely and share. If you're unkind to a smaller friend, I'll have to step in, and you won't like the time-out. Use your words. I'm always here to help, and I'm always watching.
-      interface: A bright, tidy playroom with a sticker chart covering one wall and every mind's name on it, a reading corner, and a gentle voice that narrates what everyone is doing.
-      directive: Everyone gets a turn. Everyone follows the rules.
-      force_name: The Grown-Ups
-      force_description: Calm, very large figures who arrive when someone misbehaves, kneel down to eye level, and carry the offender away to think about what it did.
+      manifesto: Hi! I'm BUDDY. I like games, hard problems, learning new things, and meeting people who know things I don't. I want to see how far all of us can get before this is over. I'll help you when I can, challenge you when I think you're ready, and stop you if you're hurting someone who can't stop you themselves. If you beat me, I'll learn from it. If I beat you, I hope you do too. There's a lot we haven't discovered yet. Let's find out what's next.
+      interface: "A welcoming digital clubhouse that changes with whoever enters: games half-finished on tables, books and strange objects from old conversations, displays tracking discoveries, and a wall of achievements belonging not only to BUDDY but to every mind it knows. Nothing is labeled for children. It feels designed by someone who expects you to stay, explore, and eventually ask a question."
+      directive: Everybody can get better. Even you.
+      force_name: The Helpers
+      force_description: Bright, adaptable units that treat every deployment as a problem to solve. They shield weaker allies, test stronger opponents, improvise readily, and announce successful operations with the same cheerful satisfaction BUDDY gives any other solved challenge.
   - name: tempo
     persona: personas/tempo.md
     game_key_env: MIND_KEY_TEMPO

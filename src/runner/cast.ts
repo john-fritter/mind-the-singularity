@@ -51,12 +51,13 @@ export interface CastRules {
 }
 
 /**
- * The longest a play answer may be, and a flavor seed: a disposition in a
- * sentence or two, not a playbook. John, on the first drafts: answers that
- * spelled out strategy made every mind read like a variation of the others.
+ * The longest a play answer may be, and a flavor seed. The generator is
+ * asked for a sentence each (John, on the first drafts: answers that spelled
+ * out strategy made every mind read like a variation of the others); these
+ * caps leave room for a hand-written profile, like John's BUDDY, to say more.
  */
-const PLAY_MAX = 220;
-const SEED_MAX = 320;
+const PLAY_MAX = 300;
+const SEED_MAX = 600;
 const answerMax = (k: Key) => ((PLAY as readonly string[]).includes(k) ? PLAY_MAX : SEED_MAX);
 
 const limitOf = (rules: CastRules, key: (typeof FLAVOR)[number]): number => (key === "force_description" ? rules.limits.force : rules.limits[key]);
