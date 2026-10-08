@@ -334,17 +334,17 @@ async function runnerTables(pool: Pool, url: string) {
     assert.equal((await tables.runs(null, 10)).length, 3);
 
     const admin = { account: "overseer", admin: true };
-    const form = { model: "z-ai/glm-5.2", fallback_models: "tencent/hy3", reasoning_effort: "low", wakes_per_day: "6", window: "08:00-24:00", daily_tokens: "" };
+    const form = { model: "minimax/minimax-m3", fallback_models: "tencent/hy3", reasoning_effort: "low", wakes_per_day: "6", window: "08:00-24:00", daily_tokens: "" };
     const changed = await changeBot(tables, admin, "lantern", form);
     assert.ok(changed.ok && changed.change);
     const read = (await store.tunables()).get("lantern")!;
-    assert.equal(read.model, "z-ai/glm-5.2");
+    assert.equal(read.model, "minimax/minimax-m3");
     assert.deepEqual(read.fallback_models, ["tencent/hy3"]);
     assert.equal(read.wakes_per_day, 6);
     assert.equal(read.json_mode, false);
     const logged = await tables.changes("lantern", 5);
     assert.equal(logged[0]!.by, "overseer");
-    assert.deepEqual(logged[0]!.changes.model, { from: lantern.model, to: "z-ai/glm-5.2" });
+    assert.deepEqual(logged[0]!.changes.model, { from: lantern.model, to: "minimax/minimax-m3" });
     const undone = await undoChange(tables, admin, "lantern", changed.change.id);
     assert.ok(undone.ok && undone.change?.undoes === changed.change.id);
     assert.equal((await store.tunables()).get("lantern")!.model, lantern.model);

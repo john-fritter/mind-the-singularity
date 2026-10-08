@@ -42,9 +42,11 @@ tick_seconds: 60
 # Every bot's tunables, unless it sets its own. Once a bot is in the
 # database, the admin's settings at /admin/bots win over this file.
 defaults:
-  model: deepseek/deepseek-v4.1-flash
+  # From the 6b capability probe (npm run probe; docs/decisions.md): GLM
+  # 5.2 played cleanest, DeepSeek V4.1 Flash nearly as well and fastest.
+  model: z-ai/glm-5.2
   # Tried in order when the model fails twice in a way that may pass.
-  fallback_models: []
+  fallback_models: [deepseek/deepseek-v4.1-flash]
   reasoning_effort: low
   # Off: NanoGPT answered DeepSeek V4.1 Flash's JSON mode with a 502 in the
   # 6b probe, and the wake takes the JSON object out of prose anyway.

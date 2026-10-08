@@ -1682,8 +1682,9 @@ daily budget of 1,000,000 tokens, 8 wakes a day all day by default, UTC.
   it to 6b), about 20 tokens a wake.
 - **Model calls are streamed.** NanoGPT answers a non-streamed call that
   runs past about 30 seconds with `502 upstream request failed`. In the
-  probe, every model's first real wake with a reasoning effort set did
-  that: reasoning over a 7,700-token prompt takes longer. Streaming keeps
+  probe's first run, each of the five models that got that far failed its
+  first real wake this way with a reasoning effort set: reasoning over a
+  7,700-token prompt takes longer. Streaming keeps
   the connection open, so only `model_timeout_seconds` applies. Reasoning
   is no longer sent as `exclude: true`: with it excluded nothing streams
   while the model thinks, and the cutoff comes back. Its text arrives in
@@ -1698,3 +1699,33 @@ daily budget of 1,000,000 tokens, 8 wakes a day all day by default, UTC.
   (`src/runner/probe.ts`: reachable, does `reasoning_effort` change the
   reasoning, JSON mode) is the runner's. The wakes run at `low` effort (or
   none for a model that refuses the parameter), without JSON mode.
+- **An empty answer isn't sent back.** NanoGPT refuses an assistant turn
+  with no content (a 400), which the retry used to send after an empty
+  reply; an empty stream (no content, no usage) is now a failure that may
+  pass, retried like a 5xx. A reply cut off at the output cap with nothing
+  but reasoning tells the model so in the retry.
+
+**The probe** (2026-10-07/08; `/mnt/project-files/phase-6b/probe-report.md`
+in the project files), two wakes each as LANTERN at `low`, no JSON mode:
+
+| Model | Orders accepted | Tokens a wake (in / out) | Time a call | Verdict |
+| --- | --- | --- | --- | --- |
+| `z-ai/glm-5.2` | 19/19 | 7,500 / 4,200 | 45s | plays; reasoning tokens unreported |
+| `deepseek/deepseek-v4.1-flash` | 17/17 | 7,800 / 6,000 | 34s | plays; effort setting unreliable |
+| `tencent/hy3` | 27/28 | 7,700 / 5,200 | 54s | plays; refuses JSON mode |
+| `google/gemma-4-31b-it` | 10/11 | 8,300 / 2,700 | 117s | weak and slow |
+| `minimax/minimax-m3` | 5/5 at `none` | 11,700 / 260 | 8s | at `low` reasons past the cap; terse at `none` |
+| `qwen/qwen3.8-27b` | 7/7, then timeouts | 16,300 / 13,100 | 316s | too slow |
+| `qwen/qwen3.8-flash` | none | - | - | refuses effort, thinks past the cap |
+
+- **The defaults are GLM 5.2 at `low`, falling back to DeepSeek V4.1
+  Flash.** Which bot runs what is John's at /admin/bots and 6c's cast.
+- **A wake costs about 12,000-14,000 tokens with reasoning on**, not
+  DESIGN.md's ~8,000: reasoning is billed as output. 1,000,000 a day is
+  then about 75 wakes. Worth weighing in 6c and 6d (bots, wakes a day,
+  `none` where a model plays well without reasoning).
+- **Live check:** `serve` against `npm start` on a local database, Lantern
+  on GLM 5.2 and Tally on DeepSeek V4.1 Flash at 96 wakes a day for 40
+  minutes: six wakes on their slots, a restart in between with no slot
+  repeated, `/admin/bots` showing them, and the empty-stream failure above
+  (found there, fixed, then retried cleanly).

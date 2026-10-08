@@ -44,7 +44,7 @@ const formOf = (t: Tunables): Record<string, string> => ({
 });
 
 async function main() {
-  const start = pickTunables(lantern);
+  const start = { ...pickTunables(lantern), model: "deepseek/deepseek-v4.1-flash", fallback_models: [] };
   const bots = new Map([["lantern", { ...start }]]);
   const tables = memoryBotTables({ timezone: "UTC", budget: 50_000 }, bots, [done("2026-10-07", 0, 1200), done("2026-10-07", 1, 800), done("2026-10-06", 5, 999)]);
 

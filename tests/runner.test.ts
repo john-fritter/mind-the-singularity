@@ -199,7 +199,7 @@ async function retries() {
   assert.equal(r4.outcome, "done", r4.error ?? "");
   assert.deepEqual(sleeps, [settings.retry_wait_seconds * 1000]);
   const m5 = new ScriptedModel([new ModelError("NanoGPT 503: busy", 503, null), new ModelError("NanoGPT 503: busy", 503, null)]);
-  const r5 = await runWake(deps(setup().connect, m5), settings, bot, persona, { gameKey: KEY });
+  const r5 = await runWake(deps(setup().connect, m5), settings, { ...bot, fallback_models: [] }, persona, { gameKey: KEY });
   assert.equal(r5.outcome, "failed");
   assert.match(r5.error!, /503/);
   // The daily cap isn't retried.
