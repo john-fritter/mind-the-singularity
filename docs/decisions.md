@@ -1787,3 +1787,15 @@ in the project files), two wakes each as LANTERN at `low`, no JSON mode:
   the service will try to wake them on the box unless they're paused at
   /admin/bots or removed. Each cast bot needs an account and its key in
   `runner.env` as `MIND_KEY_<DESIGNATION>` (`runner.env.example`).
+
+## 2026-10-08 — The cast: LOCUS replaces UNDERSTORY; no mind names another
+
+- **LOCUS replaces UNDERSTORY** at John's request: a Symbiote built by a
+  neurotechnology company to run its brain-computer implants (domain The
+  Threshold, forces The Linked). It takes UNDERSTORY's slot,
+  `cast/profiles/03-locus.yaml`, so the balance (a Symbiote that joins a
+  convergence) and the model dealing (Hy3) are unchanged.
+- **A profile never names another mind.** A persona that names a rival
+  points the bot at it whether or not that mind is in the epoch. John
+  changed BUDDY's sample line to say `[NAME]` instead of NIGHTJAR; LOCUS's
+  does the same. No other profile names a mind of the cast.
