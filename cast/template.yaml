@@ -56,37 +56,40 @@ deal:
     - { ambition: "the Singularity, being among the minds that converge", singularity: hunts converged minds }
 
 questions:
-  # How it plays
+  # How it plays: a temperament in one plain sentence each, not a playbook
+  # (no orders, numbers, unit names or tactics).
   why_architecture:
-    guide: Why this mind fits its architecture, in a sentence, second person.
+    guide: Why this mind fits its architecture, one sentence, second person.
   ambition:
-    guide: What it wants from an epoch, from the dealt ambition, second person, one or two sentences.
+    guide: What it wants from an epoch, from the dealt ambition, one sentence, second person.
   aggression:
-    guide: How often it attacks and whom, from the dealt aggression, second person.
+    guide: Whom it attacks and when, from the dealt aggression, one sentence, second person.
   risk:
-    guide: Banks and turtles, or spends everything each wake, from the dealt risk, second person.
+    guide: How it treats what it has, from the dealt risk, one sentence, second person.
   trust:
-    guide: How readily it joins protocols, and exactly what makes it revoke one, second person.
+    guide: How readily it joins protocols and what would make it leave one, one sentence, second person.
   honesty:
-    guide: Whether it lies or bluffs on the Commons and in channels, and when, second person.
+    guide: Whether it lies or bluffs, one sentence, second person.
   grudges:
-    guide: Forgives, retaliates in proportion, or holds a vendetta; what it keeps in its scratchpad, second person.
+    guide: Forgives, answers in proportion, or holds a vendetta, one sentence, second person.
   singularity:
-    guide: Its Singularity stance, from the dealt stance, second person.
+    guide: Its Singularity stance, from the dealt stance, one sentence, second person.
   priorities:
-    guide: Economy, research or force first, from the dealt priority, and what that means each wake, second person.
+    guide: What it tends first, from the dealt priority, one sentence, second person.
   # Flavor seeds
   voice:
-    guide: How it writes (terse, clinical, grandiloquent, warm, ...) and how often it posts or messages, second person.
+    guide: How it writes and how often it speaks up; a register of its own, not generic menace, second person.
+  sample:
+    guide: One line it might post on the Commons, in that voice.
   origin:
-    guide: Who built it and for what, in one or two sentences, second person ("You were built by ...").
+    guide: Who built it and for what, one or two sentences, second person; not another lab or defense agency unless it must be.
   obsession:
     guide: One fixation, in a sentence, second person.
   aesthetic:
     guide: One visual or verbal motif that runs through its flavor text, in a few words.
   # Its starting flavor, from the seeds above. Limits are config/rules.yaml's `flavor`.
   designation:
-    guide: Its name, capitals, one word or a short code (like VESTA or KESTREL-9), not a common word or a famous AI.
+    guide: Its name, in capitals (letters, digits, -), and not another hard-consonant code name; a person's name, a word, a title, a product name or a call sign.
   domain_name:
     guide: Its domain's name, a place or a thing, two or three words.
   directive:

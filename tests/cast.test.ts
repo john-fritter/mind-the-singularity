@@ -32,11 +32,13 @@ function theDeal() {
   assert.notDeepEqual(deal(template, archs, cast.generator.seed + 1, 20), slots);
 
   // The prompt names the slot and what's taken.
-  const [system, user] = generationMessages(template, rules, slots[0]!, 20, { designations: ["CORVUS"], domainNames: ["Null Grid"], origins: [] });
-  assert.match(system!.content, /exactly these keys/);
-  assert.match(system!.content, new RegExp(`directive: .*at most ${rules.limits.directive} characters`));
-  assert.match(user!.content, /designations: CORVUS/);
-  assert.match(user!.content, new RegExp(slots[0]!.dealt.ambition));
+  const [sys, usr] = generationMessages(template, rules, slots[0]!, 20, { designations: ["CORVUS"], domainNames: ["Null Grid"], origins: [] });
+  const system = String(sys!.content);
+  const user = String(usr!.content);
+  assert.match(system, /exactly these keys/);
+  assert.match(system, new RegExp(`directive: .*at most ${rules.limits.directive} characters`));
+  assert.match(user, /designations: CORVUS/);
+  assert.match(user, new RegExp(slots[0]!.dealt.ambition));
 }
 
 const sample: Profile = {
@@ -51,6 +53,7 @@ const sample: Profile = {
   singularity: "You join a convergence that will win.",
   priorities: "Economy first.",
   voice: "You write plainly, and rarely.",
+  sample: "Level holding.",
   origin: "You were built by a water board.",
   obsession: "You are fixated on uptime.",
   aesthetic: "Gauges and green lamps",
@@ -103,6 +106,7 @@ function compiling() {
   assert.match(persona, /^You are WEIR, a Steward\. You were built by a water board\./);
   assert.match(persona, /- \*\*Protocols:\*\* You sign with neighbors and revoke on betrayal\./);
   assert.match(persona, /Your directive: "Hold the level\."/);
+  assert.match(persona, /You sound like this: "Level holding\."/);
   assert.throws(() => compileCast([sample, sample], rules, cast), /Two profiles/);
 }
 

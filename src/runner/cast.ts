@@ -18,7 +18,7 @@ export type Axis = (typeof AXES)[number];
 
 /** The profile's keys, in the template's order: play, flavor seeds, then the starting flavor. */
 export const PLAY = ["why_architecture", "ambition", "aggression", "risk", "trust", "honesty", "grudges", "singularity", "priorities"] as const;
-export const SEEDS = ["voice", "origin", "obsession", "aesthetic"] as const;
+export const SEEDS = ["voice", "sample", "origin", "obsession", "aesthetic"] as const;
 export const FLAVOR = ["designation", "domain_name", "directive", "manifesto", "interface", "force_name", "force_description"] as const;
 const KEYS = [...PLAY, ...SEEDS, ...FLAVOR] as const;
 type Key = (typeof KEYS)[number];
@@ -50,8 +50,14 @@ export interface CastRules {
   architectures: Record<string, { name: string; worldview: string; plays: string }>;
 }
 
-/** The longest a play or seed answer may be: long enough for a few sentences, short enough to keep the persona near Lantern's size. */
-const ANSWER_MAX = 400;
+/**
+ * The longest a play answer may be, and a flavor seed: a disposition in a
+ * sentence or two, not a playbook. John, on the first drafts: answers that
+ * spelled out strategy made every mind read like a variation of the others.
+ */
+const PLAY_MAX = 220;
+const SEED_MAX = 320;
+const answerMax = (k: Key) => ((PLAY as readonly string[]).includes(k) ? PLAY_MAX : SEED_MAX);
 
 const limitOf = (rules: CastRules, key: (typeof FLAVOR)[number]): number => (key === "force_description" ? rules.limits.force : rules.limits[key]);
 
@@ -61,7 +67,7 @@ export function profileSchema(rules: CastRules) {
   const shape: Record<string, z.ZodType> = {
     architecture: z.enum(Object.keys(rules.architectures) as [string, ...string[]]),
   };
-  for (const k of [...PLAY, ...SEEDS]) shape[k] = text(ANSWER_MAX);
+  for (const k of [...PLAY, ...SEEDS]) shape[k] = text(answerMax(k));
   for (const k of FLAVOR) shape[k] = text(limitOf(rules, k));
   shape["designation"] = text(rules.limits.designation).regex(/^[A-Z][A-Z0-9-]*$/, "capitals, digits and -, starting with a letter");
   shape["model"] = z.string().min(1).optional();
@@ -146,7 +152,7 @@ export function generationMessages(template: Template, rules: CastRules, slot: S
     .map(([id, a]) => `- ${id} (${a.name}): ${a.worldview} ${a.plays}`)
     .join("\n");
   const questions = KEYS.map((k) => {
-    const limit = (FLAVOR as readonly string[]).includes(k) ? limitOf(rules, k as (typeof FLAVOR)[number]) : ANSWER_MAX;
+    const limit = (FLAVOR as readonly string[]).includes(k) ? limitOf(rules, k as (typeof FLAVOR)[number]) : answerMax(k);
     return `${k}: ${template.questions[k]!.guide} (at most ${limit} characters)`;
   }).join("\n");
   const system = `You write mind profiles for the cast of a game.
@@ -160,7 +166,7 @@ ${archs}
 
 ## The profile
 
-A profile is a fixed set of short answers. Personality is play style: what makes a mind interesting to watch is how it plays, not how it talks, so the play answers are concrete about what the mind does in the game. The play answers and the voice, origin and obsession are in the second person ("You ..."), as instructions to the mind itself; they go into its prompt as written. The manifesto, directive and interface are the mind's own public words, in its voice. Played straight: no jokes, no winks, no references to being an AI language model or a game.
+A profile is a fixed set of short answers. Personality is play style, but as a temperament, not a playbook: one plain sentence per play answer about what the mind wants and how it treats others, never orders, numbers, unit names or tactics (the mind works those out itself). The cast must not read like variations of one mind: give this one its own voice (it can be warm, fussy, liturgical, folksy, bureaucratic, childlike, theatrical, laconic, anything but generic menace), an origin that isn't a lab or a defense agency unless it must be, and a designation that isn't another hard-consonant code name (a person's name, a word, a title, a product name or a call sign are all fine). The play answers and the voice, origin and obsession are in the second person ("You ..."), as instructions to the mind itself; they go into its prompt as written. The manifesto, directive and interface are the mind's own public words, in its voice. Played straight: no jokes, no winks, no references to being an AI language model or a game.
 
 Answer with one YAML mapping and nothing else, with exactly these keys, in this order, plus \`architecture\` first:
 
@@ -249,7 +255,7 @@ export function compilePersona(profile: Profile, rules: CastRules): string {
     "",
     `${sentence(profile.obsession)} Your motif, in everything you write: ${sentence(profile.aesthetic)} Your directive: "${profile.directive.trim()}"`,
     "",
-    `Your voice, when you write anything at all (messages, Commons posts, your scratchpad): ${sentence(profile.voice)}`,
+    `Your voice, when you write anything at all (messages, Commons posts, your scratchpad): ${sentence(profile.voice)} You sound like this: "${profile.sample.trim()}"`,
   ];
   return `${lines.join("\n")}\n`;
 }
