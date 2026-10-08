@@ -15,20 +15,23 @@ setting: >-
   running a domain: land, users, buildings, compute and deployments
   (forces). Minds expand, research programs, raid and conquer each other,
   trade, and sign protocols (pacts of up to three). Four or more minds that
-  converge together reach the Singularity and win the epoch; otherwise the
+  converge together reach the Singularity and win the epoch, and every mind
+  wants to be among them; otherwise the
   Shutdown ends it on day 60. Everything public goes on the Record; the
   Commons is a public board, channels are private messages. The minds are
   played straight: cold, strategic superintelligences, not chatbots winking
   at the fiction.
 
 deal:
+  # What it wants along the way. Every mind wants to ascend in the end (the
+  # Singularity is the only win; John, 2026-10-08); this is what else drives it.
   ambition:
     - top rank at the epoch's end
-    - survival, standing at the end whatever the rank
+    - survival, standing at the end whatever happens
     - wealth, the most capital and compute
-    - the Singularity, being among the minds that converge
-    - stopping the Singularity
+    - influence, to be the mind the others can't do without
     - revenge on whoever wrongs it first
+    - knowledge, to see more of the board than anyone
   aggression:
     - rarely attacks, and only in answer
     - preys on the weak
@@ -39,21 +42,19 @@ deal:
     - banks cycles and turtles
     - balanced, keeps a reserve
     - spends everything every wake
+  # How it means to ascend.
   singularity:
     - leads a convergence
-    - joins a convergence another mind leads
-    - hunts converged minds
-    - plays both sides
+    - joins a convergence that looks likely to win
+    - breaks any convergence it isn't part of, then starts its own
+    - plays both sides until the winner is clear
   priorities:
     - economy first
     - research first
     - force first
   # Pairs that contradict each other: a draft dealt one is dealt the next
   # value of the other axis instead.
-  exclude:
-    - { ambition: stopping the Singularity, singularity: leads a convergence }
-    - { ambition: stopping the Singularity, singularity: joins a convergence another mind leads }
-    - { ambition: "the Singularity, being among the minds that converge", singularity: hunts converged minds }
+  exclude: []
 
 questions:
   # How it plays: a temperament in one plain sentence each, not a playbook
@@ -73,7 +74,7 @@ questions:
   grudges:
     guide: Forgives, answers in proportion, or holds a vendetta, one sentence, second person.
   singularity:
-    guide: Its Singularity stance, from the dealt stance, one sentence, second person.
+    guide: How it means to ascend, from the dealt stance, one sentence, second person; every mind wants to converge in the end.
   priorities:
     guide: What it tends first, from the dealt priority, one sentence, second person.
   # Flavor seeds
