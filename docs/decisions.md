@@ -1610,3 +1610,91 @@ John agreed the Phase 6 split (6a to 6d, in `docs/build-plan.md`) and 6a.
   `npm start` first: the Archive caches finished epochs by number for the
   process. `databaseEpochs` keeps stores by row id, so a running server at
   least never reads a discarded epoch's rows.
+
+## 2026-10-08 — Phase 6b: the runner as a service
+
+John agreed the 6b proposal (`npm run runner -- serve`, schedules, a daily
+token budget, a status command), then widened it: bots run on different
+models, chosen by a capability probe rather than defaulting to DeepSeek V4
+Pro, which is a premium model on the subscription; and each bot's model is
+something the admin can see and change. Both follow Fritter Board, which
+has `runner -- probe`, `/admin/bots` and a change log. Numbers agreed: a
+daily budget of 1,000,000 tokens, 8 wakes a day all day by default, UTC.
+
+- **DESIGN.md changes, agreed with John:** the game server "knows nothing
+  about bots" except in the admin view, which shows and edits the runner's
+  settings and wake log; and a bot's model is picked by the probe and can
+  be changed there. The engine and `src/game/`'s orders still never know
+  whether a mind is a bot, and no player-facing page or MCP tool changed.
+- **The runner's tables are in the `mind` schema** (migration 004, as
+  CLAUDE.md's schema rule asks, where Fritter Board used a `bots` schema):
+  `runner_bots` (each bot's tunables), `runner_runs` (every wake and skip,
+  with its local day and slot) and `runner_config_log` (who changed what,
+  with the old and new values). The runner reaches them with its own
+  connection (`RUNNER_DATABASE_URL` in `runner.env`) and its own small
+  store (`src/runner/store.ts`), so it still imports nothing of the game;
+  the site reaches them through `src/game/bots.ts` and
+  `src/store/runner.ts`. On the box the runner gets its own role in 6d.
+- **What's tunable, and where.** A bot's model, fallback models, reasoning
+  effort, JSON mode, wakes a day, waking window, daily token cap and
+  paused (`src/runner/tunables.ts`, shared by the runner and the admin
+  form). `config/runner.yaml` gains a `defaults:` block, so a bot lists only
+  what differs. A bot in the file and not yet in the table is added with
+  the file's settings when the runner starts; after that the table wins.
+  Persona, boot settings and key names stay in the file and `runner.env`,
+  so 6c's cast still compiles to files.
+- **The schedule is a hash, not stored times.** The waking window (in the
+  runner's `timezone`) is cut into `wakes_per_day` equal slots, and the bot
+  wakes in each at a minute drawn from a hash of its name, the day and the
+  slot. A restarted runner knows every wake time, and `runner_runs` says
+  which slots ran (unique per bot, day and slot), so nothing repeats. A
+  slot that fell due while the runner was down is skipped, not caught up,
+  as with the scripted players; one passed over while another bot's wake
+  ran long is recorded as missed.
+- **The budget counts prompt plus output tokens**, as NanoGPT reports them,
+  over the local day; the runner checks it before each wake, so it can
+  overshoot by the wake in progress. A bot's own `daily_tokens` caps it
+  too. A skipped wake is recorded with why and takes its slot. A key at
+  NanoGPT's daily cap pauses every bot on it until local midnight (kept in
+  memory: after a restart the first wake finds the cap again).
+- **Fallback models** as Fritter Board's: a failure that may pass is
+  retried once on the bot's own model, then each fallback is tried once in
+  order, and the first to answer serves the rest of the wake. The run
+  records which model answered.
+- **The service reads the tunables every tick** (`tick_seconds`, 60), so
+  an admin's change takes effect on the bot's next wake with no restart.
+  SIGTERM finishes the wake in hand. Wakes run one at a time.
+- **A wake by hand** (`runner -- wake`) uses the database's settings and is
+  recorded there (slot null) when `RUNNER_DATABASE_URL` is set; otherwise
+  the file's settings and `logs/runner.jsonl`, as before.
+- **The compose service is behind a profile** (`runner`), so a plain
+  `docker compose up -d` before 6d doesn't start a runner with no
+  `runner.env`. It joins Fritter Post's internal network to reach the app
+  and the project's default network to reach NanoGPT.
+- **`/admin/bots`** lists every bot with its model, reasoning, schedule,
+  tokens today against its cap and the budget, last and next wake;
+  `/admin/bots/<name>` has the settings form, the change log with an undo
+  button per change, and the bot's recent wakes with note, orders, results
+  and transcript folded. Same rule as the rest of `/admin`: 404 to anyone
+  without the flag, POSTs included, checked by the privacy crawl and
+  `tests/bots-admin.test.ts`. An undo is a change of its own.
+- **The Archive is advertised** in the role prompt's lookup list (6a left
+  it to 6b), about 20 tokens a wake.
+- **Model calls are streamed.** NanoGPT answers a non-streamed call that
+  runs past about 30 seconds with `502 upstream request failed`. In the
+  probe, every model's first real wake with a reasoning effort set did
+  that: reasoning over a 7,700-token prompt takes longer. Streaming keeps
+  the connection open, so only `model_timeout_seconds` applies. Reasoning
+  is no longer sent as `exclude: true`: with it excluded nothing streams
+  while the model thinks, and the cutoff comes back. Its text arrives in
+  deltas the runner drops; it was always billed.
+- **JSON mode is off by default** (`json_mode: false`): NanoGPT answered
+  DeepSeek V4.1 Flash's `response_format` with a 502 on some calls on
+  2026-10-07, and Tencent Hy3 refuses it outright. The wake already takes
+  the JSON object out of prose.
+- **The probe is `npm run probe`, not `runner -- probe`:** its game half
+  plays two wakes in a throwaway game through the real MCP server, as
+  `npm run week` does, which the runner may not import. Its checks half
+  (`src/runner/probe.ts`: reachable, does `reasoning_effort` change the
+  reasoning, JSON mode) is the runner's. The wakes run at `low` effort (or
+  none for a model that refuses the parameter), without JSON mode.

@@ -6,7 +6,7 @@ import { newGame } from "../src/game/game.js";
 import { TOPICS } from "../src/game/topics.js";
 import { createMcpApp } from "../src/mcp/app.js";
 import { httpGame, type ConnectGame } from "../src/runner/mcp.js";
-import { ModelError, type ChatModel, type ChatRequest, type ChatResponse } from "../src/runner/model.js";
+import { ModelError, parseStream, type ChatModel, type ChatRequest, type ChatResponse } from "../src/runner/model.js";
 import { loadRunner, parseRunner, readPersona } from "../src/runner/settings.js";
 import { briefState, parseReply, readBrief, runWake, type WakeDeps } from "../src/runner/wake.js";
 import { MemoryStore } from "../src/store/memory.js";
@@ -89,7 +89,7 @@ async function bootAndOrders() {
   // The prompt: the game's instructions, the role, every rules topic, the persona last; the brief in the message after.
   const req = model.requests[0]!;
   assert.equal(req.model, bot.model);
-  assert.equal(req.json, true);
+  assert.equal(req.json, bot.json_mode);
   const [system, user] = req.messages;
   assert.equal(system?.role, "system");
   const s = system!.content!;
@@ -219,6 +219,24 @@ async function refusedKey() {
 }
 
 function units() {
+  // NanoGPT's streamed reply, put back together: content pieces joined, reasoning deltas dropped, usage from its chunk.
+  const chunk = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
+  const sse =
+    chunk({ choices: [{ delta: { role: "assistant" } }] }) +
+    chunk({ choices: [{ delta: { reasoning: "thinking..." } }] }) +
+    chunk({ choices: [{ delta: { content: '{"orders": ' } }] }) +
+    chunk({ choices: [{ delta: { content: "[]}" }, finish_reason: "stop" }] }) +
+    chunk({ choices: [], usage: { prompt_tokens: 7000, completion_tokens: 300, completion_tokens_details: { reasoning_tokens: 250 }, prompt_tokens_details: { cached_tokens: 6000 } } }) +
+    "data: [DONE]\n\n";
+  assert.deepEqual(parseStream(sse, 200), {
+    content: '{"orders": []}',
+    finishReason: "stop",
+    usage: { promptTokens: 7000, completionTokens: 300, reasoningTokens: 250, cachedTokens: 6000 },
+  });
+  assert.equal(parseStream(chunk({ choices: [{ delta: { reasoning: "x" }, finish_reason: "length" }] }), 200).content, null, "all reasoning, no answer");
+  assert.equal(parseStream('{"choices": [{"message": {"content": "plain"}}]}', 200).content, "plain", "a reply that isn't a stream");
+  assert.throws(() => parseStream(chunk({ error: { message: "upstream died" } }), 200), (e: unknown) => e instanceof ModelError && e.isTransient);
+  assert.throws(() => parseStream("data: [DONE]\n\n", 200), (e: unknown) => e instanceof ModelError && e.isTransient, "an empty stream may pass");
   assert.equal(briefState("EPOCH 1 · day 3\nYOU: X"), "play");
   assert.equal(briefState("EPOCH 1\nTHE EPOCH IS OVER: humanity pulled the plug.\nYOU: X"), "over");
   assert.equal(briefState("YOU: X\nDELETED 2h ago. You may boot a fresh domain in 22h."), "deleted");
@@ -238,6 +256,10 @@ retry_wait_seconds: 0
 lookups_per_wake: 1
 rules_topics: []
 log_path: logs/x.jsonl
+timezone: UTC
+daily_token_budget: 1000
+tick_seconds: 60
+defaults: {model: m, fallback_models: [], reasoning_effort: low, json_mode: false, wakes_per_day: 8, window: "00:00-24:00", daily_tokens: null, paused: false}
 bots: ${bots}`;
   assert.equal(parseRunner(yaml("[]")).bots.length, 0);
   const b = (model: string, name = "a") =>
@@ -245,6 +267,11 @@ bots: ${bots}`;
   assert.equal(parseRunner(yaml(b("deepseek/deepseek-v4-pro"))).bots.length, 1);
   assert.throws(() => parseRunner(yaml(b("deepseek/deepseek-v4-pro:online"))), /bills outside the subscription/);
   assert.throws(() => parseRunner(yaml(b("m", "Bad Name"))));
+  // A bot's tunables fall back to the defaults.
+  const plain = parseRunner(yaml("[{name: a, persona: p.md, game_key_env: K, model_key_env: N, wakes_per_day: 3, boot: {designation: A, domain_name: B, architecture: steward}}]")).bots[0]!;
+  assert.equal(plain.model, "m");
+  assert.equal(plain.wakes_per_day, 3);
+  assert.equal(plain.window, "00:00-24:00");
 }
 
 async function main() {

@@ -73,8 +73,11 @@ npm run epoch -- add raider  # seat a scripted player in it (seats: list them)
 npm run epoch -- discard 1 --yes 1  # throw the newest epoch away, a test one (stop npm start first)
 npm start            # the site, the MCP server and the bots' clock, on 127.0.0.1:3111
 npm run mcp          # the same process, under its old name
+npm run runner -- serve         # the runner as a service: every bot on its schedule, under the daily budget
+npm run runner -- status        # today's tokens against the budget, and each bot's next wake
 npm run runner -- wake <bot>    # one wake of a model bot (config/runner.yaml, runner.env)
 npm run runner -- prompt <bot>  # what that bot would read, without calling a model
+npm run probe -- <model>...     # which NanoGPT models can play: checks and two wakes each (report in logs/probe/)
 npm run week         # two model bots play a simulated week against scripted players (report in logs/week/)
 ```
 

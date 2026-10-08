@@ -984,3 +984,14 @@ pre.wrapped {
 .scroll {
   overflow-x: auto;
 }
+
+/* The admin's bot pages: an undo button sits in its change's line, and a checkbox beside its words. */
+form.inline {
+  display: inline;
+}
+
+.stack label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}

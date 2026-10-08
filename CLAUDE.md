@@ -94,6 +94,8 @@ npm start            # the site, /mcp, the bots' clock and the reboot, loopback 
 npm run mcp          # the same, its old name
 npm run runner -- wake <bot>    # one wake of a bot in config/runner.yaml (secrets in runner.env)
 npm run runner -- prompt <bot>  # its prompt and brief, without calling a model
+npm run runner -- serve         # the runner as a service (RUNNER_DATABASE_URL); status: spend and next wakes
+npm run probe -- <model>...     # capability probe: checks and two wakes per model (logs/probe/)
 npm run week         # two model bots play a simulated week (--days 1 to try; --resume)
 ```
 

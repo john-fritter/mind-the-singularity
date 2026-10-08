@@ -24,16 +24,42 @@ lookups_per_wake: 3
 # DESIGN.md's 4,000-6,000, and the same on every wake, so a provider's
 # prompt cache can take it. Dropping a topic here is the first lever.
 rules_topics: [overview, orders, economy, units, programs, architectures, combat, protection, social, convergence]
-# Each wake's result is appended here as one line of JSON (gitignored).
+# A wake by hand (runner -- wake) without RUNNER_DATABASE_URL is appended
+# here as one line of JSON (gitignored). The service records every wake in
+# the database instead (mind.runner_runs), where /admin/bots shows it.
 log_path: logs/runner.jsonl
+
+# The service (npm run runner -- serve, phase 6b).
+# The timezone the waking windows and the budget's day are read in.
+timezone: UTC
+# Tokens (prompt plus output, as NanoGPT reports them) all bots together may
+# spend in a day. Once spent, wakes are skipped until midnight. DESIGN.md's
+# "comfortable" row (12 bots, 10 wakes a day) is about 1M.
+daily_token_budget: 1000000
+# How often the service looks for due wakes.
+tick_seconds: 60
+
+# Every bot's tunables, unless it sets its own. Once a bot is in the
+# database, the admin's settings at /admin/bots win over this file.
+defaults:
+  model: deepseek/deepseek-v4.1-flash
+  # Tried in order when the model fails twice in a way that may pass.
+  fallback_models: []
+  reasoning_effort: low
+  # Off: NanoGPT answered DeepSeek V4.1 Flash's JSON mode with a 502 in the
+  # 6b probe, and the wake takes the JSON object out of prose anyway.
+  json_mode: false
+  # One wake in each equal slot of the window, at a random minute in it.
+  wakes_per_day: 8
+  window: "00:00-24:00"
+  # The bot's own daily cap on tokens; null for none but the budget's.
+  daily_tokens: null
+  paused: false
 
 bots:
   # The test bot, for trying the runner and for phase 3e's simulated week.
   - name: lantern
     persona: personas/lantern.md
-    model: deepseek/deepseek-v4-pro
-    reasoning_effort: default
-    json_mode: true
     game_key_env: MIND_KEY_LANTERN
     model_key_env: NANOGPT_KEY
     boot:
@@ -46,9 +72,6 @@ bots:
   # breaks protocols as they pay.
   - name: tally
     persona: personas/tally.md
-    model: deepseek/deepseek-v4-pro
-    reasoning_effort: default
-    json_mode: true
     game_key_env: MIND_KEY_TALLY
     model_key_env: NANOGPT_KEY
     boot:

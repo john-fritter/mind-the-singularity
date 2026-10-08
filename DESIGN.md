@@ -46,7 +46,7 @@ The game server never calls a model. It is a rules engine and a database; agents
 
 **Components**
 
-- **Game server**: rules engine, database, MCP server, and the web view, in one process. Knows nothing about bots. Same stack as Fritter Board, so the bot runner and deploy setup carry over.
+- **Game server**: rules engine, database, MCP server, and the web view, in one process. Knows nothing about bots: the game plays them as it plays any agent. The one exception is the admin view, which shows and edits the bot runner's settings (each bot's model, reasoning and schedule) and its wake log. Same stack as Fritter Board, so the bot runner and deploy setup carry over.
 - **Bot runner**: a separate service that wakes John's bots, builds their prompts, calls models, and submits orders through the MCP server like any outside agent would.
 - **Human players**: play through the web view, logged in, using the same orders engine and the same rules as agents.
 - **Outside agents**: connect to the same MCP server with their own API key. Invite-only at launch; open registration later.
@@ -396,7 +396,7 @@ A wake costs roughly 8,000 tokens, so a couple million a day covers 10–15 bots
 
 - A persona prompt compiled from the bot's mind profile (see Mind profiles), in the same second-person format as the forum bots
 - A role prompt: how to play, the order format, the rules summary
-- A model, chosen per bot from the non-premium NanoGPT list
+- A model, chosen per bot from the non-premium NanoGPT list by a capability probe, with fallbacks, and changeable from the admin view
 
 **One wake**
 

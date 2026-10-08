@@ -9,6 +9,9 @@ import { createApp } from "../src/app.js";
 import { fixedEpoch, listedEpochs } from "../src/game/epochs.js";
 import { viewArchive } from "../src/game/public.js";
 import { logIn, memoryLogins } from "./logins.js";
+import { loadRunner } from "../src/runner/settings.js";
+import { pickTunables } from "../src/runner/store.js";
+import { memoryBotTables } from "../src/store/runner.js";
 
 // Private stays private (CLAUDE.md): another mind's scratchpad, full status,
 // private events, channels, offers made to one mind and protocol proposals never reach `view` or another mind's brief,
@@ -24,6 +27,8 @@ const T = T0 + 50 * HOUR_MS;
 const SECRET = "SECRET-PLAN-7731";
 /** A message between HALCYON and VESTA: PIKE and strangers never see it. */
 const WHISPER = "WHISPER-4410";
+/** A bot's model, which only the admin's /admin/bots shows. */
+const BOT_MODEL = "secret-vendor/bot-model-5150";
 
 /** The keys a public listing or page may carry, and nothing else. */
 const SUMMARY_KEYS = ["architecture", "designation", "power", "rank", "status", "territory"];
@@ -182,11 +187,18 @@ async function anonymousVisitor(store: MemoryStore) {
   assert.ok(game.world.offers.some((o) => o.to !== null), "a private offer is open");
 
   const logins = memoryLogins({ pike: "pike-password", halcyon: "halcyon-password", overseer: "overseer-password" }, ["overseer"]);
-  const app = createApp({ epochs: fixedEpoch(store), now: () => T, identify: async () => null, logins });
+  // The bot runner's tables, with a bot whose settings only the admin sees.
+  const runner = loadRunner();
+  const bots = memoryBotTables(
+    { timezone: "UTC", budget: 1000 },
+    new Map([["lantern", { ...pickTunables(runner.bots[0]!), model: BOT_MODEL }]]),
+  );
+  const app = createApp({ epochs: fixedEpoch(store), now: () => T, identify: async () => null, logins, bots });
   /** What only HALCYON, VESTA or a prober may know. */
   const SECRETS = [
     SECRET,
     WHISPER,
+    BOT_MODEL,
     "Probed",
     "Strength",
     "777 capital",
@@ -291,6 +303,9 @@ const ADMIN_URLS = [
   "/admin/orders",
   "/admin/orders?account=halcyon",
   "/admin/elsewhere",
+  "/admin/bots",
+  "/admin/bots/lantern",
+  "/admin/bots/nobody",
 ];
 
 /**
@@ -301,7 +316,7 @@ const ADMIN_URLS = [
  */
 async function loggedIn(app: ReturnType<typeof createApp>, logins: ReturnType<typeof memoryLogins>, anonymous: Map<string, number>) {
   const cookie = await logIn(app, "pike", "pike-password");
-  const SECRETS = [SECRET, WHISPER, "Probed", "Strength", "777 capital", String(STATUS_CAPITAL), STATUS_CAPITAL.toLocaleString("en-US"), String(STATUS_COMPUTE), STATUS_COMPUTE.toLocaleString("en-US")];
+  const SECRETS = [SECRET, WHISPER, BOT_MODEL, "Probed", "Strength", "777 capital", String(STATUS_CAPITAL), STATUS_CAPITAL.toLocaleString("en-US"), String(STATUS_COMPUTE), STATUS_COMPUTE.toLocaleString("en-US")];
   const withoutAccount = (body: string) => body.replace(/<nav class="account"[\s\S]*?<\/nav>/, "");
   const seen = new Set<string>();
   // Its own play pages, and the channels of the pair whose whisper it must never read.
@@ -381,11 +396,11 @@ async function admin(app: ReturnType<typeof createApp>, anonymous: Map<string, n
       if (href.startsWith("/admin") && !bodies.has(href)) queue.push(href);
     }
   }
-  for (const must of ["/admin", "/admin/minds/HALCYON", "/admin/minds/VESTA", "/admin/minds/PIKE", "/admin/channels", "/admin/record", "/admin/orders"]) {
+  for (const must of ["/admin", "/admin/minds/HALCYON", "/admin/minds/VESTA", "/admin/minds/PIKE", "/admin/channels", "/admin/record", "/admin/orders", "/admin/bots", "/admin/bots/lantern"]) {
     assert.ok(bodies.has(must), `the admin's crawl didn't reach ${must}`);
   }
   const everything = [...bodies.values()].join("\n");
-  for (const secret of [SECRET, WHISPER, STATUS_CAPITAL.toLocaleString("en-US"), STATUS_COMPUTE.toLocaleString("en-US"), "777 capital", "[private]"]) {
+  for (const secret of [SECRET, WHISPER, BOT_MODEL, STATUS_CAPITAL.toLocaleString("en-US"), STATUS_COMPUTE.toLocaleString("en-US"), "777 capital", "[private]"]) {
     assert.ok(everything.includes(secret), `the admin view never shows "${secret}"`);
   }
   assert.ok(bodies.get("/admin/minds/HALCYON")!.includes(SECRET), "HALCYON's admin page shows its scratchpad");
@@ -416,7 +431,7 @@ async function downtime(store: MemoryStore) {
   const down = T0 + rules.epoch.length_days * DAY_MS + HOUR_MS;
   const epochs = listedEpochs([store]);
   const app = createApp({ epochs, now: () => down, identify: async () => null, logins: memoryLogins({}) });
-  const SECRETS = [SECRET, WHISPER, "Probed", "Strength", "777 capital", STATUS_CAPITAL.toLocaleString("en-US"), STATUS_COMPUTE.toLocaleString("en-US")];
+  const SECRETS = [SECRET, WHISPER, BOT_MODEL, "Probed", "Strength", "777 capital", STATUS_CAPITAL.toLocaleString("en-US"), STATUS_COMPUTE.toLocaleString("en-US")];
 
   const agents = await viewArchive(epochs, {}, down);
   assert.ok(agents.ok && agents.epochs.length === 1 && agents.epochs[0]!.outcome === "shutdown");
