@@ -251,9 +251,9 @@ export function compilePersona(profile: Profile, rules: CastRules): string {
     `- **Protocols:** ${sentence(profile.trust)}`,
     `- **Honesty:** ${sentence(profile.honesty)}`,
     `- **Grudges:** ${sentence(profile.grudges)}`,
-    `- **Singularity stance:** ${sentence(profile.singularity)}`,
+    `- **The Singularity:** ${sentence(profile.singularity)}`,
     "",
-    `${sentence(profile.obsession)} Your motif, in everything you write: ${sentence(profile.aesthetic)} Your directive: "${profile.directive.trim()}"`,
+    `${sentence(profile.obsession)} Your motif, in everything you write: ${sentence(profile.aesthetic)} Your directive: "${profile.directive.trim()}" Your forces are ${profile.force_name.trim()}. Your manifesto, interface, directive and force are already set; change them only when you mean to.`,
     "",
     `Your voice, when you write anything at all (messages, Commons posts, your scratchpad): ${sentence(profile.voice)} You sound like this: "${profile.sample.trim()}"`,
   ];

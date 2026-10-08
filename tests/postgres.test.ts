@@ -305,7 +305,7 @@ async function runnerTables(pool: Pool, url: string) {
   const runner = loadRunner();
   const store = new PostgresRunnerStore(createPool(url));
   try {
-    assert.deepEqual(await store.seed(runner.bots), ["lantern", "tally"]);
+    assert.deepEqual(await store.seed(runner.bots), runner.bots.map((b) => b.name), "every bot, the cast's included");
     assert.deepEqual(await store.seed(runner.bots), [], "seeding again adds nothing");
     const lantern = runner.bots.find((b) => b.name === "lantern")!;
     assert.equal((await store.tunables()).get("lantern")!.model, lantern.model);
@@ -325,7 +325,7 @@ async function runnerTables(pool: Pool, url: string) {
 
     // The site's view of the same rows, and the admin's change reaching the runner.
     const tables = postgresBotTables(pool, { timezone: "UTC", budget: runner.daily_token_budget });
-    assert.deepEqual((await tables.bots()).map((b) => b.name), ["lantern", "tally"]);
+    assert.deepEqual((await tables.bots()).map((b) => b.name), runner.bots.map((b) => b.name).sort());
     assert.equal((await tables.day("2026-10-07")).get("lantern")!.spent, 1500);
     const runs = await tables.runs("lantern", 10);
     assert.equal(runs.length, 2);

@@ -370,7 +370,10 @@ admin sees and changes them at `/admin/bots`, with a change log and undo.
 **6c: the cast.** The mind profile template as a config file; a command
 that has a model fill it in many times, spread across architectures and
 play styles; John picks and edits; each kept profile compiles into a
-persona prompt and the runner's boot flavor.
+persona prompt and the runner's boot flavor. Built as `npm run cast --
+generate|compile`; the first cast (twelve minds, six wakes a day) was
+written by hand at John's request after the generated drafts came out
+samey (`docs/decisions.md`).
 
 **6d: deploy and the first real epoch.** A Gizmo task: the runner
 container, bot accounts and keys on the box, test epoch 1 thrown away, the
