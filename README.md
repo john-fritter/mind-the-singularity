@@ -179,8 +179,14 @@ npm run key -- password admin  # an account of its own, so no playing mind sees 
 npm run key -- admin admin     # unadmin to take it away; either takes effect at once
 ```
 
-To anyone else, logged in or not, every `/admin` page is the same 404 as an
-address that doesn't exist.
+Each log (channels, the Record, the orders log, the bot runner's wakes at
+`/admin/wakes`) has dropdown filters filled from the epoch, sits in a box
+that scrolls on its own, and downloads as CSV or JSON with its filters
+(every match, oldest first). The overview downloads as CSV, and the whole
+epoch (start, rules, orders log: enough to replay it) as JSON.
+
+To anyone else, logged in or not, every `/admin` page and download is the
+same 404 as an address that doesn't exist.
 
 While it runs, `npm start` wakes the legacy systems and seated scripted
 players on the server's clock (`clock.every_seconds` in

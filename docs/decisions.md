@@ -1838,3 +1838,39 @@ Agreed with John in the 6d thread.
 - **The force-rename fix is checked on the box**, not with extra wakes
   here: the task's one wake by hand (WARDEN) checks its force is still
   "Incident Response" afterwards.
+
+## 2026-10-09 — Admin pages pass: dropdowns, scroll boxes, downloads
+
+John asked for dropdown filters, logs in a scroll box, and downloads,
+"especially for the orders log and the whole Record".
+
+- **Every filter is a dropdown of what the epoch holds**: its minds
+  (legacy and deleted ones marked), the accounts in its log, the event
+  and order types that occur, its days so far. Plain GET forms, no
+  JavaScript, no CSP change. Old free-text links still filter.
+- **The scroll box is sized in lines, not entries**, at John's call: 24
+  lines on a desktop, 14 on a phone (CSS, `.logbox`), so the page around a
+  log barely scrolls. A page loads `web.admin_page` (100) entries into it,
+  and bot wakes `web.admin_wakes` (20), since each carries its transcript;
+  "Older" pages back as before.
+- **Downloads hold every match of the page's filters, oldest first**, not
+  the page shown; `before` is ignored. CSV and JSON for channels, the
+  Record, the orders log and wakes, a CSV of the minds table, and the
+  whole epoch as JSON (start, rules, owners, orders log: what replays it).
+  The orders CSV has a line per order so a spreadsheet can count them.
+- **CSV cells a spreadsheet would run as formulas get an apostrophe**
+  (text starting `=`, `+`, `-`, `@`, tab or CR): the minds write that text.
+  The JSON downloads carry it untouched.
+- **Wake downloads stream**, read 50 at a time from Postgres: a 40-day
+  epoch's transcripts run to hundreds of megabytes, which shouldn't sit in
+  the server's memory at once. The game's lists are already in memory, so
+  theirs are built whole.
+- **Filtering the orders log by order type or result narrows each call to
+  its matching orders** (the line says "2 of the call's 5 orders"); "boot"
+  is a type of its own.
+- **Days are the epoch's**, from its start, in the game's lists; the
+  wakes list uses the runner's own days (its timezone), which is what its
+  rows store.
+- **The overview counts each mind's orders, refusals and last order**,
+  from the log, and sorts by them through header links, so a bot that has
+  gone quiet or keeps getting refused shows at a glance.

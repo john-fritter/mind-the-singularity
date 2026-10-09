@@ -1,23 +1,12 @@
-import { REASONING_EFFORTS, type BotPage, type BotRow, type BotRun, type BotsOverview, type ConfigChange, type Tunables } from "../../game/bots.js";
+import { REASONING_EFFORTS, RUN_OUTCOMES, type BotPage, type BotRow, type BotRun, type BotsOverview, type ConfigChange, type Tunables, type WakesPage } from "../../game/bots.js";
 import { num } from "../format.js";
-import { Time } from "./components.js";
+import { AdminNav, adminHref, Count, Downloads, FilterForm, LogBox, Pick, type Filters } from "./admin.js";
+import { Older, Time } from "./components.js";
 import { Layout, type PageCtx } from "./layout.js";
 
 // The bot runner's pages in the admin view (phase 6b): every bot's model,
 // schedule and spend, and one bot's settings form, wakes and change log.
 // src/game/bots.ts decides who sees them; these only lay them out.
-
-function BotsNav(props: { here: string }) {
-  const links: [string, string][] = [
-    ["/admin", "Minds"],
-    ["/admin/bots", "Bots"],
-  ];
-  return (
-    <nav class="play-nav" aria-label="Admin">
-      {links.map(([href, label]) => (href === props.here ? <strong>{label}</strong> : <a href={href}>{label}</a>))}
-    </nav>
-  );
-}
 
 const botHref = (name: string) => `/admin/bots/${encodeURIComponent(name)}`;
 
@@ -151,14 +140,17 @@ export function BotsOverviewView(props: { ctx: PageCtx; page: BotsOverview }) {
   return (
     <Layout ctx={props.ctx} title="Admin: bots">
       <h1>Bots</h1>
-      <p class="muted">Admin view: the bot runner's settings and wakes. Only accounts with the admin flag see these pages.</p>
-      <BotsNav here="/admin/bots" />
+      <p class="muted admin-note">Admin view: the bot runner's settings and wakes. Only accounts with the admin flag see these pages.</p>
+      <AdminNav top={null} here="/admin/bots" />
       <p>
         {p.day} ({p.timezone}): {num(p.total)} of {num(p.budget)} tokens spent across all bots. Wakes stop for the day once the budget is spent.
       </p>
       {p.bots.length === 0 ? <p class="muted">No bots yet: the runner adds config/runner.yaml's bots when it starts.</p> : <BotsTable rows={p.bots} />}
       <h2>Latest wakes</h2>
       <RunsTable runs={p.recent} showBot />
+      <p>
+        <a href="/admin/wakes">Every wake, with transcripts</a>
+      </p>
     </Layout>
   );
 }
@@ -230,14 +222,18 @@ function ChangeLog(props: { name: string; changes: ConfigChange[] }) {
   );
 }
 
-function RunDetail(props: { run: BotRun }) {
+function RunDetail(props: { run: BotRun; summary?: string }) {
   const r = props.run;
   const d = r.detail;
   if (!d || r.outcome === "skipped") return null;
   return (
     <details>
       <summary>
-        <Time at={r.at} />: <Outcome run={r} />
+        {props.summary ?? (
+          <>
+            <Time at={r.at} />: <Outcome run={r} />
+          </>
+        )}
       </summary>
       {d.note ? <p>Note: {d.note}</p> : null}
       {d.orders ? <pre class="wrapped">{JSON.stringify(d.orders, null, 1)}</pre> : null}
@@ -258,7 +254,7 @@ export function BotView(props: { ctx: PageCtx; page: BotPage; error?: string; sa
   return (
     <Layout ctx={props.ctx} title={`Admin: bot ${b.name}`}>
       <h1>Bot {b.name}</h1>
-      <BotsNav here="" />
+      <AdminNav top={null} here="" />
       <p>
         Today ({p.day}, {p.timezone}): {b.ran} wake{b.ran === 1 ? "" : "s"} run or skipped, {num(b.spent)} tokens
         {b.tunables?.daily_tokens != null ? ` of its ${num(b.tunables.daily_tokens)}` : ""}.{" "}
@@ -273,10 +269,57 @@ export function BotView(props: { ctx: PageCtx; page: BotPage; error?: string; sa
       <h2>Changes</h2>
       <ChangeLog name={b.name} changes={p.changes} />
       <h2>Wakes</h2>
-      <RunsTable runs={p.runs} showBot={false} />
-      {p.runs.map((r) => (
-        <RunDetail run={r} />
-      ))}
+      <p>
+        <a href={adminHref(null, "/admin/wakes", { bot: b.name })}>All its wakes</a>
+      </p>
+      <Downloads what="its wakes" href={(ext) => adminHref(null, `/admin/wakes.${ext}`, { bot: b.name })} />
+      <LogBox label="Its wakes">
+        <RunsTable runs={p.runs} showBot={false} />
+        {p.runs.map((r) => (
+          <RunDetail run={r} />
+        ))}
+      </LogBox>
+    </Layout>
+  );
+}
+
+/** Every wake, newest first, a page at a time, each with its orders, results and transcript to open. */
+export function WakesView(props: { ctx: PageCtx; page: WakesPage; filter: Filters; olderHref: string | null }) {
+  const p = props.page;
+  const f = props.filter;
+  return (
+    <Layout ctx={props.ctx} title="Admin: wakes">
+      <h1>Wakes</h1>
+      <p class="muted admin-note">Admin view: every wake the bot runner recorded. Days are the runner's ({p.timezone}).</p>
+      <AdminNav top={null} here="/admin/wakes" />
+      <FilterForm action="/admin/wakes" clear="/admin/wakes">
+        <Pick name="bot" label="Bot" value={f["bot"]} options={p.bots} /> <Pick name="outcome" label="Outcome" value={f["outcome"]} options={RUN_OUTCOMES} />{" "}
+        <Pick name="day" label="Day" value={f["day"]} options={p.days} />
+      </FilterForm>
+      <Downloads what="these wakes (the JSON has each transcript)" href={(ext) => adminHref(null, `/admin/wakes.${ext}`, f)} />
+      <Count matched={p.matched} total={p.total} shown={p.runs.length} noun="wakes" />
+      <LogBox label="Wakes">
+        {p.runs.length === 0 ? (
+          <p class="muted">No wakes match.</p>
+        ) : (
+          <ol class="adminlog">
+            {p.runs.map((r) => (
+              <li id={`wake-${r.id}`}>
+                <p>
+                  <a href={`#wake-${r.id}`} class="anchor">
+                    #{r.id}
+                  </a>{" "}
+                  · <Time at={r.at} />
+                  {r.slot === null ? " (by hand)" : ""} · <a href={botHref(r.bot)}>{r.bot}</a> · <Outcome run={r} /> · {r.model ?? "no model"} ·{" "}
+                  {num(tokens(r))} tokens{ordersOk(r) ? ` · orders ok ${ordersOk(r)}` : ""}
+                </p>
+                <RunDetail run={r} summary="Orders, results and transcript" />
+              </li>
+            ))}
+          </ol>
+        )}
+      </LogBox>
+      <Older href={props.olderHref} />
     </Layout>
   );
 }

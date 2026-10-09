@@ -56,6 +56,11 @@ web:
   front_record: 10
   # Record entries or Commons posts on one page.
   page: 50
+  # Entries an admin list page loads (its scroll box shows a screenful of
+  # them); "Older" pages back past them. Downloads hold every match.
+  admin_page: 100
+  # Bot wakes on one admin page; each carries its whole transcript.
+  admin_wakes: 20
   # Minds the Archive lists for each finished epoch, strongest first.
   archive_top: 5
 

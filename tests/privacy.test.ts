@@ -306,6 +306,22 @@ const ADMIN_URLS = [
   "/admin/bots",
   "/admin/bots/lantern",
   "/admin/bots/nobody",
+  "/admin/wakes",
+  "/admin/wakes?bot=lantern",
+  "/admin/record?seen=private",
+  "/admin/orders?result=refused",
+  // The downloads.
+  "/admin/minds.csv",
+  "/admin/epoch.json",
+  "/admin/record.csv",
+  "/admin/record.json",
+  "/admin/record.json?type=probed",
+  "/admin/orders.csv",
+  "/admin/orders.json?mind=HALCYON",
+  "/admin/channels.csv",
+  "/admin/channels.json",
+  "/admin/wakes.csv",
+  "/admin/wakes.json",
 ];
 
 /**
@@ -396,7 +412,7 @@ async function admin(app: ReturnType<typeof createApp>, anonymous: Map<string, n
       if (href.startsWith("/admin") && !bodies.has(href)) queue.push(href);
     }
   }
-  for (const must of ["/admin", "/admin/minds/HALCYON", "/admin/minds/VESTA", "/admin/minds/PIKE", "/admin/channels", "/admin/record", "/admin/orders", "/admin/bots", "/admin/bots/lantern"]) {
+  for (const must of ["/admin", "/admin/minds/HALCYON", "/admin/minds/VESTA", "/admin/minds/PIKE", "/admin/channels", "/admin/record", "/admin/orders", "/admin/bots", "/admin/bots/lantern", "/admin/wakes", "/admin/minds.csv", "/admin/epoch.json", "/admin/record.csv", "/admin/orders.json", "/admin/channels.csv", "/admin/wakes.json"]) {
     assert.ok(bodies.has(must), `the admin's crawl didn't reach ${must}`);
   }
   const everything = [...bodies.values()].join("\n");
@@ -406,6 +422,8 @@ async function admin(app: ReturnType<typeof createApp>, anonymous: Map<string, n
   assert.ok(bodies.get("/admin/minds/HALCYON")!.includes(SECRET), "HALCYON's admin page shows its scratchpad");
   assert.ok(bodies.get("/admin/channels")!.includes(WHISPER), "the admin's channels show the whisper");
   assert.ok(bodies.get("/admin/orders")!.includes(SECRET), "the orders log shows the scratchpad order");
+  assert.ok(bodies.get("/admin/orders.json")!.includes(SECRET), "the orders download has the scratchpad order");
+  assert.ok(bodies.get("/admin/channels.csv")!.includes(WHISPER), "the channels download has the whisper");
   const probes = await (await app.request("/admin/record?type=probed", { headers: { cookie } })).text();
   assert.match(probes, /Probed|probed/, "the admin's Record has private events");
   // Bad queries are refused, not shown; a missing mind is missing.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { loadSite } from "../config.js";
 import { dayOf, nextWake, type Day } from "../runner/schedule.js";
 import { parseModelList, REASONING_EFFORTS, TUNABLE_FIELDS, TunablesSchema, type Tunables } from "../runner/tunables.js";
 
@@ -47,6 +48,15 @@ export interface BotRun {
   detail: { lookups?: unknown[]; orders?: unknown[] | null; results?: unknown; note?: string | null; transcript?: { role: string; content: string | null }[] } | null;
 }
 
+/** Which runs a wakes list wants: any field left out matches all. */
+export interface RunFilter {
+  bot?: string | undefined;
+  outcome?: BotRun["outcome"] | undefined;
+  day?: Day | undefined;
+}
+
+export const RUN_OUTCOMES = ["done", "skipped", "failed"] as const;
+
 /** A bot's row: its tunables, or why they no longer read as valid. */
 export interface BotEntry {
   name: string;
@@ -65,6 +75,12 @@ export interface BotTables {
   day(day: Day): Promise<Map<string, { spent: number; slots: Set<number> }>>;
   /** A bot's newest runs, newest first; all bots' with `bot` null. */
   runs(bot: string | null, limit: number): Promise<BotRun[]>;
+  /** Runs matching `filter`: newest first below the id `before`, or oldest first above the id `after`; `limit` at most. */
+  find(filter: RunFilter, page: { before?: number; after?: number; limit: number }): Promise<BotRun[]>;
+  /** How many runs match `filter`. */
+  count(filter: RunFilter): Promise<number>;
+  /** The days with runs, newest first. */
+  days(): Promise<Day[]>;
   /** A bot's newest changes, newest first. */
   changes(bot: string, limit: number): Promise<ConfigChange[]>;
   /** Sets the tunables and logs the change in one step; null when the bot doesn't exist. */
@@ -134,6 +150,81 @@ export async function botPage(t: BotTables | undefined, identity: Identity, name
   if (!bot) return gameError("not_found", `No bot called ${name}.`);
   const [runs, changes] = await Promise.all([t.runs(name, RUNS_SHOWN), t.changes(name, CHANGES_SHOWN)]);
   return { day, timezone: t.timezone, bot, runs, changes };
+}
+
+/** Every wake, newest first, filtered by bot, outcome and day; with what the filters may pick from. */
+export interface WakesPage {
+  timezone: string;
+  bots: string[];
+  days: Day[];
+  runs: BotRun[];
+  more: boolean;
+  matched: number;
+  total: number;
+}
+
+const WakesQuery = z.strictObject({
+  bot: z.string().trim().min(1).max(80).optional(),
+  outcome: z.enum(RUN_OUTCOMES).optional(),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a day is YYYY-MM-DD").optional(),
+  before: z.coerce.number().int().positive().optional(),
+});
+
+function wakesQuery(query: unknown): { filter: RunFilter; before: number | undefined } | GameError {
+  const q = WakesQuery.safeParse(query);
+  if (!q.success) return gameError("invalid", z.prettifyError(q.error));
+  return { filter: { bot: q.data.bot, outcome: q.data.outcome, day: q.data.day }, before: q.data.before };
+}
+
+/** A page of wakes: the newest `web.admin_wakes` that match, below `before`. */
+export async function botWakes(t: BotTables | undefined, identity: Identity, query: unknown): Promise<WakesPage | GameError> {
+  if (identity.admin !== true || !t) return notFound();
+  const q = wakesQuery(query);
+  if ("ok" in q) return q;
+  const limit = loadSite().web.admin_wakes;
+  const [bots, days, found, matched, total] = await Promise.all([
+    t.bots(),
+    t.days(),
+    t.find(q.filter, { before: q.before, limit: limit + 1 }),
+    t.count(q.filter),
+    t.count({}),
+  ]);
+  return {
+    timezone: t.timezone,
+    bots: bots.map((b) => b.name),
+    days,
+    runs: found.slice(0, limit),
+    more: found.length > limit,
+    matched,
+    total,
+  };
+}
+
+/** How many wakes a download reads at a time, so a long epoch's transcripts never sit in memory at once. */
+const WAKES_BATCH = 50;
+
+/** Every matching wake, oldest first, a batch at a time, for a download. */
+export async function wholeWakes(
+  t: BotTables | undefined,
+  identity: Identity,
+  query: unknown,
+): Promise<{ batches: () => AsyncGenerator<BotRun[]> } | GameError> {
+  if (identity.admin !== true || !t) return notFound();
+  const q = wakesQuery(query);
+  if ("ok" in q) return q;
+  const { filter } = q;
+  return {
+    async *batches() {
+      let after = 0;
+      for (;;) {
+        const runs = await t.find(filter, { after, limit: WAKES_BATCH });
+        if (runs.length === 0) return;
+        yield runs;
+        after = runs.at(-1)!.id;
+        if (runs.length < WAKES_BATCH) return;
+      }
+    },
+  };
 }
 
 /** The settings form's fields, as text. */

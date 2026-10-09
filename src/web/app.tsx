@@ -22,7 +22,7 @@ import {
   threadPage,
   type RecordFilter,
 } from "../game/public.js";
-import { ADMIN_RECORD_TYPES, adminChannels, adminMind, adminOrders, adminOverview, adminRecord } from "../game/admin.js";
+import { adminChannels, adminEpochFile, adminMind, adminOrders, adminOverview, adminRecord, type AdminListPage } from "../game/admin.js";
 import { bootMind, submitOrders } from "../game/game.js";
 import { architectureMarks } from "../game/look.js";
 import { playPage } from "../game/play.js";
@@ -46,8 +46,10 @@ import {
 } from "./views/pages.js";
 import { DashboardView, LoginView, RulesView, SettingsView, type Flash } from "./views/play.js";
 import { HandbookView } from "./views/rules.js";
-import { botPage, botsOverview, changeBot, undoChange, type BotTables } from "../game/bots.js";
-import { BotsOverviewView, BotView } from "./views/bots.js";
+import { botPage, botsOverview, botWakes, changeBot, undoChange, wholeWakes, type BotTables } from "../game/bots.js";
+import { channelsCsv, channelsJson, mindsCsv, ordersCsv, ordersJson, recordCsv, recordJson, wakeJson, wakesCsvHeader, wakesCsvRows } from "./download.js";
+import { BotsOverviewView, BotView, WakesView } from "./views/bots.js";
+import { isoAt } from "./format.js";
 import { AdminChannelsView, AdminMindView, AdminOrdersView, AdminOverviewView, AdminRecordView, adminHref } from "./views/admin.js";
 import { ChannelsView, ChannelView, FlavorView, PlayCommonsView, PlayThreadView, ProtocolsView, TradesView, type PlayCtx } from "./views/social.js";
 
@@ -519,10 +521,37 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
 
   const viewerOrNobody = (c: Context): Identity => viewerOf(c) ?? { account: "" };
 
+  /** The query's filters, without the epoch (adminHref adds it) or the paging. */
+  const filtersOf = (query: Record<string, string>): Record<string, string> => {
+    const { epoch: _epoch, before: _before, ...rest } = query;
+    return rest;
+  };
+  /** A file to save, never shown in the browser. */
+  const attachment = (c: Context, filename: string, type: string, body: string | ReadableStream<Uint8Array>) => {
+    c.header("Content-Type", `${type}; charset=utf-8`);
+    c.header("Content-Disposition", `attachment; filename="${filename}"`);
+    return c.body(body);
+  };
+  const today = () => isoAt(deps.now()).slice(0, 10);
+  const fileName = (epoch: number, what: string, ext: string) => `mind-epoch${epoch}-${what}-${today()}.${ext}`;
+  const jsonFile = (v: unknown) => `${JSON.stringify(v, null, 1)}\n`;
+
   app.get("/admin", async (c) => {
-    const page = await adminOverview(deps.epochs, viewerOrNobody(c), given(c, ["epoch"]), deps.now());
+    const page = await adminOverview(deps.epochs, viewerOrNobody(c), given(c, ["epoch", "sort"]), deps.now());
     if (isError(page)) return refuse(c, page);
     return render(c, <AdminOverviewView ctx={pageCtx(c)} page={page} />);
+  });
+
+  app.get("/admin/minds.csv", async (c) => {
+    const page = await adminOverview(deps.epochs, viewerOrNobody(c), given(c, ["epoch", "sort"]), deps.now());
+    if (isError(page)) return refuse(c, page);
+    return attachment(c, fileName(page.epoch.number, "minds", "csv"), "text/csv", mindsCsv(page.minds));
+  });
+
+  app.get("/admin/epoch.json", async (c) => {
+    const got = await adminEpochFile(deps.epochs, viewerOrNobody(c), given(c, ["epoch"]), deps.now());
+    if (isError(got)) return refuse(c, got);
+    return attachment(c, fileName(got.file.epoch, "epoch", "json"), "application/json", jsonFile(got.file));
   });
 
   app.get("/admin/minds/:name", async (c) => {
@@ -536,45 +565,64 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
     return render(c, <AdminMindView ctx={pageCtx(c)} page={page} olderHref={older} />);
   });
 
+  const CHANNEL_KEYS = ["epoch", "mind", "with", "day", "before"];
+  const ADMIN_RECORD_KEYS = ["epoch", "mind", "n", "type", "day", "seen", "before"];
+  const ORDER_KEYS = ["epoch", "account", "mind", "order", "result", "day", "before"];
+
   app.get("/admin/channels", async (c) => {
-    const query = given(c, ["epoch", "mind", "before"]);
+    const query = given(c, CHANNEL_KEYS);
     const page = await adminChannels(deps.epochs, viewerOrNobody(c), query, deps.now());
     if (isError(page)) return refuse(c, page);
-    const older = page.more ? adminHref(page, "/admin/channels", { mind: query["mind"], before: page.entries.at(-1)?.seq }) : null;
-    return render(c, <AdminChannelsView ctx={pageCtx(c)} page={page} mind={query["mind"] ?? ""} olderHref={older} />);
+    const filter = filtersOf(query);
+    const older = page.more ? adminHref(page, "/admin/channels", { ...filter, before: page.entries.at(-1)?.seq }) : null;
+    return render(c, <AdminChannelsView ctx={pageCtx(c)} page={page} filter={filter} olderHref={older} />);
   });
 
   app.get("/admin/record", async (c) => {
-    const query = given(c, ["epoch", "mind", "n", "type", "before"]);
+    const query = given(c, ADMIN_RECORD_KEYS);
     const page = await adminRecord(deps.epochs, viewerOrNobody(c), query, deps.now());
     if (isError(page)) return refuse(c, page);
-    const older = page.more
-      ? adminHref(page, "/admin/record", { mind: query["mind"], n: query["n"], type: query["type"], before: page.entries.at(-1)?.seq })
-      : null;
-    return render(
-      c,
-      <AdminRecordView
-        ctx={pageCtx(c)}
-        page={page}
-        types={ADMIN_RECORD_TYPES}
-        filter={{ mind: query["mind"] ?? "", type: query["type"] ?? "" }}
-        olderHref={older}
-      />,
-    );
+    const filter = filtersOf(query);
+    const older = page.more ? adminHref(page, "/admin/record", { ...filter, before: page.entries.at(-1)?.seq }) : null;
+    return render(c, <AdminRecordView ctx={pageCtx(c)} page={page} filter={filter} olderHref={older} />);
   });
 
   app.get("/admin/orders", async (c) => {
-    const query = given(c, ["epoch", "account", "mind", "before"]);
+    const query = given(c, ORDER_KEYS);
     const page = await adminOrders(deps.epochs, viewerOrNobody(c), query, deps.now());
     if (isError(page)) return refuse(c, page);
-    const older = page.more
-      ? adminHref(page, "/admin/orders", { account: query["account"], mind: query["mind"], before: page.entries.at(-1)?.index })
-      : null;
-    return render(
-      c,
-      <AdminOrdersView ctx={pageCtx(c)} page={page} filter={{ account: query["account"] ?? "", mind: query["mind"] ?? "" }} olderHref={older} />,
-    );
+    const filter = filtersOf(query);
+    const older = page.more ? adminHref(page, "/admin/orders", { ...filter, before: page.entries.at(-1)?.index }) : null;
+    return render(c, <AdminOrdersView ctx={pageCtx(c)} page={page} filter={filter} olderHref={older} />);
   });
+
+  // The lists as files: every match of the same filters, oldest first; `before` is ignored.
+  const lists = [
+    { what: "channels", keys: CHANNEL_KEYS, list: adminChannels, csv: channelsCsv, json: channelsJson },
+    { what: "record", keys: ADMIN_RECORD_KEYS, list: adminRecord, csv: recordCsv, json: recordJson },
+    { what: "orders", keys: ORDER_KEYS, list: adminOrders, csv: ordersCsv, json: ordersJson },
+  ] as const;
+  for (const l of lists) {
+    for (const ext of ["csv", "json"] as const) {
+      app.get(`/admin/${l.what}.${ext}`, async (c) => {
+        const query = filtersOf(given(c, l.keys));
+        const epoch = c.req.query("epoch")?.trim();
+        const asked = epoch ? { ...query, epoch } : query;
+        const page = await (l.list as (...a: Parameters<typeof adminRecord>) => Promise<AdminListPage<never> | GameError>)(
+          deps.epochs,
+          viewerOrNobody(c),
+          asked,
+          deps.now(),
+          "whole",
+        );
+        if (isError(page)) return refuse(c, page);
+        const name = fileName(page.epoch.number, l.what, ext);
+        if (ext === "csv") return attachment(c, name, "text/csv", (l.csv as (e: never[]) => string)(page.entries));
+        const entries = (l.json as (e: never[]) => unknown[])(page.entries);
+        return attachment(c, name, "application/json", jsonFile({ epoch: page.epoch.number, filters: query, downloadedAt: isoAt(deps.now()), entries }));
+      });
+    }
+  }
 
   // The bot runner's settings and wakes (src/game/bots.ts decides who sees them).
   app.get("/admin/bots", async (c) => {
@@ -608,6 +656,48 @@ export function createWebApp(deps: WebDeps): Hono<WebEnv> {
     const id = Number((await form(c))["change"]);
     return afterChange(c, name, await undoChange(deps.bots, viewerOrNobody(c), name, Number.isInteger(id) ? id : -1));
   });
+
+  const WAKE_KEYS = ["bot", "outcome", "day", "before"];
+
+  app.get("/admin/wakes", async (c) => {
+    const query = given(c, WAKE_KEYS);
+    const page = await botWakes(deps.bots, viewerOrNobody(c), query);
+    if (isError(page)) return refuse(c, page);
+    const filter = filtersOf(query);
+    const older = page.more ? adminHref(null, "/admin/wakes", { ...filter, before: page.runs.at(-1)?.id }) : null;
+    return render(c, <WakesView ctx={pageCtx(c)} page={page} filter={filter} olderHref={older} />);
+  });
+
+  // Every matching wake, read and written a batch at a time: a long epoch's transcripts are large.
+  for (const ext of ["csv", "json"] as const) {
+    app.get(`/admin/wakes.${ext}`, async (c) => {
+      const filter = filtersOf(given(c, WAKE_KEYS));
+      const got = await wholeWakes(deps.bots, viewerOrNobody(c), filter);
+      if (isError(got)) return refuse(c, got);
+      const encoder = new TextEncoder();
+      const batches = got.batches();
+      let first = true;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(ext === "csv" ? wakesCsvHeader() : `{"filters":${JSON.stringify(filter)},"downloadedAt":${JSON.stringify(isoAt(deps.now()))},"wakes":[\n`),
+          );
+        },
+        async pull(controller) {
+          const next = await batches.next();
+          if (next.done) {
+            if (ext === "json") controller.enqueue(encoder.encode("]}\n"));
+            controller.close();
+            return;
+          }
+          const text = ext === "csv" ? wakesCsvRows(next.value) : `${first ? "" : ",\n"}${next.value.map((r) => JSON.stringify(wakeJson(r))).join(",\n")}`;
+          first = false;
+          controller.enqueue(encoder.encode(text));
+        },
+      });
+      return attachment(c, `mind-wakes-${today()}.${ext}`, ext === "csv" ? "text/csv" : "application/json", body);
+    });
+  }
 
   app.notFound(notFound);
   app.onError((err, c) => {

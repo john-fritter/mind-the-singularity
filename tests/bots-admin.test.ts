@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { createApp } from "../src/app.js";
 import { loadRules } from "../src/config.js";
 import { listedEpochs } from "../src/game/epochs.js";
-import { botPage, botsOverview, changeBot, tunablesFromForm, undoChange } from "../src/game/bots.js";
+import { botPage, botsOverview, botWakes, changeBot, tunablesFromForm, undoChange, wholeWakes } from "../src/game/bots.js";
+import { loadSite } from "../src/config.js";
 import { newGame } from "../src/game/game.js";
 import { skipped } from "../src/runner/service.js";
 import { loadRunner } from "../src/runner/settings.js";
@@ -105,6 +106,28 @@ async function main() {
   assert.equal(page.runs.length, 3);
   assert.ok("ok" in (await botPage(tables, ADMIN, "nobody", T)));
 
+  // Every wake, filtered by bot, outcome and day; nobody else gets any.
+  const wakes = await botWakes(tables, ADMIN, { day: "2026-10-07" });
+  assert.ok(!("ok" in wakes));
+  assert.deepEqual([wakes.runs.length, wakes.matched, wakes.total, wakes.more], [2, 2, 3, false]);
+  assert.deepEqual(wakes.days, ["2026-10-07", "2026-10-06"]);
+  assert.deepEqual(wakes.bots, ["lantern"]);
+  const failed = await botWakes(tables, ADMIN, { outcome: "failed" });
+  assert.ok(!("ok" in failed) && failed.runs.length === 0);
+  assert.ok("ok" in (await botWakes(tables, ADMIN, { day: "yesterday" })));
+  assert.ok("ok" in (await botWakes(tables, { account: "pike" }, {})));
+  assert.ok("ok" in (await wholeWakes(tables, { account: "pike" }, {})));
+  // A download reads a batch at a time, oldest first, and misses none.
+  const many = memoryBotTables({ timezone: "UTC", budget: 50_000 }, new Map(bots), Array.from({ length: 123 }, (_, i) => done("2026-10-07", i, 100 + i)));
+  const whole = await wholeWakes(many, ADMIN, {});
+  assert.ok(!("ok" in whole));
+  const seen: number[] = [];
+  for await (const batch of whole.batches()) seen.push(...batch.map((r) => r.id));
+  assert.deepEqual(seen, Array.from({ length: 123 }, (_, i) => i + 1));
+  const paged = await botWakes(many, ADMIN, {});
+  const shown = loadSite().web.admin_wakes;
+  assert.ok(!("ok" in paged) && paged.runs.length === shown && paged.more && paged.runs[0]!.id === 123);
+
   // Through the web: the pages, the form's post and undo, a refusal shown on the page, and a 404 for anyone else.
   const logins = memoryLogins({ overseer: "overseer-password", pike: "pike-password" }, ["overseer"]);
   const app = createApp({
@@ -127,6 +150,24 @@ async function main() {
   const mine = await (await app.request("/admin/bots/lantern", { headers: { cookie: admin } })).text();
   assert.match(mine, /NOTE-77/, "a wake's note");
   assert.match(mine, /name="model" value="[^"]+"/);
+
+  const wakesPage = await (await app.request("/admin/wakes?bot=lantern&day=2026-10-06", { headers: { cookie: admin } })).text();
+  assert.match(wakesPage, /<option value="2026-10-06" selected="">2026-10-06<\/option>/);
+  assert.match(wakesPage, /class="logbox"/);
+  assert.match(wakesPage, /1 of 3 wakes match/);
+  assert.match(wakesPage, /href="\/admin\/wakes\.json\?bot=lantern&amp;day=2026-10-06"/);
+  assert.match(mine, /href="\/admin\/wakes\?bot=lantern"/, "a bot's page links its wakes");
+  const wakesCsv = await app.request("/admin/wakes.csv", { headers: { cookie: admin } });
+  assert.match(wakesCsv.headers.get("content-disposition") ?? "", /^attachment; filename="mind-wakes-2026-10-07\.csv"$/);
+  const csvLines = (await wakesCsv.text()).trimEnd().split("\r\n");
+  assert.equal(csvLines.length, 4);
+  assert.match(csvLines[1]!, /^1,[^,]+,lantern,2026-10-07,0,done,[^,]+,false,1,1150,50,0,0,1,1,$/);
+  const wakesJson = JSON.parse(await (await app.request("/admin/wakes.json?day=2026-10-07", { headers: { cookie: admin } })).text()) as { filters: unknown; wakes: { id: number; detail: { note: string } }[] };
+  assert.deepEqual(wakesJson.filters, { day: "2026-10-07" });
+  assert.deepEqual(wakesJson.wakes.map((w) => [w.id, w.detail.note]), [[1, "NOTE-77"], [2, "NOTE-77"]]);
+  for (const url of ["/admin/wakes", "/admin/wakes.csv", "/admin/wakes.json"]) {
+    assert.equal((await app.request(url, { headers: { cookie: pike } })).status, 404, url);
+  }
 
   assert.equal((await post("/admin/bots/lantern", pike, formOf({ ...start, model: "x/y" }))).status, 404);
   assert.equal((await post("/admin/bots/lantern/undo", pike, { change: "1" })).status, 404);

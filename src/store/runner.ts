@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { withTransaction } from "../db/index.js";
-import { tunablesDiff, type BotEntry, type BotRun, type BotTables, type Changes, type ConfigChange } from "../game/bots.js";
+import { tunablesDiff, type BotEntry, type BotRun, type BotTables, type Changes, type ConfigChange, type RunFilter } from "../game/bots.js";
 import type { Day } from "../runner/schedule.js";
 import { rowTunables, type RunRecord } from "../runner/store.js";
 import type { Tunables } from "../runner/tunables.js";
@@ -75,6 +75,26 @@ export function postgresBotTables(pool: Pool, settings: { timezone: string; budg
         : await pool.query<Record<string, unknown>>("SELECT * FROM runner_runs WHERE bot = $1 ORDER BY id DESC LIMIT $2", [bot, limit]);
       return rows.map(run);
     },
+    async find(filter, page) {
+      const { where, params } = runsWhere(filter);
+      const ascending = page.after !== undefined;
+      if (page.before !== undefined) where.push(`id < $${params.push(page.before)}`);
+      if (page.after !== undefined) where.push(`id > $${params.push(page.after)}`);
+      const { rows } = await pool.query<Record<string, unknown>>(
+        `SELECT * FROM runner_runs ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY id ${ascending ? "ASC" : "DESC"} LIMIT $${params.push(page.limit)}`,
+        params,
+      );
+      return rows.map(run);
+    },
+    async count(filter) {
+      const { where, params } = runsWhere(filter);
+      const { rows } = await pool.query<{ n: string }>(`SELECT COUNT(*) AS n FROM runner_runs ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`, params);
+      return Number(rows[0]!.n);
+    },
+    async days() {
+      const { rows } = await pool.query<{ day: unknown }>("SELECT DISTINCT day FROM runner_runs WHERE day IS NOT NULL ORDER BY day DESC");
+      return rows.map((r) => dayText(r.day)!);
+    },
     async changes(bot, limit) {
       const { rows } = await pool.query<Record<string, unknown>>("SELECT * FROM runner_config_log WHERE bot = $1 ORDER BY id DESC LIMIT $2", [bot, limit]);
       return rows.map(change);
@@ -100,10 +120,23 @@ export function postgresBotTables(pool: Pool, settings: { timezone: string; budg
   };
 }
 
+/** A run filter as SQL conditions, with their parameters. */
+function runsWhere(filter: RunFilter): { where: string[]; params: unknown[] } {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filter.bot !== undefined) where.push(`bot = $${params.push(filter.bot)}`);
+  if (filter.outcome !== undefined) where.push(`outcome = $${params.push(filter.outcome)}`);
+  if (filter.day !== undefined) where.push(`day = $${params.push(filter.day)}`);
+  return { where, params };
+}
+
 /** A change from settings that no longer read as valid: every field, from unknown. */
 function wholeChange(next: Tunables): Changes {
   return Object.fromEntries(Object.entries(next).map(([k, v]) => [k, { from: null, to: v }])) as Changes;
 }
+
+const matches = (r: BotRun, f: RunFilter) =>
+  (f.bot === undefined || r.bot === f.bot) && (f.outcome === undefined || r.outcome === f.outcome) && (f.day === undefined || r.day === f.day);
 
 /** The tables in memory, for tests: bots and runs given directly, changes kept as Postgres would. */
 export function memoryBotTables(settings: { timezone: string; budget: number }, bots: Map<string, Tunables>, runs: RunRecord[] = []): BotTables {
@@ -143,6 +176,20 @@ export function memoryBotTables(settings: { timezone: string; budget: number }, 
         .filter((r) => bot === null || r.bot === bot)
         .reverse()
         .slice(0, limit);
+    },
+    async find(filter, page) {
+      const all = runs.map(asRun).filter((r) => matches(r, filter));
+      if (page.after !== undefined) return all.filter((r) => r.id > page.after!).slice(0, page.limit);
+      return all
+        .filter((r) => page.before === undefined || r.id < page.before)
+        .reverse()
+        .slice(0, page.limit);
+    },
+    async count(filter) {
+      return runs.map(asRun).filter((r) => matches(r, filter)).length;
+    },
+    async days() {
+      return [...new Set(runs.flatMap((r) => (r.day === null ? [] : [r.day])))].sort().reverse();
     },
     async changes(bot, limit) {
       return log.filter((c) => c.bot === bot).reverse().slice(0, limit);
