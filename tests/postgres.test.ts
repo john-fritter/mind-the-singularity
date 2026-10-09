@@ -332,6 +332,17 @@ async function runnerTables(pool: Pool, url: string) {
     assert.equal(runs[1]!.detail?.note, "kept");
     assert.equal(runs[0]!.slot, null);
     assert.equal((await tables.runs(null, 10)).length, 3);
+    // The wakes list's filters and paging, and a download's batches.
+    assert.deepEqual(await tables.days(), ["2026-10-07", "2026-10-06"]);
+    assert.equal(await tables.count({}), 3);
+    assert.equal(await tables.count({ bot: "lantern", day: "2026-10-07", outcome: "done" }), 2);
+    assert.equal(await tables.count({ outcome: "skipped" }), 1);
+    const newest = await tables.find({ bot: "lantern" }, { limit: 1 });
+    assert.equal(newest.length, 1);
+    assert.deepEqual((await tables.find({ bot: "lantern" }, { before: newest[0]!.id, limit: 5 })).map((r) => r.slot), [0]);
+    const oldest = await tables.find({}, { after: 0, limit: 2 });
+    assert.ok(oldest.length === 2 && oldest[0]!.id < oldest[1]!.id);
+    assert.equal((await tables.find({}, { after: oldest[1]!.id, limit: 5 })).length, 1);
 
     const admin = { account: "overseer", admin: true };
     const form = { model: "minimax/minimax-m3", fallback_models: "tencent/hy3", reasoning_effort: "low", wakes_per_day: "6", window: "08:00-24:00", daily_tokens: "" };

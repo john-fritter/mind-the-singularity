@@ -10,6 +10,18 @@ export function formatAt(ms: number): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
+/** "5 Oct 14:30": a moment in a narrow column, UTC like the rest. */
+export function formatShort(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
+/** "10 Oct": a day, for lists of days. */
+export function formatDate(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
 /** The moment as an ISO string, for <time datetime>. */
 export const isoAt = (ms: number) => new Date(ms).toISOString();
 

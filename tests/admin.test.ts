@@ -6,6 +6,7 @@ import { adminChannels, adminMind, adminOrders, adminOverview, adminRecord } fro
 import { listedEpochs } from "../src/game/epochs.js";
 import { bootMind, newGame, submitOrders } from "../src/game/game.js";
 import { MemoryStore } from "../src/store/memory.js";
+import { csv } from "../src/web/download.js";
 import { logIn, memoryLogins } from "./logins.js";
 
 // The admin view (src/game/admin.ts, /admin): who gets it, what it shows,
@@ -85,6 +86,7 @@ async function main() {
   assert.equal(overview.epoch.number, 2);
   assert.deepEqual(overview.epochs, [2, 1]);
   assert.ok(overview.newest);
+  assert.equal(overview.sort, "rank");
   const owners = new Map(overview.minds.map((m) => [m.mind.designation, m.owner]));
   assert.equal(owners.get("HALCYON"), "halcyon");
   assert.equal(owners.get("VESTA"), "vesta");
@@ -119,22 +121,80 @@ async function main() {
   );
   const call = log.entries[0]!;
   assert.equal(call.orders.length, 3);
-  assert.deepEqual(JSON.parse(call.orders[0]!.order), {
+  assert.deepEqual(call.orders[0]!.order, {
     do: "scratchpad",
     text: "NOTE-1",
   });
+  assert.equal(call.orders[0]!.type, "scratchpad");
   assert.equal(call.orders[2]!.result?.ok, false, "a refused order shows as refused");
-  assert.match(log.entries[1]!.input!, /Glasswater/);
+  assert.match(JSON.stringify(log.entries[1]!.input), /Glasswater/);
+  assert.equal(log.matched, 2);
+  assert.equal(log.total, 3, "two boots and a call");
+
+  // What the dropdowns offer comes from the epoch.
+  assert.ok(log.choices.minds.some((m) => m.designation === "HALCYON" && !m.legacy && !m.deleted));
+  assert.ok(log.choices.minds.some((m) => m.legacy), "legacy systems are offered");
+  assert.ok(log.choices.accounts.includes("halcyon") && log.choices.accounts.includes("vesta"));
+  assert.deepEqual(log.choices.orders, ["message", "nonsense", "scratchpad"]);
+  assert.ok(log.choices.types.includes("message") && !log.choices.types.includes("battle"), "only the types the Record holds");
+  assert.deepEqual(log.choices.days.map((d) => d.day), [3, 2, 1], "50 hours in: day 3");
+
+  // An order type or a result narrows each call to its matching orders.
+  const refused = await adminOrders(epochs, ADMIN, { result: "refused" }, T);
+  assert.ok(!("ok" in refused) && refused.entries.length === 1);
+  assert.deepEqual(
+    refused.entries[0]!.orders.map((o) => [o.n, o.type]),
+    [[3, "nonsense"]],
+  );
+  assert.equal(refused.entries[0]!.calls, 3);
+  const messagesSent = await adminOrders(epochs, ADMIN, { order: "message" }, T);
+  assert.ok(!("ok" in messagesSent) && messagesSent.entries.length === 1 && messagesSent.entries[0]!.orders[0]!.n === 2);
+  const boots = await adminOrders(epochs, ADMIN, { order: "boot" }, T);
+  assert.ok(!("ok" in boots) && boots.entries.length === 2 && boots.entries.every((e) => e.kind === "boot"));
+  const dayOne = await adminOrders(epochs, ADMIN, { day: "1" }, T);
+  assert.ok(!("ok" in dayOne) && dayOne.entries.every((e) => e.kind === "boot") && dayOne.matched === 2);
+  const dayThree = await adminOrders(epochs, ADMIN, { day: "3" }, T);
+  assert.ok(!("ok" in dayThree) && dayThree.matched === 1 && dayThree.entries[0]!.kind === "orders");
+
+  // The Record by day and by who may see it; channels between a pair.
+  const privately = await adminRecord(epochs, ADMIN, { seen: "private" }, T);
+  assert.ok(!("ok" in privately) && privately.entries.length > 0 && privately.entries.every((e) => !e.public));
+  const openly = await adminRecord(epochs, ADMIN, { seen: "public" }, T);
+  assert.ok(!("ok" in openly) && openly.entries.every((e) => e.public) && openly.matched + privately.matched === openly.total);
+  const pair = await adminChannels(epochs, ADMIN, { mind: "VESTA", with: "HALCYON" }, T);
+  assert.ok(!("ok" in pair) && pair.entries.length === 1);
+  const otherPair = await adminChannels(epochs, ADMIN, { mind: "VESTA", with: "VESTA" }, T);
+  assert.ok(!("ok" in otherPair) && otherPair.entries.length === 0);
+  const withOnly = await adminChannels(epochs, ADMIN, { with: "HALCYON" }, T);
+  assert.ok(!("ok" in withOnly) && withOnly.entries.length === 1);
+  const otherDay = await adminChannels(epochs, ADMIN, { day: "2" }, T);
+  assert.ok(!("ok" in otherDay) && otherDay.entries.length === 0 && otherDay.total === 1);
+
+  // The overview counts each mind's orders; sorts keep everyone.
+  const after = await adminOverview(epochs, ADMIN, { sort: "refused" }, T);
+  assert.ok(!("ok" in after));
+  assert.equal(after.minds[0]!.mind.designation, "HALCYON");
+  assert.deepEqual([after.minds[0]!.orders, after.minds[0]!.refused, after.minds[0]!.lastOrderAt], [3, 1, T]);
+  const quiet = await adminOverview(epochs, ADMIN, { sort: "quiet" }, T);
+  assert.ok(!("ok" in quiet) && quiet.minds.at(-1)!.mind.designation === "HALCYON" && quiet.minds.length === after.minds.length);
+  assert.ok("ok" in (await adminOverview(epochs, ADMIN, { sort: "nonsense" }, T)));
 
   // Paging back through the log, a page at a time.
-  for (let i = 0; i < site.web.page + 3; i++)
+  const page = site.web.admin_page;
+  for (let i = 0; i < page + 3; i++)
     assert.ok((await submitOrders(store, halcyon, [{ do: "scratchpad", text: `NOTE-${i}` }], T + i)).ok);
   const first = await adminOrders(epochs, ADMIN, { mind: "HALCYON" }, T + 100);
-  assert.ok(!("ok" in first) && first.entries.length === site.web.page && first.more);
+  assert.ok(!("ok" in first) && first.entries.length === page && first.more && first.matched === page + 5);
   const second = await adminOrders(epochs, ADMIN, { mind: "HALCYON", before: first.entries.at(-1)!.index }, T + 100);
   assert.ok(!("ok" in second) && !second.more);
-  assert.equal(first.entries.length + second.entries.length, site.web.page + 3 + 2);
+  assert.equal(first.entries.length + second.entries.length, page + 3 + 2);
   assert.ok(second.entries.every((e) => e.index < first.entries.at(-1)!.index));
+  // Whole, for a download: every match, oldest first, whatever `before` says.
+  const whole = await adminOrders(epochs, ADMIN, { mind: "HALCYON", before: 3 }, T + 100, "whole");
+  assert.ok(!("ok" in whole) && whole.entries.length === page + 5 && !whole.more);
+  assert.ok(whole.entries.every((e, i) => i === 0 || e.index > whole.entries[i - 1]!.index));
+  const wholeRecord = await adminRecord(epochs, ADMIN, {}, T + 100, "whole");
+  assert.ok(!("ok" in wholeRecord) && wholeRecord.entries.length === wholeRecord.total && wholeRecord.entries.every((e) => e.raw?.seq === e.seq));
 
   // Another epoch, by number.
   const then = await adminOverview(epochs, ADMIN, { epoch: "1" }, T);
@@ -165,6 +225,47 @@ async function main() {
   assert.match(past, /GHOST/);
   assert.match(past, /href="\/admin\/minds\/GHOST\?epoch=1"/, "links keep the epoch");
   assert.match(past, /href="\/admin\/channels\?epoch=1"/);
+
+  // The filters are dropdowns of what the epoch holds, and the logs sit in a scroll box.
+  const recordPage = await (await app.request("/admin/record?mind=vesta&day=3", { headers: { cookie } })).text();
+  assert.match(recordPage, /<select name="mind">[\s\S]*<option value="VESTA" selected="">VESTA<\/option>/, "the mind dropdown keeps its pick");
+  assert.match(recordPage, /<option value="3" selected="">3 \(7 Oct\)<\/option>/, "days are named by date");
+  assert.match(recordPage, /class="logbox"/);
+  assert.match(recordPage, /href="\/admin\/record\.csv\?mind=vesta&amp;day=3"/, "a download keeps the filters");
+  const ordersPage = await (await app.request("/admin/orders", { headers: { cookie } })).text();
+  assert.match(ordersPage, /<option value="halcyon">halcyon<\/option>/);
+  assert.match(ordersPage, /<option value="nonsense">nonsense<\/option>/);
+  assert.match(ordersPage, /boots and calls/);
+
+  // Downloads: every match as a file to save, CSV or JSON.
+  const download = async (url: string) => {
+    const res = await app.request(url, { headers: { cookie } });
+    assert.equal(res.status, 200, url);
+    assert.match(res.headers.get("content-disposition") ?? "", /^attachment; filename="mind-[a-z0-9-]+\.(csv|json)"$/, url);
+    return { type: res.headers.get("content-type") ?? "", body: await res.text() };
+  };
+  const ordersCsv = await download("/admin/orders.csv?mind=HALCYON");
+  assert.match(ordersCsv.type, /^text\/csv/);
+  const lines = ordersCsv.body.trimEnd().split("\r\n");
+  assert.equal(lines[0], "index,time,day,account,mind,kind,n,order_type,order,ok,message,cycles");
+  assert.equal(lines.length, 1 + 1 + 3 + page + 3, "a header, the boot, then one line per order");
+  assert.match(lines[2]!, /^3,[^,]+,3,halcyon,HALCYON,orders,1,scratchpad,"\{""do"":""scratchpad"",""text"":""NOTE-1""\}",true,/);
+  const ordersJson = JSON.parse((await download("/admin/orders.json?result=refused")).body) as { epoch: number; filters: unknown; entries: { orders: unknown[] }[] };
+  assert.equal(ordersJson.epoch, 2);
+  assert.deepEqual(ordersJson.filters, { result: "refused" });
+  assert.equal(ordersJson.entries.length, 1);
+  const recordJson = JSON.parse((await download("/admin/record.json")).body) as { entries: { seq: number; event: { seq: number } }[] };
+  assert.ok(recordJson.entries.length > 0 && recordJson.entries.every((e, i) => e.event.seq === e.seq && (i === 0 || e.seq > recordJson.entries[i - 1]!.seq)));
+  assert.match((await download("/admin/record.csv?type=message")).body, /^seq,time,day,type,public,minds,text\r\n\d+,[^,]+,3,message,false,HALCYON VESTA,/);
+  assert.match((await download("/admin/channels.csv")).body, /,HALCYON,VESTA,hello\r\n$/);
+  assert.match((await download("/admin/minds.csv")).body, /^rank,mind,owner,/);
+  const epochFile = JSON.parse((await download("/admin/epoch.json?epoch=1")).body) as { epoch: number; start: { seed: number }; log: unknown[] };
+  assert.deepEqual([epochFile.epoch, epochFile.start.seed, epochFile.log.length], [1, 3, 1]);
+  assert.equal((await app.request("/admin/record.csv?type=nonsense", { headers: { cookie } })).status, 400);
+  assert.equal((await app.request("/admin/orders.json?epoch=9", { headers: { cookie } })).status, 404);
+
+  // CSV quoting, and texts a spreadsheet would run as formulas.
+  assert.equal(csv(["a", "b"], [["x,y", 'say "hi"'], ["line\nbreak", null], ["=SUM(A1)", -5], ["@cmd", "+1"]]), 'a,b\r\n"x,y","say ""hi"""\r\n"line\nbreak",\r\n\'=SUM(A1),-5\r\n\'@cmd,\'+1\r\n');
 
   // MCP: whatever the key's identity says, the tools act as the bare account; there is no admin tool.
   const listed = await app.request("/mcp", {

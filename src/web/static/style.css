@@ -995,3 +995,57 @@ form.inline {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* A log in the admin view: a fixed number of lines that scrolls on its
+   own, fewer on a phone, so the page around it barely scrolls. */
+.logbox {
+  --logbox-lines: 24;
+  max-height: calc(var(--logbox-lines) * 1.5em);
+  max-height: calc(var(--logbox-lines) * 1lh);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 0.5rem;
+  margin: 0.5rem 0;
+}
+
+@media (max-width: 40rem) {
+  .logbox {
+    --logbox-lines: 14;
+  }
+}
+
+.logbox:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.downloads,
+.count {
+  margin: 0.25rem 0;
+}
+
+a.anchor {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.logbox > ol,
+.logbox > ul {
+  margin: 0;
+}
+
+.logbox .adminlog > li:first-child > p:first-child {
+  margin-top: 0.25rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* On a phone, the admin pages skip their reminder of what they are, to keep the logs in view. */
+@media (max-width: 40rem) {
+  .admin-note {
+    display: none;
+  }
+}
