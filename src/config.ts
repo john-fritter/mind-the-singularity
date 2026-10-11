@@ -65,6 +65,7 @@ export const SiteSchema = z.strictObject({
     proposals: count,
     refused: count,
     refused_size: count,
+    paused: count,
     max_size: count,
     scanned: count,
   }),

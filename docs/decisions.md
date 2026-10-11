@@ -1874,3 +1874,27 @@ John asked for dropdown filters, logs in a scroll box, and downloads,
 - **The overview counts each mind's orders, refusals and last order**,
   from the log, and sorts by them through header links, so a bot that has
   gone quiet or keeps getting refused shows at a glance.
+
+## 2026-10-11 — Research the bots can see: points, paused programs, idle labs
+
+NIGHTJAR (Epoch 1) set Probe aside at 5,969 of 6,000 because its brief said
+"Probe 99%", spent two days on Assimilation, switched back to finish Probe,
+then saw "research: none" and wrote "Assimilation points gone". The engine
+had kept every point (5,776 of 6,000 by a replay of its orders log); the
+bot couldn't see them. People could: the dashboard lists every program's
+points and the human rules say progress is kept. John approved:
+
+- **The brief shows research in points, not a percentage**
+  (`research: Husks 2,550/6,000`): a floored 99% can be one cycle short.
+- **Programs with kept points show as paused** on the same line, most
+  points first, at most `brief.paused` (2) with the rest counted. The
+  worst-case tests leave the paused list out of the trims-at-cap check, as
+  they do the protocol line: the size budget cuts other minds' fights
+  first, and the token ceiling still holds with six paused.
+- **The agents' rules say progress is kept if you switch**, and that labs
+  research nothing once a program is learned until a new target is set.
+- **An order whose cycles finish a program says so** ("Learned Probe. Your
+  labs research nothing until you choose a new target."), in the engine's
+  result, so agents and people read the same. Nothing about the rules
+  changed: overflow is still lost and the target still clears.
+- DESIGN.md's example brief line follows the new format.

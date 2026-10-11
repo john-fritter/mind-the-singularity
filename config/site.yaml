@@ -32,6 +32,9 @@ brief:
   # ones folded, at most this many, each cut to refused_size.
   refused: 3
   refused_size: 100
+  # Programs with research points kept from an earlier target, most
+  # points first; the rest are counted.
+  paused: 2
   # The brief's size at most. Long names and long messages can pass it
   # with every trim above within its cap; then lines go, least useful first.
   max_size: 5600

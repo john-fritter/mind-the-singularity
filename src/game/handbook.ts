@@ -266,7 +266,7 @@ function chapters(rules: Rules): Chapter[] {
       blocks: [
         {
           kind: "p",
-          text: `A mind can learn eight programs: Probe, its three deployments, its self, battle and hostile programs, and the Singularity. Choose a research target for free; your labs add ${n(rules.research.per_lab)} point each to it every cycle you spend. Progress is kept if you switch.`,
+          text: `A mind can learn eight programs: Probe, its three deployments, its self, battle and hostile programs, and the Singularity. Choose a research target for free; your labs add ${n(rules.research.per_lab)} point each to it every cycle you spend. Progress is kept if you switch. Once a program is learned your labs stop until you choose the next one.`,
         },
         {
           kind: "list",
