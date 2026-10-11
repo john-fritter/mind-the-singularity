@@ -4,6 +4,7 @@ import { loadPlayers, loadRules, loadSite } from "../src/config.js";
 import { ARCHITECTURES, BUILDINGS, HARDWARE, programsOf, type Program, type Unit } from "../src/engine/architectures.js";
 import { DAY_MS, HOUR_MS } from "../src/engine/cycles.js";
 import { describe, type EventData, type GameEvent } from "../src/engine/record.js";
+import { programName } from "../src/engine/names.js";
 import { briefText, size } from "../src/game/brief.js";
 import { bootMind, newGame, submitOrders } from "../src/game/game.js";
 import { getBrief, type Brief, type OfferView, type ProposalView, type PublicSummary, type ShownEvent } from "../src/game/read.js";
@@ -151,6 +152,12 @@ function worstCase(longName: (i: number) => string, big = 987_654_321, text: (ch
       attack: big,
       defense: big,
       research: { program: "singularity", name: "The Singularity", progress: big, cost: big },
+      // Six programs paused, as many as there can be (the Singularity waits
+      // on the other seven), each a point short of the dearest tier.
+      paused: programs
+        .filter((p) => p !== "singularity")
+        .slice(0, 6)
+        .map((program) => ({ program, name: programName(rules, program), progress: 74_999, cost: 75_000 })),
       bootPeriodEndsAt: T0 + 54 * DAY_MS,
       deletedAt: null,
       rebootAt: null,
@@ -262,8 +269,10 @@ const quiet = (b: Brief): Brief => ({
  * nothing else since the last wake.
  */
 function trimsHold() {
-  // Your protocol's line too would pass the budget; it's checked with the proposals.
-  const text = briefText(rules, { ...quiet(worstCase(shortName, 12_345)), protocol: null });
+  // Your protocol's line and paused research too would pass the budget;
+  // they're checked with the proposals and on their own.
+  const worst = worstCase(shortName, 12_345);
+  const text = briefText(rules, { ...quiet(worst), protocol: null, you: { ...worst.you, paused: [] } });
   const since = text.slice(text.indexOf("SINCE LAST WAKE"), text.indexOf("CHANNELS"));
   assert.equal((since.match(/^- MIND-\d+ took .* sectors from MIND-1 /gm) ?? []).length, site.brief.yours, "your events, newest kept");
   assert.equal((since.match(/^- The convergence of /gm) ?? []).length, site.brief.world, "the world's moments, rare ones first");
@@ -281,6 +290,16 @@ function trimsHold() {
   refusedTrimsHold(briefText(rules, { ...quiet(calm), refused: full.refused }));
   offerTrimsHold(briefText(rules, { ...quiet(calm), offers: full.offers }));
   proposalTrimsHold(briefText(rules, { ...quiet(calm), proposals: full.proposals }));
+  pausedTrimsHold(briefText(rules, quiet(calm)));
+}
+
+function pausedTrimsHold(text: string) {
+  const line = text.split("\n").find((l) => l.startsWith("research: "));
+  assert.ok(line, "the research line");
+  const shown = line.match(/ 74,999\/75,000/g) ?? [];
+  assert.equal(shown.length, site.brief.paused, "the most-advanced paused programs");
+  assert.match(line, new RegExp(`^research: The Singularity 12,345/12,345 · paused: .*, ${6 - site.brief.paused} more · countermeasure: `));
+  assert.ok(size(text) <= site.brief.max_size);
 }
 
 function proposalTrimsHold(text: string) {
@@ -458,6 +477,12 @@ async function reads() {
   const quiet = briefText(rules, (await getBrief(store, halcyon, t + HOUR_MS)) as Brief);
   assert.match(quiet, /^SINCE LAST WAKE \(1h\)\n- nothing$/m);
   assert.doesNotMatch(quiet, /REFUSED/, "only last wake's refusals");
+
+  // Research in points, and points kept on another program shown as paused.
+  const switched = [{ do: "set_research", program: "probe" }, { do: "expand" }, { do: "set_research", program: "hardening" }, { do: "expand" }];
+  assert.ok((await submitOrders(store, vesta, switched, t)).ok);
+  const research = briefText(rules, (await getBrief(store, vesta, t + HOUR_MS)) as Brief);
+  assert.match(research, /^research: Hardening [\d,]+\/[\d,]+ · paused: Probe [\d,]+\/6,000 · countermeasure: none$/m);
 
   // The final week is announced in the header.
   const late = briefText(rules, (await getBrief(store, halcyon, T0 + 55 * DAY_MS)) as Brief);

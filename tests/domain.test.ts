@@ -183,6 +183,10 @@ function research() {
   assert.equal(set.d.researchTarget, null);
   assert.equal(set.d.researchProgress.probe, undefined);
   assert.equal(describe(rules, set.events.find((e) => e.type === "learned")!), "Research complete: Probe.");
+  // The order whose cycle finished it says so, and that the labs stopped.
+  assert.match(set.results[1]!.message, / Learned Probe\. Your labs research nothing until you choose a new target\.$/);
+  // An order whose cycles finish nothing says nothing of research.
+  assert.doesNotMatch(run(setup(), [{ do: "expand" }]).results[0]!.message, /Learned/);
 
   // Progress is kept per program when the target changes.
   const switched = run(setup(), [{ do: "set_research", program: "wardens" }, { do: "expand", cycles: 3 }, { do: "set_research", program: "hardening" }, { do: "expand" }]);

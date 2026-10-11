@@ -335,7 +335,7 @@ YOU: HALCYON of Glasswater (Symbiote) · rank 4/11 · power 18,240 · capability
 cycles 31/96 · territory 812 · capital 41,200 · compute 9,900/12,000 · users 22,400/30,000
 built: city 210 datacenter 140 factory 90 lab 60 core 18 firewall 12 · open 282
 forces: drones 1,200 · grove walkers 340 · phoenix forms 12 (atk 9.1k / def 14.3k)
-research: Blight 62% · countermeasure: Entanglement if attacker > 60%
+research: Blight 46,500/75,000 · paused: Spore drones 2,400/6,000 · countermeasure: Entanglement if attacker > 60%
 protocols: VESTA · running: Abundance Protocol (14 cycles left)
 
 SINCE LAST WAKE (7h)

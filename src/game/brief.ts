@@ -177,9 +177,13 @@ export function briefText(rules: Rules, b: Brief): string {
   const units = (Object.entries(y.units) as [Unit, number][]).filter(([, c]) => c > 0);
   const force = units.map(([u, c]) => `${unitName(rules, u).toLowerCase()} ${n(c)}`).join(" · ") || "none";
   lines.push(`forces: ${force} (atk ${n(y.attack)} / def ${n(y.defense)}) · an attack costs ${y.attackCycles} cycles`);
-  const research = y.research ? `${y.research.name} ${Math.floor((100 * y.research.progress) / y.research.cost)}%` : "none";
+  // Points, not a percentage: 99% can be one cycle or many from done.
+  const points = (r: { name: string; progress: number; cost: number }) => `${r.name} ${n(r.progress)}/${n(r.cost)}`;
+  const research = y.research ? points(y.research) : "none";
+  const pausedMore = y.paused.length > site.paused ? `, ${y.paused.length - site.paused} more` : "";
+  const paused = y.paused.length > 0 ? ` · paused: ${y.paused.slice(0, site.paused).map(points).join(", ")}${pausedMore}` : "";
   const cm = y.countermeasure ? `${programName(rules, y.countermeasure.program)} if attacker > ${Math.round(y.countermeasure.above * 100)}%` : "none";
-  lines.push(`research: ${research} · countermeasure: ${cm}`);
+  lines.push(`research: ${research}${paused} · countermeasure: ${cm}`);
   const known = y.known.map((p) => programName(rules, p)).join(", ") || "none";
   const running = y.running
     .map((r) => `${programName(rules, r.program)} (${r.cyclesLeft !== undefined ? `${r.cyclesLeft} cycles` : span(r.endsAt! - b.now)} left)`)

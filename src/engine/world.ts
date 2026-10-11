@@ -6,6 +6,7 @@ import { shutdownTimers } from "./convergence.js";
 import { syncCycles } from "./cycles.js";
 import { rebootAt } from "./deletion.js";
 import { legacyDomain, startingDomain } from "./domain.js";
+import { programName } from "./names.js";
 import { flavorText, writeLastLog } from "./flavor.js";
 import { parseOrder } from "./orders.js";
 import { emit, type GameEvent } from "./record.js";
@@ -186,11 +187,23 @@ export function applyOrders(rules: Rules, world: World, domainId: number, orders
     const seq = ++next.seq;
     const losses = { abandoned: 0, shutDown: 0 };
     const ctx = { rules, world: next, domain, now, events, rng: rngFor(next.seed, seq), losses };
+    const before = events.length;
     const result = applyOrder(ctx, parsed.order);
     reportUpkeepLosses(next, domain, now, events, losses);
-    return result;
+    return withLearned(rules, result, events.slice(before), domain.id, domain.researchTarget === null);
   });
   return { world: next, results, events };
+}
+
+/**
+ * Names the programs an order's cycles finished researching, so a mind
+ * knows its labs stopped: the target clears when a program is learned.
+ */
+function withLearned(rules: Rules, result: OrderResult, events: GameEvent[], domainId: number, idle: boolean): OrderResult {
+  const learned = events.flatMap((e) => (e.type === "learned" && e.domain === domainId ? [programName(rules, e.program)] : []));
+  if (learned.length === 0) return result;
+  const labs = idle ? " Your labs research nothing until you choose a new target." : "";
+  return { ...result, message: `${result.message} Learned ${learned.join(", ")}.${labs}` };
 }
 
 /** An order's `do`, if it has one, for reporting a refused order. */

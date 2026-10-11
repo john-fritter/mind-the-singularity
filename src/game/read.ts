@@ -130,6 +130,8 @@ export interface YourStatus extends DomainStatus {
   attack: number;
   defense: number;
   research: { program: Program; name: string; progress: number; cost: number } | null;
+  /** Programs with points kept from an earlier target, most points first. */
+  paused: { program: Program; name: string; progress: number; cost: number }[];
   bootPeriodEndsAt: number;
   deletedAt: number | null;
   /** When the account may boot again, once deleted. */
@@ -419,6 +421,10 @@ export async function getBrief(store: WorldStore, identity: Identity, now: numbe
         progress: me.researchProgress[target] ?? 0,
         cost: researchCost(rules, target),
       },
+      paused: (Object.entries(me.researchProgress) as [Program, number][])
+        .filter(([p, progress]) => p !== target && progress > 0 && !me.known.includes(p))
+        .sort(([, a], [, b]) => b - a)
+        .map(([program, progress]) => ({ program, name: programName(rules, program), progress, cost: researchCost(rules, program) })),
       bootPeriodEndsAt: bootPeriodEnds(rules, me),
       deletedAt: me.deletedAt,
       rebootAt: rebootAt(rules, me),
